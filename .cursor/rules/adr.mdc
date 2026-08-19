@@ -1,0 +1,36 @@
+---
+description: Track architecture/design decisions as ADRs and keep them updated when decisions change
+alwaysApply: true
+---
+
+# Architecture Decision Records
+
+This repo is **one project** (EduConsult CRM, built via an agent-harnessed
+delivery process). Its single canonical ADR log lives at `docs/adr/`
+(index: `docs/adr/README.md`, template: `docs/adr/TEMPLATE.md`).
+`harness-demo/adr/` is a frozen historical log (see `docs/adr/0008`) —
+never add new entries there.
+
+## When to write or update an ADR
+
+Whenever you (the agent) make, or the user directs, a decision that is
+**significant and hard to reverse** — e.g. tech stack, data model /
+multi-tenancy approach, auth/security model, deployment topology, agent
+architecture, CI/CD or test-gating policy, major API/schema conventions —
+record it as an ADR. Skip ADRs for routine implementation details, bug
+fixes, or anything easily reversed in a single PR.
+
+## How
+
+1. **New decision**: add `docs/adr/NNNN-kebab-title.md` (next sequential
+   number) using `docs/adr/TEMPLATE.md`'s structure (Status, Date, Context,
+   Decision, Alternatives considered, Consequences). Add a row to the
+   index table in `docs/adr/README.md`.
+2. **Decision changes or is reversed**: do **not** edit the old ADR's
+   Context/Decision text. Write a **new** ADR describing the new decision,
+   then update the old ADR's `**Status**:` line to
+   `Superseded by ADR-NNNN` (linking the new one), and update both rows in
+   the index table.
+3. Do this proactively, in the same turn as the decision is made — don't
+   wait to be asked. If you're unsure whether something rises to
+   "significant," err toward writing a short ADR rather than skipping it.
