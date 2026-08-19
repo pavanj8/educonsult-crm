@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { isApiError } from '../api/client'
-import { fetchBranches } from '../api/branches'
-import type { Branch } from '../types/branch'
+import {
+  createBranch as createBranchApi,
+  fetchBranches,
+  updateBranch as updateBranchApi,
+} from '../api/branches'
+import type { Branch, BranchCreateRequest, BranchUpdateRequest } from '../types/branch'
 
 import { hasAccessToken } from '../store/authStorage'
 
@@ -10,6 +14,9 @@ export function useBranches() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [updateError, setUpdateError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const loadBranches = useCallback(async () => {
     if (!hasAccessToken()) {
@@ -41,10 +48,53 @@ export function useBranches() {
     void loadBranches()
   }, [loadBranches])
 
+  const createBranch = useCallback(async (payload: BranchCreateRequest) => {
+    setSubmitting(true)
+    setCreateError(null)
+    try {
+      const created = await createBranchApi(payload)
+      setBranches((prev) => [...prev, created])
+      return created
+    } catch (err) {
+      if (isApiError(err)) {
+        setCreateError(err.message)
+      } else {
+        setCreateError('Failed to create branch')
+      }
+      throw err
+    } finally {
+      setSubmitting(false)
+    }
+  }, [])
+
+  const updateBranch = useCallback(async (id: number, payload: BranchUpdateRequest) => {
+    setSubmitting(true)
+    setUpdateError(null)
+    try {
+      const updated = await updateBranchApi(id, payload)
+      setBranches((prev) => prev.map((branch) => (branch.id === id ? updated : branch)))
+      return updated
+    } catch (err) {
+      if (isApiError(err)) {
+        setUpdateError(err.message)
+      } else {
+        setUpdateError('Failed to update branch')
+      }
+      throw err
+    } finally {
+      setSubmitting(false)
+    }
+  }, [])
+
   return {
     branches,
     loading,
     error,
+    createError,
+    updateError,
+    submitting,
     reload: loadBranches,
+    createBranch,
+    updateBranch,
   }
 }
