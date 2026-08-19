@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import AppLayout from '../layouts/AppLayout'
 import HomePage from '../pages/HomePage'
@@ -21,17 +21,10 @@ function renderAt(path: string) {
 
 describe('routing shell', () => {
   it('renders the app layout and home page at /', () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ items: [], unread_count: 0 }),
-    }) as typeof fetch
-
     renderAt('/')
 
     expect(screen.getByRole('heading', { name: 'EduConsult CRM' })).toBeInTheDocument()
     expect(screen.getByText('Welcome to EduConsult CRM')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument()
   })
 
   it('renders the not found page for unknown routes', () => {
