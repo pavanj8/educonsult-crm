@@ -6,6 +6,7 @@ import {
   mockAuthMe,
   mockLoginApi,
   setAuthSession,
+  SUPER_ADMIN_USER,
   type UserRole,
 } from './helpers/auth.js'
 import { gotoHome, gotoLoginForm } from './helpers/navigation.js'
@@ -15,6 +16,7 @@ type AppFixtures = {
   loginPage: void
   authenticatedPage: void
   counselorPage: void
+  superAdminPage: void
 }
 
 export const test = base.extend<AppFixtures>({
@@ -40,6 +42,13 @@ export const test = base.extend<AppFixtures>({
     const tokens = loginTokensForRole('counselor')
     await mockLoginApi(page, tokens)
     await gotoLoginForm(page)
+    await use()
+  },
+
+  superAdminPage: async ({ page }, use) => {
+    await mockAuthMe(page, SUPER_ADMIN_USER)
+    await setAuthSession(page, accessTokenForRole('super_admin'))
+    await gotoHome(page)
     await use()
   },
 })
