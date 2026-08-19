@@ -49,8 +49,8 @@ jobs:
       - name: Skip if a Dev Agent run is already active or queued
         id: busy
         run: |
-          ACTIVE=$(gh run list -R ${{ github.repository }} --workflow=agent-harness.yml --limit 10 --json status \
-            --jq '[.[] | select(.status=="in_progress" or .status=="queued" or .status=="pending" or .status=="waiting")] | length')
+          ACTIVE=$(gh run list -R ${{ github.repository }} --workflow=agent-harness.yml --limit 10 --json status,event \
+            --jq '[.[] | select(.event != "issue_comment") | select(.status=="in_progress" or .status=="queued" or .status=="pending" or .status=="waiting")] | length')
           echo "Active/queued Dev (agent-harness.yml) runs: $ACTIVE"
           echo "Test/Review running on other tickets do not block picking the next Dev (docs/adr/0016)."
           if [ "$ACTIVE" -gt 0 ]; then

@@ -59,12 +59,22 @@ jobs:
         if: steps.finalize.outputs.ready == 'true'
         run: |
           BRANCH="agent/issue-${{ github.event.inputs.issue_number }}"
+          ISSUE="${{ github.event.inputs.issue_number }}"
           PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
           if [ -n "$PR_NUMBER" ]; then
             gh pr merge "$PR_NUMBER" --merge --delete-branch
           else
             echo "No open PR found for branch $BRANCH; skipping auto-merge."
           fi
+          # Closes #N in the PR body does not reliably close the issue.
+          # Close it here. No comment: an issue_comment would start
+          # agent-harness.yml, which then skips and looks "busy" to the picker.
+          gh issue close "$ISSUE" -R ${{ github.repository }} || true
+
+      - name: Start next Dev (do not wait for cron)
+        if: steps.finalize.outputs.ready == 'true'
+        run: |
+          gh workflow run agent-harness-queue-picker.yml -R ${{ github.repository }} --ref main
 
       - name: Auto-retry on needs-rework (docs/adr/0015)
         if: steps.finalize.outputs.retry == 'true'

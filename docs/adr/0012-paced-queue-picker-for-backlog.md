@@ -124,3 +124,16 @@ Same stuck shape as the previous amendment: issue has
 `agent:ready-for-dev`, no harness run. Fix: add `contents: read`, and
 pass `--ref main` so `gh` does not have to guess the default branch.
 Issue #58 was re-dispatched by hand after this landed.
+
+## Amendment (2026-08-19, same day): don't wait on Actions cron after a merge
+
+GitHub's `schedule:` trigger is not a reliable metronome — after the
+16:13 UTC failure, the next cron ticks did not run for tens of minutes
+even though the repo was active. A green ticket (#60) merged and then
+the queue sat idle until a human noticed.
+
+Fix: `agent-finalize.yml` dispatches this picker immediately after a
+successful merge, and explicitly `gh issue close`s the merged issue
+(`Closes #N` still does not always close it). The picker's "busy" check
+also ignores `issue_comment` events, which are almost always skipped
+`/dev-agent` misses and were falsely counting as an active Dev run.
