@@ -42,9 +42,9 @@ One workflow run = one iteration, sequentially: Dev Agent -> commit+push ->
 hard gate -> Test Agent -> Review Agent -> open/update a PR -> finalize
 labels + summary comment -> auto-merge if green
 (`docs/adr/0011-auto-merge-agent-harness-prs.md`). If anything fails, the
-issue gets `agent:needs-rework` and the PR stays open with the branch
-as-is; re-add `agent:ready-for-dev` (or comment `/dev-agent` again) to run
-another iteration on the same branch. A repo-wide `concurrency:` group on
+issue gets `agent:needs-rework` and the harness auto-retries that issue
+with the Test/Review comments injected into the next Dev Agent prompt,
+until `MAX_ITERATIONS` (`docs/adr/0015`). A repo-wide `concurrency:` group on
 the workflow means only one iteration runs at a time.
 
 ## Processing a large backlog unattended
@@ -55,9 +55,11 @@ group (not an unbounded FIFO), so a burst of triggers gets almost all of
 them cancelled (see `docs/adr/0012` for what happened when this was
 tried). Instead, `.github/workflows/agent-harness-queue-picker.yml` runs
 on a 5-minute cron, and whenever the harness is idle, triggers exactly
-one untouched `task` + `phase:mvp` issue at a time. To queue a batch:
-leave the issues with no `agent:*` label and the picker finds them on its
-own; nothing else needs to run.
+one untouched `task` + `phase:mvp` issue at a time (or a
+`agent:needs-rework` issue still under `MAX_ITERATIONS` — those are
+preferred, so feedback is addressed before starting a new ticket). To
+queue a batch: leave the issues with no `agent:*` label and the picker
+finds them on its own; failed tickets retry themselves.
 
 ## Required repo setup (one-time)
 
@@ -92,9 +94,6 @@ python finalize_iteration.py 123 1 --hard-gate true --test true --review true
 
 ## Known gaps (tracked, not yet resolved)
 
-- No auto-looping across iterations yet (docs/adr/0009's "deferred"
-  alternative) — a human/comment must trigger each retry on a
-  `agent:needs-rework` issue; nothing retries it automatically.
 - `check_test_gate.py`'s test-to-code mapping is a repo-wide heuristic
   (did *any* test change when *any* app code changed), not per-ticket
   traceability.

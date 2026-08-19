@@ -22,6 +22,7 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  actions: write
 
 concurrency:
   # Serializes every harness run repo-wide (not per-issue): with many
@@ -51,6 +52,9 @@ jobs:
       DEV_AGENT_MODEL: composer-2.5
       TEST_AGENT_MODEL: grok-4.6
       REVIEW_AGENT_MODEL: grok-4.6
+      # Auto-retry cap (docs/adr/0015). In-job dispatch stops at this
+      # iteration count; a human /dev-agent can still continue past it.
+      MAX_ITERATIONS: "5"
 
     steps:
       - name: Determine issue number
@@ -159,4 +163,19 @@ jobs:
             gh pr merge "$PR_NUMBER" --merge --delete-branch
           else
             echo "No open PR found for branch ${{ steps.branch.outputs.name }}; skipping auto-merge."
+          fi
+
+      - name: Auto-retry on needs-rework (docs/adr/0015)
+        if: steps.finalize.outputs.ready == 'false'
+        run: |
+          N="${{ steps.iteration.outputs.number }}"
+          ISSUE="${{ steps.issue.outputs.number }}"
+          if [ "$N" -lt "$MAX_ITERATIONS" ]; then
+            NEXT=$((N + 1))
+            echo "Iteration $N failed; dispatching retry $NEXT/$MAX_ITERATIONS for #$ISSUE"
+            gh issue comment "$ISSUE" --body "Auto-retrying: Dev Agent will receive Test/Review/gate feedback from iteration ${N} on iteration ${NEXT} (cap ${MAX_ITERATIONS}). See docs/adr/0015."
+            gh workflow run agent-harness.yml -R ${{ github.repository }} --ref main -f issue_number="$ISSUE"
+          else
+            echo "Hit MAX_ITERATIONS=$MAX_ITERATIONS on #$ISSUE; leaving agent:needs-rework."
+            gh issue comment "$ISSUE" --body "Stopped auto-retry after ${MAX_ITERATIONS} iterations. Label remains \`agent:needs-rework\`. Comment \`/dev-agent\` (or run the workflow manually) to continue. See docs/adr/0015."
           fi

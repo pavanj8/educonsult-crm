@@ -15,7 +15,8 @@ Label vocabulary:
   agent:test-pass / agent:test-fail
   agent:review-pass / agent:review-fail
   agent:ready-to-merge      -- hard gate + test + review all passed this iteration
-  agent:needs-rework        -- something failed; re-add agent:ready-for-dev to retry
+  agent:needs-rework        -- something failed; harness auto-retries
+                               until MAX_ITERATIONS (docs/adr/0015)
 """
 from __future__ import annotations
 
@@ -73,6 +74,41 @@ def get_current_iteration(issue: dict) -> int:
     return 0
 
 
+def get_issue_comments(issue_number: int) -> list[dict]:
+    out = _run([
+        "gh", "issue", "view", str(issue_number),
+        "--comments", "--json", "comments",
+    ])
+    return json.loads(out).get("comments") or []
+
+
+def prior_iteration_feedback(issue_number: int, limit_chars: int = 12000) -> str:
+    """Test/Review/harness comments the Dev Agent must address on retry.
+
+    Truncates to `limit_chars` from the end so the newest feedback is kept
+    if the thread is long (docs/adr/0015).
+    """
+    parts: list[str] = []
+    for comment in get_issue_comments(issue_number):
+        body = (comment.get("body") or "").strip()
+        if not body:
+            continue
+        if not (
+            body.startswith("### Test Agent")
+            or body.startswith("### Review Agent")
+            or body.startswith("## Harness iteration")
+        ):
+            continue
+        created = comment.get("createdAt") or ""
+        parts.append(f"--- {created} ---\n{body}")
+    if not parts:
+        return ""
+    blob = "\n\n".join(parts)
+    if len(blob) > limit_chars:
+        blob = blob[-limit_chars:]
+    return blob
+
+
 def start_new_iteration(issue_number: int, current_iteration: int) -> int:
     """Removes the old agent:iteration-N label (if any) and adds the next
     one. Returns the new iteration number."""
@@ -80,6 +116,9 @@ def start_new_iteration(issue_number: int, current_iteration: int) -> int:
         remove_label(issue_number, f"agent:iteration-{current_iteration}")
     new_iteration = current_iteration + 1
     add_label(issue_number, f"agent:iteration-{new_iteration}")
+    # Consumed: this iteration is now in flight. Finalize will re-add
+    # needs-rework if the gates fail again (docs/adr/0015).
+    remove_label(issue_number, "agent:needs-rework")
     return new_iteration
 
 
@@ -132,7 +171,8 @@ def finalize_iteration(
     overall = (
         "\u2705 ready to merge"
         if all_green
-        else "\u274c needs rework \u2014 re-add `agent:ready-for-dev` after addressing the comments above to retry"
+        else "\u274c needs rework \u2014 the harness will auto-retry this issue "
+        "with the Test/Review feedback above (docs/adr/0015), until MAX_ITERATIONS"
     )
     summary = (
         f"## Harness iteration {iteration} summary\n\n"

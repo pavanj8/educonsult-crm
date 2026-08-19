@@ -46,12 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MAX_ITERATIONS: "5"
     steps:
       - name: Skip if a harness run is already active or queued
         id: busy
         run: |
           ACTIVE=$(gh run list -R ${{ github.repository }} --workflow=agent-harness.yml --limit 10 --json status \
-            --jq '[.[] | select(.status=="in_progress" or .status=="queued")] | length')
+            --jq '[.[] | select(.status=="in_progress" or .status=="queued" or .status=="pending" or .status=="waiting")] | length')
           echo "Active/queued harness runs: $ACTIVE"
           if [ "$ACTIVE" -gt 0 ]; then
             echo "busy=true" >> "$GITHUB_OUTPUT"
@@ -59,15 +60,28 @@ jobs:
             echo "busy=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Pick next untouched MVP task and trigger it
+      - name: Pick next MVP task (untouched or needs-rework) and trigger it
         if: steps.busy.outputs.busy == 'false'
         run: |
+          # Eligible: never-touched (no agent:* label) OR agent:needs-rework
+          # with iteration < MAX_ITERATIONS. Prefer needs-rework so Test/
+          # Review feedback is addressed before starting a new ticket
+          # (docs/adr/0015). Untouched issues still drain when nothing is
+          # waiting on retry.
           NEXT=$(gh issue list -R ${{ github.repository }} --label "task,phase:mvp" --state open --limit 300 --json number,labels \
-            --jq '[.[] | select([.labels[].name] | any(startswith("agent:")) | not)] | sort_by(.number) | .[0].number // empty')
+            | jq -r --argjson max "$MAX_ITERATIONS" '
+              def names: [.labels[].name];
+              def iter: [names[] | select(startswith("agent:iteration-")) | split("-") | last | tonumber] | .[0] // 0;
+              def untouched: (names | any(startswith("agent:")) | not);
+              def retryable: ((names | index("agent:needs-rework")) != null) and (iter < $max);
+              [.[] | select(untouched or retryable)]
+              | sort_by([if ((.labels | map(.name) | index("agent:needs-rework")) != null) then 0 else 1 end, .number])
+              | .[0].number // empty
+            ')
           if [ -n "$NEXT" ]; then
             echo "Triggering harness for issue #$NEXT"
             gh issue edit "$NEXT" -R ${{ github.repository }} --add-label "agent:ready-for-dev"
             gh workflow run agent-harness.yml -R ${{ github.repository }} --ref main -f issue_number="$NEXT"
           else
-            echo "No untouched, open phase:mvp task issues remain -- nothing to queue."
+            echo "No eligible open phase:mvp task issues remain -- nothing to queue."
           fi

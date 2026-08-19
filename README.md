@@ -113,8 +113,10 @@ tracked as open GitHub Issues.
    security, architecture, code quality, UX, test adequacy).
 4. If all of those pass, the harness **auto-merges the PR itself**
    ([ADR-0011](docs/adr/0011-auto-merge-agent-harness-prs.md)), which
-   closes the issue. If anything fails, the PR stays open labeled
-   `agent:needs-rework` for a human (or a follow-up iteration) to address.
+   closes the issue. If anything fails, the issue is labeled
+   `agent:needs-rework` and the harness **auto-retries** with that
+   Test/Review feedback ([ADR-0015](docs/adr/0015-auto-retry-needs-rework.md)),
+   up to `MAX_ITERATIONS` (default 5).
 5. A repo-wide concurrency queue means only one iteration runs at a time,
    so a large backlog of issues can be triggered without agents stepping
    on each other's changes.

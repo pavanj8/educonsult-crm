@@ -60,8 +60,29 @@ class DevAgentReport:
         }
 
 
-def build_prompt(issue: dict, requirements: str, journeys: str, epics: str, dod: str, iteration: int) -> str:
+def build_prompt(
+    issue: dict,
+    requirements: str,
+    journeys: str,
+    epics: str,
+    dod: str,
+    iteration: int,
+    prior_feedback: str,
+) -> str:
     protected = ", ".join(target_app.PROTECTED_PATHS)
+    if prior_feedback:
+        feedback_block = (
+            f"## Feedback from prior iterations — you MUST address this\n"
+            f"The previous Test Agent, Review Agent, and/or hard test gate "
+            f"rejected this work. Fix the defects below. Do not ignore them "
+            f"and do not re-implement from scratch unless the feedback says "
+            f"the current approach is wrong.\n\n{prior_feedback}"
+        )
+    else:
+        feedback_block = (
+            "## Feedback from prior iterations\n"
+            "None — this is the first iteration (or no Test/Review comments yet)."
+        )
     return f"""You are the DEV AGENT in an automated engineering harness for the
 EduConsult CRM project. "No ticket, no code" is the hard rule here: you
 implement EXACTLY what the referenced GitHub Issue's acceptance criteria
@@ -69,6 +90,8 @@ describe -- nothing more, nothing speculative.
 
 ## Issue #{issue['number']}: {issue['title']}
 {issue['body']}
+
+{feedback_block}
 
 ## Project requirements (docs/requirements.md)
 {requirements}
@@ -101,14 +124,14 @@ describe -- nothing more, nothing speculative.
    patterns).
 6. Run your own tests (e.g. `pytest` inside `backend/`) and iterate until
    they pass, before finishing.
-7. This is iteration {iteration} for this issue. If earlier iteration
-   comments exist on the issue (Dev/Test/Review feedback), read them via
-   `gh issue view {issue['number']} --comments` and address them.
+7. This is iteration {iteration} for this issue. If the feedback section
+   above is non-empty, treating it as optional is a failure.
 
 ## Final message
 End your response with a short structured summary: what you implemented,
-which files you changed, what tests you added/updated, and anything you
-noticed but deliberately left out of scope.
+which files you changed, what tests you added/updated, how you addressed
+prior Test/Review feedback (if any), and anything you noticed but
+deliberately left out of scope.
 """
 
 
@@ -120,6 +143,7 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         read_text(REPO_ROOT / "docs" / "epics.md"),
         read_text(REPO_ROOT / "docs" / "definition-of-done.md"),
         iteration,
+        ticket_utils.prior_iteration_feedback(issue["number"]),
     )
 
     print(f"--- Dev Agent starting for issue #{issue['number']} (model={model}) ---\n")

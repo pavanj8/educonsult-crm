@@ -1,6 +1,6 @@
 # ADR-0009: Agent harness execution model — GitHub Actions runners, GitHub Issues as tickets, hard test gate
 
-**Status**: Accepted — implemented, not yet run
+**Status**: Accepted — implemented; auto-loop decided in [ADR-0015](0015-auto-retry-needs-rework.md)
 **Date**: 2026-08-19 (implementation: 2026-08-19)
 
 ## Context

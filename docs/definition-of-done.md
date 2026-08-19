@@ -30,7 +30,7 @@ iteration:
 
 ## 6. Delivery
 - [ ] A pull request exists, linked to the issue (`Closes #N`), containing all commits for this iteration.
-- [ ] The harness auto-merges the PR the moment all gates above pass in the same iteration (`docs/adr/0011`); merging is what closes the issue. If any gate fails, the PR stays open with `agent:needs-rework` until a later iteration passes.
+- [ ] The harness auto-merges the PR the moment all gates above pass in the same iteration (`docs/adr/0011`); merging is what closes the issue. If any gate fails, the PR stays open with `agent:needs-rework` and the harness auto-retries with that feedback until `MAX_ITERATIONS` (`docs/adr/0015`).
 
 ## How this is enforced
 
@@ -43,6 +43,8 @@ iteration:
 | Traceability | `docs/epics.md` / `docs/journeys.md` structure + issue body (`scripts/setup_github_issues.py`) |
 | Final sign-off / label | `agents/github_ticket_utils.py: finalize_iteration()` |
 | Auto-merge on pass | `.github/workflows/agent-harness.yml` ("Auto-merge PR" step, `docs/adr/0011`) |
+| Auto-retry on fail | `.github/workflows/agent-harness.yml` ("Auto-retry on needs-rework" step) + queue picker (`docs/adr/0015`) |
 
 If any item fails, the issue gets `agent:needs-rework` instead of
-`agent:ready-to-merge`, per `docs/adr/0009`'s iteration model.
+`agent:ready-to-merge`, and the harness starts another iteration with
+that feedback (`docs/adr/0015`), until `MAX_ITERATIONS`.

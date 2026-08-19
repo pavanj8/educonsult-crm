@@ -72,10 +72,11 @@ Issue #55's PR had actually merged despite the issue not auto-closing
   decision) now drains automatically, roughly one ticket every few
   minutes depending on how long each Dev/Test/Review iteration takes,
   with zero ongoing action from the user or from any chat session.
-- Failed iterations (`agent:needs-rework`) are *not* retried by the
-  picker — it only ever picks issues with no `agent:*` label at all,
-  matching ADR-0009's "no auto-loop retries" stance. A human still needs
-  to decide whether/how to re-run a failed ticket.
+- Failed iterations (`agent:needs-rework`) were originally *not* retried
+  by the picker (matching ADR-0009's then-deferred auto-loop stance).
+  **Superseded by [ADR-0015](0015-auto-retry-needs-rework.md)**: the
+  picker now also selects `agent:needs-rework` issues below
+  `MAX_ITERATIONS`, and the harness job self-dispatches a retry.
 - Once the backlog is exhausted the picker just no-ops every 5 minutes;
   cheap, but worth disabling (or leaving — it's harmless) once phase:mvp
   is fully done.
