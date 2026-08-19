@@ -24,6 +24,10 @@ import github_ticket_utils as ticket_utils
 import target_app
 
 REPO_ROOT = target_app.REPO_ROOT
+# Fast/cheap tier: Dev Agent writes a lot of code across many tickets, and
+# composer-2.5 is purpose-built for agentic coding loops (edit -> run ->
+# fix). Test/Review intentionally use a stronger model instead -- see
+# docs/adr/0013.
 DEFAULT_MODEL = "composer-2.5"
 
 

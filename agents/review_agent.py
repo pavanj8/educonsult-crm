@@ -25,7 +25,10 @@ import github_ticket_utils as ticket_utils
 import target_app
 
 REPO_ROOT = target_app.REPO_ROOT
-DEFAULT_MODEL = "composer-2.5"
+# High-end tier deliberately, not the fast/cheap model Dev Agent uses --
+# five-perspective review is where model quality matters most for
+# actually catching defects. See docs/adr/0013.
+DEFAULT_MODEL = "claude-opus-5"
 
 PERSPECTIVES = [
     "Security Analyst",
