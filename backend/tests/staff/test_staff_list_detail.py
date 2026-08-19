@@ -115,6 +115,7 @@ def test_list_staff_success_with_real_jwt(client, db_session):
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["id"] == staff_id
+    assert response.json()[0]["is_active"] is True
 
 
 def test_list_staff_excludes_non_staff_roles(client, db_session, override_authenticated_user):
@@ -172,6 +173,7 @@ def test_branch_manager_can_get_staff_in_own_branch(
     assert body["role"] == Role.VISA_PROCESSOR.value
     assert body["tenant_id"] == 1
     assert body["branch_id"] == branch.id
+    assert body["is_active"] is True
 
 
 def test_branch_manager_cannot_get_staff_in_other_branch(
@@ -242,6 +244,7 @@ def test_get_staff_success_with_real_jwt(client, db_session):
 
     assert response.status_code == 200
     assert response.json()["email"] == "jwt.detail@example.test"
+    assert response.json()["is_active"] is True
 
 
 def test_get_staff_rejects_non_manager_roles(client, db_session, override_authenticated_user):
