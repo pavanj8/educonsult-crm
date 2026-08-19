@@ -41,6 +41,14 @@ export const DEMO_USER = {
   branch_id: 1,
 }
 
+export const SUPER_ADMIN_USER = {
+  id: 99,
+  email: 'super_admin@demo.test',
+  role: 'super_admin' as UserRole,
+  tenant_id: null,
+  branch_id: null,
+}
+
 const ROLE_TOKENS: Record<UserRole, string> = {
   super_admin: 'test-token-super-admin',
   consultancy_owner: 'test-token-consultancy-owner',
