@@ -21,6 +21,7 @@ from pathlib import Path
 from cursor_sdk import Agent, CursorAgentError, LocalAgentOptions
 
 import github_ticket_utils as ticket_utils
+import sdk_run
 import target_app
 
 REPO_ROOT = target_app.REPO_ROOT
@@ -139,8 +140,7 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
                             sys.stdout.flush()
                             final_text_parts.append(block.text)
             result = run.wait()
-            print(f"\n\n--- Dev Agent run finished: status={result.status} ---")
-            return result.status, "".join(final_text_parts)
+            return sdk_run.finish_run("dev-agent", result, "".join(final_text_parts))
     except CursorAgentError as err:
         print(f"[dev-agent] STARTUP FAILURE: {err}", file=sys.stderr)
         return "startup_error", str(err)

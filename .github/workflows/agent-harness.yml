@@ -44,12 +44,13 @@ jobs:
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Asymmetric model tiering (docs/adr/0013): fast/cheap for generating
-      # code, high-end for independently verifying it. Tune here without
-      # touching agents/*.py -- these override each script's DEFAULT_MODEL.
+      # Asymmetric model tiering (docs/adr/0013, docs/adr/0014): cheap
+      # model to write, strongest *locally executable* model to verify.
+      # Do not pick IDs from Cursor.models.list() alone -- many listed
+      # IDs fail immediately on the local runtime.
       DEV_AGENT_MODEL: composer-2.5
-      TEST_AGENT_MODEL: claude-opus-5
-      REVIEW_AGENT_MODEL: claude-opus-5
+      TEST_AGENT_MODEL: grok-4.6
+      REVIEW_AGENT_MODEL: grok-4.6
 
     steps:
       - name: Determine issue number

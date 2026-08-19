@@ -102,3 +102,8 @@ python finalize_iteration.py 123 1 --hard-gate true --test true --review true
   issue on every merge done via `gh pr merge` in practice; worth
   double-checking, or closing the issue explicitly as a fallback in the
   auto-merge workflow step.
+- `Cursor.models.list()` IDs are not all executable on the local SDK
+  runtime the harness uses. Test/Review currently run `grok-4.6`, not
+  `claude-opus-5` — see `docs/adr/0014`. Changing those IDs in
+  `.github/workflows/agent-harness.yml` without a local probe will
+  silently fail-closed (`agent:needs-rework`) again.

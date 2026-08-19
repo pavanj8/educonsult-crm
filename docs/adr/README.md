@@ -40,4 +40,5 @@ receive new entries.
 | [0010](0010-formal-definition-of-done.md) | Formal, written Definition of Done for every epic and task | Accepted — implemented | 2026-08-19 |
 | [0011](0011-auto-merge-agent-harness-prs.md) | Auto-merge agent harness PRs once all gates pass | Accepted — implemented | 2026-08-19 |
 | [0012](0012-paced-queue-picker-for-backlog.md) | Paced queue picker for processing a large issue backlog unattended | Accepted — implemented | 2026-08-19 |
-| [0013](0013-asymmetric-model-tiering.md) | Asymmetric model tiering: cheap model to write, high-end model to verify | Accepted — implemented | 2026-08-19 |
+| [0013](0013-asymmetric-model-tiering.md) | Asymmetric model tiering: cheap model to write, high-end model to verify | Accepted — model IDs superseded by ADR-0014 | 2026-08-19 |
+| [0014](0014-local-sdk-runtime-model-subset.md) | Local SDK runtime only executes a subset of listed models | Accepted — implemented | 2026-08-19 |

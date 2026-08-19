@@ -105,3 +105,21 @@ exempt from this restriction — in addition to the label add (kept for
 bookkeeping/visibility and for the picker's own "already touched" check).
 Required bumping the picker's `permissions.actions` from `read` to
 `write`. The three stuck issues (#56-#58) were re-triggered by hand.
+
+## Amendment (2026-08-19, same day): `gh workflow run` needs `contents: read`
+
+The `workflow_dispatch` fix above is correct in principle, but the
+picker's `permissions:` block only granted `issues: write` and
+`actions: write`. `gh workflow run` still has to resolve
+`repository.defaultBranchRef` over GraphQL, which needs `contents: read`.
+Without it, a picker tick at 16:13 UTC labeled #58 then died with:
+
+```
+unable to determine default branch for pavanj8/educonsult-crm:
+GraphQL: Resource not accessible by integration (repository.defaultBranchRef)
+```
+
+Same stuck shape as the previous amendment: issue has
+`agent:ready-for-dev`, no harness run. Fix: add `contents: read`, and
+pass `--ref main` so `gh` does not have to guess the default branch.
+Issue #58 was re-dispatched by hand after this landed.

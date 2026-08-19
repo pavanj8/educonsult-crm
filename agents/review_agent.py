@@ -22,13 +22,14 @@ from pathlib import Path
 from cursor_sdk import Agent, CursorAgentError, LocalAgentOptions
 
 import github_ticket_utils as ticket_utils
+import sdk_run
 import target_app
 
 REPO_ROOT = target_app.REPO_ROOT
-# High-end tier deliberately, not the fast/cheap model Dev Agent uses --
-# five-perspective review is where model quality matters most for
-# actually catching defects. See docs/adr/0013.
-DEFAULT_MODEL = "claude-opus-5"
+# Strongest model empirically executable on the local SDK runtime, not
+# the account's listed high-end IDs (claude-opus-5 / gpt-5.x fail
+# immediately locally). See docs/adr/0013 and docs/adr/0014.
+DEFAULT_MODEL = "grok-4.6"
 
 PERSPECTIVES = [
     "Security Analyst",
@@ -176,8 +177,7 @@ def run_review_agent(issue: dict, model: str, diff: str, iteration: int) -> tupl
                             sys.stdout.flush()
                             final_text_parts.append(block.text)
             result = run.wait()
-            print(f"\n\n--- Review Agent run finished: status={result.status} ---")
-            return result.status, "".join(final_text_parts)
+            return sdk_run.finish_run("review-agent", result, "".join(final_text_parts))
     except CursorAgentError as err:
         print(f"[review-agent] STARTUP FAILURE: {err}", file=sys.stderr)
         return "startup_error", str(err)
@@ -239,7 +239,10 @@ def main():
         "issue_number": args.issue_number,
         "iteration": args.iteration,
         "findings": [],
-        "summary": f"Could not parse structured report. agent_run_status={agent_status}",
+        "summary": (
+            f"Could not parse structured report. agent_run_status={agent_status}. "
+            f"Raw output: {final_text[:1500]}"
+        ),
     }
 
     print_human_report(structured)

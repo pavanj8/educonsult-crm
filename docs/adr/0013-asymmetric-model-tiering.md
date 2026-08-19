@@ -1,6 +1,6 @@
 # ADR-0013: Asymmetric model tiering — cheap model to write, high-end model to verify
 
-**Status**: Accepted — implemented
+**Status**: Accepted — model IDs superseded by [ADR-0014](0014-local-sdk-runtime-model-subset.md)
 **Date**: 2026-08-19
 
 ## Context
@@ -93,3 +93,17 @@ match, as the fallback for local/manual runs.
   documents the intent (fast-for-write, strong-for-verify) so a
   replacement can be chosen consistent with that intent, not just
   picked arbitrarily.
+
+## Amendment (2026-08-19, same day): listed ≠ locally executable
+
+The IDs above came from `Cursor.models.list()`, which reports what the
+account can *see*. The first ticket to run Test/Review on `claude-opus-5`
+(#237 iteration 1, after the reopen) finished both agents in ~9 seconds
+with `status=error` and empty assistant text. Reproduced locally: the
+local SDK runtime currently executes `composer-2.5` and `grok-4.6`, and
+rejects `claude-opus-5`, `claude-sonnet-5`, `gpt-5.5`, `gpt-5.6-sol`,
+`gemini-3.1-pro`, and others the same way.
+
+The asymmetric-tiering *intent* of this ADR still holds. The concrete
+Test/Review ID is now `grok-4.6`, documented in
+[ADR-0014](0014-local-sdk-runtime-model-subset.md).

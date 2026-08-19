@@ -35,6 +35,11 @@ on:
 permissions:
   issues: write
   actions: write
+  # contents:read is required for `gh workflow run` to resolve
+  # repository.defaultBranchRef. Without it the picker labels the issue
+  # then dies on GraphQL "Resource not accessible by integration", leaving
+  # a dangling agent:ready-for-dev and no harness run (docs/adr/0012).
+  contents: read
 
 jobs:
   pick-next:
@@ -62,7 +67,7 @@ jobs:
           if [ -n "$NEXT" ]; then
             echo "Triggering harness for issue #$NEXT"
             gh issue edit "$NEXT" -R ${{ github.repository }} --add-label "agent:ready-for-dev"
-            gh workflow run agent-harness.yml -R ${{ github.repository }} -f issue_number="$NEXT"
+            gh workflow run agent-harness.yml -R ${{ github.repository }} --ref main -f issue_number="$NEXT"
           else
             echo "No untouched, open phase:mvp task issues remain -- nothing to queue."
           fi
