@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -12,14 +12,19 @@ from app.auth import (
     TokenExpiredError,
     create_access_token,
     create_refresh_token,
+    hash_password,
     verify_password,
     verify_refresh_token,
 )
 from app.db.database import get_db
+from app.models.branch import Branch
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.rbac.dependencies import get_current_user
+from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.auth import LoginRequest, MeResponse, RefreshRequest, TokenResponse
+from app.schemas.student import RegisterStudentRequest, RegisterStudentResponse
 
 router = APIRouter()
 
@@ -110,6 +115,116 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     return TokenResponse(
         access_token=create_access_token(authenticated_user),
         refresh_token=create_refresh_token(authenticated_user),
+    )
+
+
+@router.post(
+    "/register-student",
+    response_model=RegisterStudentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_student(
+    payload: RegisterStudentRequest,
+    db: Session = Depends(get_db),
+) -> RegisterStudentResponse:
+    """Public student self-registration with profile fields (E16; Journey J9)."""
+    try:
+        tenant = (
+            db.query(Tenant)
+            .filter(func.lower(Tenant.slug) == payload.tenant_slug)
+            .one_or_none()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+
+    try:
+        branch = db.get(Branch, payload.branch_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if branch is None or branch.tenant_id != tenant.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Branch not found",
+        )
+
+    try:
+        existing_user = (
+            db.query(User)
+            .filter(func.lower(User.email) == payload.email)
+            .one_or_none()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if existing_user is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists",
+        )
+
+    student_user = User(
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        role=Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        name=payload.name,
+        phone=payload.phone,
+        date_of_birth=payload.date_of_birth,
+        target_country_id=payload.target_country_id,
+        target_university_id=payload.target_university_id,
+        target_program_id=payload.target_program_id,
+    )
+    db.add(student_user)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists",
+        ) from None
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(student_user)
+    authenticated_user = _user_to_authenticated_user(student_user)
+    return RegisterStudentResponse(
+        id=student_user.id,
+        email=student_user.email,
+        role=student_user.role,
+        tenant_id=student_user.tenant_id,
+        branch_id=student_user.branch_id,
+        name=student_user.name,
+        phone=student_user.phone,
+        date_of_birth=student_user.date_of_birth,
+        target_country_id=student_user.target_country_id,
+        target_university_id=student_user.target_university_id,
+        target_program_id=student_user.target_program_id,
+        access_token=create_access_token(authenticated_user),
+        refresh_token=create_refresh_token(authenticated_user),
+        created_at=student_user.created_at,
     )
 
 
