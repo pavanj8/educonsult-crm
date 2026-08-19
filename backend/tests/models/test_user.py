@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 from sqlalchemy import inspect
@@ -17,6 +17,12 @@ def test_user_model_has_required_columns():
         "role",
         "tenant_id",
         "branch_id",
+        "name",
+        "phone",
+        "date_of_birth",
+        "target_country_id",
+        "target_university_id",
+        "target_program_id",
         "is_active",
         "created_at",
         "updated_at",
@@ -111,3 +117,56 @@ def test_user_role_persists_snake_case_value(db_session):
         select(User.__table__.c.role).where(User.__table__.c.email == "role-value@example.test")
     ).scalar_one()
     assert stored_role == Role.DOCUMENT_VERIFIER.value
+
+
+def test_student_profile_fields_persist(db_session):
+    now = datetime.now(timezone.utc)
+    dob = date(2000, 5, 15)
+    user = User(
+        email="student-profile@example.test",
+        password_hash="hashed-secret",
+        role=Role.STUDENT,
+        tenant_id=1,
+        branch_id=1,
+        name="Rahul Kumar",
+        phone="+91-9876543210",
+        date_of_birth=dob,
+        target_country_id=10,
+        target_university_id=20,
+        target_program_id=30,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    assert user.name == "Rahul Kumar"
+    assert user.phone == "+91-9876543210"
+    assert user.date_of_birth == dob
+    assert user.target_country_id == 10
+    assert user.target_university_id == 20
+    assert user.target_program_id == 30
+
+
+def test_non_student_user_profile_fields_default_null(db_session):
+    now = datetime.now(timezone.utc)
+    user = User(
+        email="counselor-no-profile@example.test",
+        password_hash="hashed-secret",
+        role=Role.COUNSELOR,
+        tenant_id=1,
+        branch_id=1,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    assert user.name is None
+    assert user.phone is None
+    assert user.date_of_birth is None
+    assert user.target_country_id is None
+    assert user.target_university_id is None
+    assert user.target_program_id is None
