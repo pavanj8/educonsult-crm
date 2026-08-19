@@ -1,0 +1,128 @@
+name: Agent Harness (Dev -> Gate -> Test -> Review)
+
+# See docs/adr/0009 for the full design rationale.
+#
+# Runs entirely on GitHub-hosted runners -- no dependency on any personal
+# machine being on. Triggered by adding the `agent:ready-for-dev` label to
+# an issue, commenting `/dev-agent` on an issue, or manually via
+# workflow_dispatch.
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "GitHub issue number to work"
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  run-harness:
+    if: >
+      (github.event_name == 'issues' && github.event.label.name == 'agent:ready-for-dev') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && contains(github.event.comment.body, '/dev-agent')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Determine issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "number=${{ github.event.inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agent dependencies
+        working-directory: agents
+        run: pip install -r requirements.txt
+
+      - name: Create or resume working branch
+        id: branch
+        run: |
+          BRANCH="agent/issue-${{ steps.issue.outputs.number }}"
+          git fetch origin
+          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+          else
+            git checkout -B "$BRANCH" origin/main
+          fi
+          git config user.name "agent-harness-bot"
+          git config user.email "agent-harness-bot@users.noreply.github.com"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare iteration
+        id: iteration
+        working-directory: agents
+        run: |
+          N=$(python prepare_iteration.py ${{ steps.issue.outputs.number }})
+          echo "number=$N" >> "$GITHUB_OUTPUT"
+
+      - name: Dev Agent
+        id: dev
+        working-directory: agents
+        continue-on-error: true
+        run: python dev_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }}
+
+      - name: Commit Dev Agent changes
+        run: |
+          git add -A
+          git diff --cached --quiet || git commit -m "Dev Agent: issue #${{ steps.issue.outputs.number }} iteration ${{ steps.iteration.outputs.number }}"
+          git push origin "${{ steps.branch.outputs.name }}"
+
+      - name: Hard test gate
+        id: gate
+        working-directory: agents
+        continue-on-error: true
+        run: python check_test_gate.py --base origin/main
+
+      - name: Test Agent (independent black-box)
+        id: test
+        working-directory: agents
+        continue-on-error: true
+        run: python test_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }}
+
+      - name: Review Agent (5-perspective code review)
+        id: review
+        working-directory: agents
+        continue-on-error: true
+        run: python review_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --base origin/main
+
+      - name: Open or update pull request
+        run: |
+          if ! gh pr list --head "${{ steps.branch.outputs.name }}" --json number --jq '.[0].number' | grep -q '[0-9]'; then
+            gh pr create \
+              --title "Issue #${{ steps.issue.outputs.number }}: agent harness implementation" \
+              --body "Automated implementation by the Dev/Test/Review agent harness. Closes #${{ steps.issue.outputs.number }}." \
+              --head "${{ steps.branch.outputs.name }}" \
+              --base main
+          fi
+
+      - name: Finalize iteration
+        working-directory: agents
+        run: |
+          python finalize_iteration.py ${{ steps.issue.outputs.number }} ${{ steps.iteration.outputs.number }} \
+            --hard-gate "${{ steps.gate.outcome == 'success' }}" \
+            --test "${{ steps.test.outcome == 'success' }}" \
+            --review "${{ steps.review.outcome == 'success' }}"
