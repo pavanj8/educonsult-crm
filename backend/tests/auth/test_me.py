@@ -1,4 +1,6 @@
-from app.auth import create_access_token
+"""Authenticated session (/auth/me) token handling tests (E5, Journey J44, issue #88)."""
+
+from app.auth import create_access_token, create_refresh_token
 from app.rbac.roles import Role
 from tests.conftest import make_auth_headers
 from tests.factories.users import make_authenticated_user, make_db_user
@@ -68,3 +70,13 @@ def test_me_rejects_when_user_record_missing(client, db_session):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Not authenticated"
+
+
+def test_me_rejects_refresh_token_as_bearer(client):
+    user = make_authenticated_user(Role.COUNSELOR)
+    refresh_token = create_refresh_token(user)
+
+    response = client.get("/auth/me", headers=make_auth_headers(refresh_token))
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid access token"
