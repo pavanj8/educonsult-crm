@@ -13,6 +13,19 @@ name: Agent Harness Queue Picker
 # instead triggers exactly one untouched issue at a time, waits for the
 # harness to be fully idle before picking the next, and is paced by its
 # own schedule rather than a burst of near-simultaneous label events.
+#
+# IMPORTANT: this job must explicitly `gh workflow run agent-harness.yml`
+# (a workflow_dispatch call) rather than relying on the `agent:ready-for-dev`
+# label add alone to fire agent-harness.yml's `issues: types: [labeled]`
+# trigger. GitHub does not let events triggered by the default
+# GITHUB_TOKEN start other workflow runs -- specifically to prevent
+# infinite trigger loops -- with workflow_dispatch/repository_dispatch as
+# the only exceptions. The label add here is still useful bookkeeping
+# (visible on the issue, and used below to detect "already touched"), but
+# by itself it silently does nothing when performed by github-actions[bot].
+# This was discovered the hard way: issues #56/#57/#58 each got labeled by
+# this workflow across three ticks and none of them actually ran (see
+# docs/adr/0012's amendment).
 
 on:
   schedule:
@@ -21,7 +34,7 @@ on:
 
 permissions:
   issues: write
-  actions: read
+  actions: write
 
 jobs:
   pick-next:
@@ -49,6 +62,7 @@ jobs:
           if [ -n "$NEXT" ]; then
             echo "Triggering harness for issue #$NEXT"
             gh issue edit "$NEXT" -R ${{ github.repository }} --add-label "agent:ready-for-dev"
+            gh workflow run agent-harness.yml -R ${{ github.repository }} -f issue_number="$NEXT"
           else
             echo "No untouched, open phase:mvp task issues remain -- nothing to queue."
           fi

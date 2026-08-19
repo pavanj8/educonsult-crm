@@ -83,3 +83,25 @@ Issue #55's PR had actually merged despite the issue not auto-closing
   label many issues in a tight loop; either let the picker's scope
   include that label set, or add a proper self-hosted queue if throughput
   needs to be faster than one-at-a-time.
+
+## Amendment (2026-08-19, same day): label-only trigger silently did nothing
+
+The first implementation only did `gh issue edit --add-label
+agent:ready-for-dev` from the picker job. This looked correct (the picker
+itself reported "success" on every run) but never actually started
+`agent-harness.yml`: GitHub does not let events triggered by the
+repository's default `GITHUB_TOKEN` start other workflow runs, precisely
+to prevent infinite trigger loops. `workflow_dispatch`/`repository_dispatch`
+are the only exceptions. Since the picker's `gh issue edit` runs as
+`github-actions[bot]` using `GITHUB_TOKEN`, the `issues: types: [labeled]`
+trigger on `agent-harness.yml` never fired. Discovered when three
+consecutive picker ticks (13:51, 14:27, 15:03) each labeled a different
+issue (#56, #57, #58) and none of them ever ran — an hour passed with the
+user's laptop closed and nothing happened.
+
+Fix: the picker now also runs `gh workflow run agent-harness.yml -f
+issue_number=$NEXT` — an explicit `workflow_dispatch` call, which *is*
+exempt from this restriction — in addition to the label add (kept for
+bookkeeping/visibility and for the picker's own "already touched" check).
+Required bumping the picker's `permissions.actions` from `read` to
+`write`. The three stuck issues (#56-#58) were re-triggered by hand.
