@@ -12,6 +12,7 @@ Label vocabulary:
   agent:ready-for-dev       -- trigger label; Dev Agent should run
   agent:iteration-N         -- which iteration is currently in flight (only one present at a time)
   agent:dev-pass / agent:dev-fail
+  agent:gate-pass / agent:gate-fail
   agent:test-pass / agent:test-fail
   agent:review-pass / agent:review-fail
   agent:ready-to-merge      -- hard gate + test + review all passed this iteration
@@ -119,11 +120,17 @@ def start_new_iteration(issue_number: int, current_iteration: int) -> int:
     # Consumed: this iteration is now in flight. Finalize will re-add
     # needs-rework if the gates fail again (docs/adr/0015).
     remove_label(issue_number, "agent:needs-rework")
+    remove_label(issue_number, "agent:ready-to-merge")
+    # Drop prior-iteration gate/test/review results so "label present"
+    # means *this* iteration finished that stage (docs/adr/0016).
+    for prefix in ("dev", "gate", "test", "review"):
+        remove_label(issue_number, f"agent:{prefix}-pass")
+        remove_label(issue_number, f"agent:{prefix}-fail")
     return new_iteration
 
 
 def set_result_label(issue_number: int, prefix: str, passed: bool) -> None:
-    """prefix is one of 'dev', 'test', 'review'."""
+    """prefix is one of 'dev', 'test', 'review', 'gate'."""
     passed_label, failed_label = f"agent:{prefix}-pass", f"agent:{prefix}-fail"
     if passed:
         add_label(issue_number, passed_label)
@@ -143,6 +150,77 @@ def report_agent_result(issue_number: int, agent_name: str, iteration: int, resu
         f"{details_markdown.strip()}\n"
     )
     post_comment(issue_number, body)
+
+
+def result_from_labels(label_names: list[str], prefix: str) -> bool | None:
+    """True/False if this iteration recorded a result for `prefix`, else None."""
+    names = set(label_names)
+    if f"agent:{prefix}-pass" in names:
+        return True
+    if f"agent:{prefix}-fail" in names:
+        return False
+    return None
+
+
+def try_finalize_iteration(issue_number: int, iteration: int) -> str:
+    """Join point for parallel Test + Review (docs/adr/0016).
+
+    Returns one of: waiting, already-finalized, stale, ready-to-merge,
+    needs-rework.
+    """
+    issue = get_issue(issue_number)
+    labels = issue["label_names"]
+    current = get_current_iteration(issue)
+    if current != iteration:
+        print(f"stale: issue is on iteration {current}, finalize asked for {iteration}")
+        return "stale"
+    if "agent:ready-to-merge" in labels or "agent:needs-rework" in labels:
+        print("already-finalized")
+        return "already-finalized"
+    gate = result_from_labels(labels, "gate")
+    test = result_from_labels(labels, "test")
+    review = result_from_labels(labels, "review")
+    missing = [
+        name
+        for name, value in (("gate", gate), ("test", test), ("review", review))
+        if value is None
+    ]
+    if missing:
+        print(f"waiting on: {', '.join(missing)}")
+        return "waiting"
+    return finalize_iteration(
+        issue_number,
+        iteration,
+        hard_gate_passed=bool(gate),
+        test_passed=bool(test),
+        review_passed=bool(review),
+    )
+
+
+def require_dev_completed(issue_number: int, iteration: int) -> None:
+    """Test/Review may only run on an issue Dev Agent just finished.
+
+    Raises SystemExit if this is the wrong iteration or Dev never
+    recorded a result (docs/adr/0016). The picker never starts Test or
+    Review; only the Dev workflow dispatches them, for that same issue.
+    """
+    issue = get_issue(issue_number)
+    current = get_current_iteration(issue)
+    if current != iteration:
+        raise SystemExit(
+            f"Refuse Test/Review: issue #{issue_number} is on iteration "
+            f"{current}, dispatch asked for {iteration}."
+        )
+    if result_from_labels(issue["label_names"], "dev") is None:
+        raise SystemExit(
+            f"Refuse Test/Review: Dev Agent has not recorded a result for "
+            f"issue #{issue_number} iteration {iteration}. These agents "
+            f"do not pick tickets from the backlog."
+        )
+    print(
+        f"Context OK: issue #{issue_number} iteration {iteration} "
+        f"has a Dev Agent result; proceeding."
+    )
 
 
 def finalize_iteration(

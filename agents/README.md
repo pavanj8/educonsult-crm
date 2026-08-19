@@ -38,14 +38,13 @@ see `docs/adr/0009`). Triggers:
 - Manually, via the Actions tab -> "Agent Harness" -> "Run workflow", passing
   an issue number.
 
-One workflow run = one iteration, sequentially: Dev Agent -> commit+push ->
-hard gate -> Test Agent -> Review Agent -> open/update a PR -> finalize
-labels + summary comment -> auto-merge if green
-(`docs/adr/0011-auto-merge-agent-harness-prs.md`). If anything fails, the
-issue gets `agent:needs-rework` and the harness auto-retries that issue
-with the Test/Review comments injected into the next Dev Agent prompt,
-until `MAX_ITERATIONS` (`docs/adr/0015`). A repo-wide `concurrency:` group on
-the workflow means only one iteration runs at a time.
+One Dev run implements a ticket, commits, and opens/updates a PR, then
+dispatches Test and Review as **separate workflows** on that ticket's
+branch (`docs/adr/0016`). Test(A) and Review(A) can therefore overlap
+each other and overlap Dev(B). Finalize joins their labels, then
+auto-merges if green (`docs/adr/0011`) or auto-retries Dev with the
+Test/Review comments (`docs/adr/0015`). Dev stays serialized
+(overlapping-file risk); Test/Review do not sit idle waiting for it.
 
 ## Processing a large backlog unattended
 
@@ -66,7 +65,7 @@ finds them on its own; failed tickets retry themselves.
 1. ✅ **Secret**: `CURSOR_API_KEY` set in repo Settings -> Secrets and
    variables -> Actions (done 2026-08-19).
 2. ✅ **Labels**: `agent:ready-for-dev`, `agent:iteration-1` through
-   `agent:iteration-10`, `agent:{dev,test,review}-{pass,fail}`,
+   `agent:iteration-10`,    `agent:{dev,test,review,gate}-{pass,fail}`,
    `agent:ready-to-merge`, `agent:needs-rework` — all created on
    `pavanj8/educonsult-crm` (done 2026-08-19). If more than 10 iterations
    are ever needed for one issue, create more `agent:iteration-N` labels
@@ -89,7 +88,7 @@ python dev_agent.py 123 --iteration 1
 python check_test_gate.py --base origin/main
 python test_agent.py 123 --iteration 1
 python review_agent.py 123 --iteration 1 --base origin/main
-python finalize_iteration.py 123 1 --hard-gate true --test true --review true
+python try_finalize.py 123 1           # no-ops until gate+test+review labels exist
 ```
 
 ## Known gaps (tracked, not yet resolved)

@@ -6,13 +6,11 @@ name: Agent Harness Queue Picker
 # close my laptop it should work" requirement behind docs/adr/0009.
 #
 # Why this exists instead of just labeling many issues at once: GitHub's
-# `concurrency:` group on agent-harness.yml only holds "1 running + 1
-# queued" per group when cancel-in-progress is false -- it is not an
-# unbounded FIFO queue. Labeling 96 issues within seconds in practice
-# cancelled 94 of them, keeping only the very last one. This workflow
-# instead triggers exactly one untouched issue at a time, waits for the
-# harness to be fully idle before picking the next, and is paced by its
-# own schedule rather than a burst of near-simultaneous label events.
+# `concurrency:` group on agent-harness.yml (the Dev stage) only holds
+# "1 running + 1 queued" per group. Test and Review are separate workflows
+# (docs/adr/0016) and do not take this slot, so they can run while Dev
+# works a different ticket. This picker only starts a new Dev when the
+# Dev workflow is idle.
 #
 # IMPORTANT: this job must explicitly `gh workflow run agent-harness.yml`
 # (a workflow_dispatch call) rather than relying on the `agent:ready-for-dev`
@@ -48,12 +46,13 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MAX_ITERATIONS: "5"
     steps:
-      - name: Skip if a harness run is already active or queued
+      - name: Skip if a Dev Agent run is already active or queued
         id: busy
         run: |
           ACTIVE=$(gh run list -R ${{ github.repository }} --workflow=agent-harness.yml --limit 10 --json status \
             --jq '[.[] | select(.status=="in_progress" or .status=="queued" or .status=="pending" or .status=="waiting")] | length')
-          echo "Active/queued harness runs: $ACTIVE"
+          echo "Active/queued Dev (agent-harness.yml) runs: $ACTIVE"
+          echo "Test/Review running on other tickets do not block picking the next Dev (docs/adr/0016)."
           if [ "$ACTIVE" -gt 0 ]; then
             echo "busy=true" >> "$GITHUB_OUTPUT"
           else

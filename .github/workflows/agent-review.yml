@@ -1,0 +1,82 @@
+name: Agent Harness Review
+
+# Five-perspective Review Agent for ONE issue Dev Agent just finished.
+# Not a queue: only dispatched by agent-harness.yml with that issue's
+# number and iteration. Refuses to run otherwise. See docs/adr/0016.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "GitHub issue number"
+        required: true
+      iteration:
+        description: "Harness iteration this Review Agent belongs to"
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+concurrency:
+  group: agent-review-${{ github.event.inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REVIEW_AGENT_MODEL: grok-4.6
+    steps:
+      - name: Checkout issue branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/issue-${{ github.event.inputs.issue_number }}
+          fetch-depth: 0
+
+      - name: Fetch main for the review diff
+        run: git fetch origin main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agent dependencies
+        working-directory: agents
+        run: pip install -r requirements.txt
+
+      - name: Require Dev completed this issue+iteration
+        working-directory: agents
+        run: python require_dev_completed.py ${{ github.event.inputs.issue_number }} ${{ github.event.inputs.iteration }}
+
+      - name: Review Agent (5-perspective code review)
+        id: review
+        working-directory: agents
+        continue-on-error: true
+        run: python review_agent.py ${{ github.event.inputs.issue_number }} --iteration ${{ github.event.inputs.iteration }} --base origin/main --model "$REVIEW_AGENT_MODEL"
+
+      - name: Ensure a review result label exists
+        if: always()
+        working-directory: agents
+        env:
+          ISSUE: ${{ github.event.inputs.issue_number }}
+        run: |
+          python -c "
+          import os
+          import github_ticket_utils as t
+          n = int(os.environ['ISSUE'])
+          labels = t.get_issue(n)['label_names']
+          if t.result_from_labels(labels, 'review') is None:
+              t.set_result_label(n, 'review', False)
+          "
+
+      - name: Dispatch finalize join (docs/adr/0016)
+        if: always()
+        run: |
+          gh workflow run agent-finalize.yml -R ${{ github.repository }} --ref main \
+            -f issue_number="${{ github.event.inputs.issue_number }}" \
+            -f iteration="${{ github.event.inputs.iteration }}"

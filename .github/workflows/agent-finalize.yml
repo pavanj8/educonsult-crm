@@ -1,0 +1,82 @@
+name: Agent Harness Finalize
+
+# Join point after Test and Review have both recorded labels for the same
+# iteration. First caller that finds all three of gate/test/review present
+# finalizes; earlier callers no-op as `waiting`. See docs/adr/0016.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "GitHub issue number"
+        required: true
+      iteration:
+        description: "Harness iteration to join"
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: agent-finalize-${{ github.event.inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MAX_ITERATIONS: "5"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Try finalize
+        id: finalize
+        working-directory: agents
+        run: |
+          python try_finalize.py ${{ github.event.inputs.issue_number }} ${{ github.event.inputs.iteration }} | tee finalize_output.txt
+          if grep -q "Final status: ready-to-merge" finalize_output.txt; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+          elif grep -q "Final status: needs-rework" finalize_output.txt; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "retry=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Auto-merge PR (docs/adr/0011)
+        if: steps.finalize.outputs.ready == 'true'
+        run: |
+          BRANCH="agent/issue-${{ github.event.inputs.issue_number }}"
+          PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr merge "$PR_NUMBER" --merge --delete-branch
+          else
+            echo "No open PR found for branch $BRANCH; skipping auto-merge."
+          fi
+
+      - name: Auto-retry on needs-rework (docs/adr/0015)
+        if: steps.finalize.outputs.retry == 'true'
+        run: |
+          N="${{ github.event.inputs.iteration }}"
+          ISSUE="${{ github.event.inputs.issue_number }}"
+          if [ "$N" -lt "$MAX_ITERATIONS" ]; then
+            NEXT=$((N + 1))
+            echo "Iteration $N failed; dispatching Dev retry $NEXT/$MAX_ITERATIONS for #$ISSUE"
+            gh issue comment "$ISSUE" --body "Auto-retrying: Dev Agent will receive Test/Review/gate feedback from iteration ${N} on iteration ${NEXT} (cap ${MAX_ITERATIONS}). See docs/adr/0015."
+            gh workflow run agent-harness.yml -R ${{ github.repository }} --ref main -f issue_number="$ISSUE"
+          else
+            echo "Hit MAX_ITERATIONS=$MAX_ITERATIONS on #$ISSUE; leaving agent:needs-rework."
+            gh issue comment "$ISSUE" --body "Stopped auto-retry after ${MAX_ITERATIONS} iterations. Label remains \`agent:needs-rework\`. Comment \`/dev-agent\` (or run the workflow manually) to continue. See docs/adr/0015."
+          fi

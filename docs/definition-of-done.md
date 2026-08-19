@@ -43,7 +43,8 @@ iteration:
 | Traceability | `docs/epics.md` / `docs/journeys.md` structure + issue body (`scripts/setup_github_issues.py`) |
 | Final sign-off / label | `agents/github_ticket_utils.py: finalize_iteration()` |
 | Auto-merge on pass | `.github/workflows/agent-harness.yml` ("Auto-merge PR" step, `docs/adr/0011`) |
-| Auto-retry on fail | `.github/workflows/agent-harness.yml` ("Auto-retry on needs-rework" step) + queue picker (`docs/adr/0015`) |
+| Auto-retry on fail | `.github/workflows/agent-finalize.yml` + queue picker (`docs/adr/0015`) |
+| Parallel Test/Review | `.github/workflows/agent-test.yml` + `agent-review.yml` (`docs/adr/0016`) |
 
 If any item fails, the issue gets `agent:needs-rework` instead of
 `agent:ready-to-merge`, and the harness starts another iteration with

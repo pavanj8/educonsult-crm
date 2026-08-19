@@ -1,6 +1,8 @@
-name: Agent Harness (Dev -> Gate -> Test -> Review)
+name: Agent Harness (Dev)
 
-# See docs/adr/0009 for the full design rationale.
+# Dev stage only. After this job pushes the issue branch it dispatches
+# Test and Review in parallel (separate workflows) so those agents are
+# not sitting idle while Dev works a different ticket. See docs/adr/0016.
 #
 # Runs entirely on GitHub-hosted runners -- no dependency on any personal
 # machine being on. Triggered by adding the `agent:ready-for-dev` label to
@@ -25,13 +27,10 @@ permissions:
   actions: write
 
 concurrency:
-  # Serializes every harness run repo-wide (not per-issue): with many
-  # issues labeled agent:ready-for-dev in quick succession, GitHub queues
-  # them one at a time instead of running Dev Agents in parallel from the
-  # same stale main, which would risk merge conflicts between tickets that
-  # touch overlapping files (e.g. multiple Docker Compose service tasks).
-  # cancel-in-progress: false means queued runs wait their turn rather than
-  # cancelling each other.
+  # Serializes Dev Agents repo-wide (docs/adr/0016). Test/Review run in
+  # other workflows and are not in this group, so they can overlap Dev
+  # work on a different ticket. Keep the historic group name so any
+  # in-flight pre-split harness run still serializes with new Dev jobs.
   group: agent-harness-queue
   cancel-in-progress: false
 
@@ -50,11 +49,6 @@ jobs:
       # Do not pick IDs from Cursor.models.list() alone -- many listed
       # IDs fail immediately on the local runtime.
       DEV_AGENT_MODEL: composer-2.5
-      TEST_AGENT_MODEL: grok-4.6
-      REVIEW_AGENT_MODEL: grok-4.6
-      # Auto-retry cap (docs/adr/0015). In-job dispatch stops at this
-      # iteration count; a human /dev-agent can still continue past it.
-      MAX_ITERATIONS: "5"
 
     steps:
       - name: Determine issue number
@@ -119,17 +113,13 @@ jobs:
         continue-on-error: true
         run: python check_test_gate.py --base origin/main
 
-      - name: Test Agent (independent black-box)
-        id: test
+      - name: Record gate result
+        if: always()
         working-directory: agents
-        continue-on-error: true
-        run: python test_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --model "$TEST_AGENT_MODEL"
-
-      - name: Review Agent (5-perspective code review)
-        id: review
-        working-directory: agents
-        continue-on-error: true
-        run: python review_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --base origin/main --model "$REVIEW_AGENT_MODEL"
+        env:
+          ISSUE: ${{ steps.issue.outputs.number }}
+          GATE_OK: ${{ steps.gate.outcome }}
+        run: python -c "import os, github_ticket_utils as t; t.set_result_label(int(os.environ['ISSUE']), 'gate', os.environ['GATE_OK']=='success')"
 
       - name: Open or update pull request
         run: |
@@ -141,41 +131,14 @@ jobs:
               --base main
           fi
 
-      - name: Finalize iteration
-        id: finalize
+      - name: Dispatch Test and Review for THIS issue only (docs/adr/0016)
         working-directory: agents
         run: |
-          python finalize_iteration.py ${{ steps.issue.outputs.number }} ${{ steps.iteration.outputs.number }} \
-            --hard-gate "${{ steps.gate.outcome == 'success' }}" \
-            --test "${{ steps.test.outcome == 'success' }}" \
-            --review "${{ steps.review.outcome == 'success' }}" | tee finalize_output.txt
-          if grep -q "Final status: ready-to-merge" finalize_output.txt; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Auto-merge PR (docs/adr/0011)
-        if: steps.finalize.outputs.ready == 'true'
-        run: |
-          PR_NUMBER=$(gh pr list --head "${{ steps.branch.outputs.name }}" --json number --jq '.[0].number')
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr merge "$PR_NUMBER" --merge --delete-branch
-          else
-            echo "No open PR found for branch ${{ steps.branch.outputs.name }}; skipping auto-merge."
-          fi
-
-      - name: Auto-retry on needs-rework (docs/adr/0015)
-        if: steps.finalize.outputs.ready == 'false'
-        run: |
-          N="${{ steps.iteration.outputs.number }}"
           ISSUE="${{ steps.issue.outputs.number }}"
-          if [ "$N" -lt "$MAX_ITERATIONS" ]; then
-            NEXT=$((N + 1))
-            echo "Iteration $N failed; dispatching retry $NEXT/$MAX_ITERATIONS for #$ISSUE"
-            gh issue comment "$ISSUE" --body "Auto-retrying: Dev Agent will receive Test/Review/gate feedback from iteration ${N} on iteration ${NEXT} (cap ${MAX_ITERATIONS}). See docs/adr/0015."
-            gh workflow run agent-harness.yml -R ${{ github.repository }} --ref main -f issue_number="$ISSUE"
-          else
-            echo "Hit MAX_ITERATIONS=$MAX_ITERATIONS on #$ISSUE; leaving agent:needs-rework."
-            gh issue comment "$ISSUE" --body "Stopped auto-retry after ${MAX_ITERATIONS} iterations. Label remains \`agent:needs-rework\`. Comment \`/dev-agent\` (or run the workflow manually) to continue. See docs/adr/0015."
-          fi
+          ITER="${{ steps.iteration.outputs.number }}"
+          python require_dev_completed.py "$ISSUE" "$ITER"
+          echo "Dispatching Test + Review for #$ISSUE iteration $ITER (same ticket Dev just finished)"
+          gh workflow run agent-test.yml -R ${{ github.repository }} --ref main \
+            -f issue_number="$ISSUE" -f iteration="$ITER"
+          gh workflow run agent-review.yml -R ${{ github.repository }} --ref main \
+            -f issue_number="$ISSUE" -f iteration="$ITER"

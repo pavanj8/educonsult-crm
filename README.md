@@ -105,21 +105,22 @@ tracked as open GitHub Issues.
 2. Adding the `agent:ready-for-dev` label to an issue triggers
    [`.github/workflows/agent-harness.yml`](.github/workflows/agent-harness.yml)
    on a GitHub-hosted runner — no dependency on anyone's laptop being on.
-3. That workflow runs, in order: **Dev Agent** (implements the issue) ->
-   commit & push -> **hard test gate** (deterministic: tests must exist,
-   not shrink, and pass) -> **Test Agent** (independent black-box tests
-   derived only from the requirements/journey/epic/issue docs, never from
-   reading the implementation) -> **Review Agent** (five perspectives:
-   security, architecture, code quality, UX, test adequacy).
+3. That workflow is the **Dev** stage: it implements the issue, commits,
+   runs the hard test gate, and opens/updates the PR. It then starts
+   **Test Agent** and **Review Agent** as separate GitHub Actions jobs
+   ([ADR-0016](docs/adr/0016-pipeline-parallelism.md)). Those can run on
+   *other* tickets Dev already finished; each job checks out that
+   ticket's `agent/issue-N` branch. Test/Review never pick an issue Dev
+   has not implemented.
 4. If all of those pass, the harness **auto-merges the PR itself**
    ([ADR-0011](docs/adr/0011-auto-merge-agent-harness-prs.md)), which
    closes the issue. If anything fails, the issue is labeled
    `agent:needs-rework` and the harness **auto-retries** with that
    Test/Review feedback ([ADR-0015](docs/adr/0015-auto-retry-needs-rework.md)),
    up to `MAX_ITERATIONS` (default 5).
-5. A repo-wide concurrency queue means only one iteration runs at a time,
-   so a large backlog of issues can be triggered without agents stepping
-   on each other's changes.
+5. **Dev** is serialized one-at-a-time (overlapping files). Test and
+   Review run in parallel on other tickets' branches
+   ([ADR-0016](docs/adr/0016-pipeline-parallelism.md)).
 
 See [`agents/README.md`](agents/README.md) for the harness internals, and
 [`docs/adr/0009`](docs/adr/0009-agent-harness-github-actions-execution.md)
