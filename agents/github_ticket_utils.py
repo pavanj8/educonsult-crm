@@ -129,13 +129,18 @@ def finalize_iteration(
         remove_label(issue_number, "agent:ready-to-merge")
         status = "needs-rework"
 
+    overall = (
+        "\u2705 ready to merge"
+        if all_green
+        else "\u274c needs rework \u2014 re-add `agent:ready-for-dev` after addressing the comments above to retry"
+    )
     summary = (
         f"## Harness iteration {iteration} summary\n\n"
         f"| Gate | Result |\n|---|---|\n"
         f"| Hard test-existence/coverage gate | {'PASS' if hard_gate_passed else 'FAIL'} |\n"
         f"| Test Agent (independent black-box) | {'PASS' if test_passed else 'FAIL'} |\n"
         f"| Review Agent (5-perspective) | {'PASS' if review_passed else 'FAIL'} |\n\n"
-        f"**Overall**: {'\u2705 ready to merge' if all_green else '\u274c needs rework \u2014 re-add `agent:ready-for-dev` after addressing the comments above to retry'}"
+        f"**Overall**: {overall}"
     )
     post_comment(issue_number, summary)
     return status
