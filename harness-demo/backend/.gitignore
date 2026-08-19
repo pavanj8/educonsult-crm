@@ -4,3 +4,4 @@ __pycache__/
 .pytest_cache/
 app.db
 *.db
+qa_run_*.db
