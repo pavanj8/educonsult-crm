@@ -1,0 +1,12 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/env.py" = ["I001"]
+"tests/**" = ["I001"]
