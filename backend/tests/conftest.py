@@ -7,6 +7,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import app.models  # noqa: F401 — register ORM models with Base.metadata
 from app.db.database import get_db
 from app.main import app
 from app.models.base import Base
