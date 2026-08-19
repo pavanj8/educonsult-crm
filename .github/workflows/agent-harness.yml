@@ -64,6 +64,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # GITHUB_TOKEN cannot push files under .github/workflows/
+          # ("without workflows permission"). A PAT/fine-grained token
+          # with the `workflow` scope, stored as GH_PAT, can. Falls back
+          # to GITHUB_TOKEN for tickets that do not touch workflow files.
+          token: ${{ secrets.GH_PAT || github.token }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -102,10 +107,18 @@ jobs:
         run: python dev_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --model "$DEV_AGENT_MODEL"
 
       - name: Commit Dev Agent changes
+        id: commit
         run: |
           git add -A
           git diff --cached --quiet || git commit -m "Dev Agent: issue #${{ steps.issue.outputs.number }} iteration ${{ steps.iteration.outputs.number }}"
           git push origin "${{ steps.branch.outputs.name }}"
+
+      - name: Mark needs-rework if commit/push failed
+        if: failure() && steps.commit.conclusion == 'failure'
+        run: |
+          ISSUE="${{ steps.issue.outputs.number }}"
+          gh issue edit "$ISSUE" -R ${{ github.repository }} --add-label "agent:needs-rework"
+          gh issue comment "$ISSUE" -R ${{ github.repository }} --body "Dev Agent commit/push failed, so Test/Review were not started. Labelled \`agent:needs-rework\` so the picker/retry can pick this up. See the Actions log for the push error."
 
       - name: Hard test gate
         id: gate
@@ -114,7 +127,7 @@ jobs:
         run: python check_test_gate.py --base origin/main
 
       - name: Record gate result
-        if: always()
+        if: steps.gate.conclusion == 'success' || steps.gate.conclusion == 'failure'
         working-directory: agents
         env:
           ISSUE: ${{ steps.issue.outputs.number }}

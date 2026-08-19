@@ -99,3 +99,23 @@ canonically here following the graduation decision
   verification so far is offline (syntax/compile checks, YAML parsing, and
   a mocked-`gh`-CLI unit test of the label state machine in
   `github_ticket_utils.py`) plus these two now-live, low-risk setup steps.
+
+## Amendment (2026-08-19): `workflows: write` to push CI workflow files
+
+Issue #61 (GitHub Actions CI for the backend) had Dev Agent write
+`.github/workflows/ci-backend.yml`, then `git push` was rejected:
+
+```
+refusing to allow a GitHub App to create or update workflow
+.github/workflows/ci-backend.yml without `workflows` permission
+```
+
+Test/Review never started; the issue sat with `agent:iteration-1` and
+no `needs-rework`, so the picker would not retry it.
+
+Fix: if commit/push fails, label `agent:needs-rework` so the ticket
+re-enters the queue instead of stalling. Pushing workflow files also
+requires a `GH_PAT` secret with the `workflow` scope — `GITHUB_TOKEN`
+cannot create/update `.github/workflows/*` even with `contents: write`.
+The Dev job's checkout uses `secrets.GH_PAT || github.token`.
+

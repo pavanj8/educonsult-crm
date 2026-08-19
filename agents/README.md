@@ -64,6 +64,9 @@ finds them on its own; failed tickets retry themselves.
 
 1. ✅ **Secret**: `CURSOR_API_KEY` set in repo Settings -> Secrets and
    variables -> Actions (done 2026-08-19).
+2. ⬜ **Secret**: `GH_PAT` — a token that can push `.github/workflows/*`
+   (`workflow` scope). `GITHUB_TOKEN` cannot; issue #61 failed on that.
+   Needed for any ticket that adds or edits GitHub Actions workflows.
 2. ✅ **Labels**: `agent:ready-for-dev`, `agent:iteration-1` through
    `agent:iteration-10`,    `agent:{dev,test,review,gate}-{pass,fail}`,
    `agent:ready-to-merge`, `agent:needs-rework` — all created on
