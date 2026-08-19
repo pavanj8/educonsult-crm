@@ -14,6 +14,11 @@ export type StaffCreateRequest = {
   branch_id: number
 }
 
+export type StaffUpdateRequest = {
+  role?: StaffCreatableRole
+  branch_id?: number
+}
+
 export type Staff = {
   id: number
   email: string

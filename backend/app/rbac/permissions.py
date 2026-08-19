@@ -20,6 +20,7 @@ class Permission(StrEnum):
     # Staff management (J5, J6)
     STAFF_CREATE = "staff:create"
     STAFF_READ = "staff:read"
+    STAFF_UPDATE = "staff:update"
     STAFF_DEACTIVATE = "staff:deactivate"
 
     # Master data & checklist templates (J7, J8)
@@ -92,6 +93,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.BRANCH_UPDATE,
             Permission.STAFF_CREATE,
             Permission.STAFF_READ,
+            Permission.STAFF_UPDATE,
             Permission.STAFF_DEACTIVATE,
             Permission.MASTER_DATA_MANAGE,
             Permission.CHECKLIST_TEMPLATE_MANAGE,
@@ -119,6 +121,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.STAFF_CREATE,
             Permission.STAFF_READ,
+            Permission.STAFF_UPDATE,
             Permission.STAFF_DEACTIVATE,
             Permission.MASTER_DATA_MANAGE,
             Permission.CHECKLIST_TEMPLATE_MANAGE,

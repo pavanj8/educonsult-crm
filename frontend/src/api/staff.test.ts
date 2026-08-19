@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createStaff } from './staff'
+import {
+  createStaff,
+  fetchStaff,
+  fetchStaffById,
+  updateStaff,
+} from './staff'
 
 const mockStaff = {
   id: 42,
@@ -16,6 +21,46 @@ describe('staff API client', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     localStorage.clear()
+  })
+
+  it('fetchStaff loads staff list with auth header', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [mockStaff],
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const result = await fetchStaff()
+
+    expect(result).toEqual([mockStaff])
+    expect(fetchMock).toHaveBeenCalledWith('/staff', {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer stored-access-token',
+      },
+    })
+  })
+
+  it('fetchStaffById loads a staff member', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockStaff,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const result = await fetchStaffById(42)
+
+    expect(result).toEqual(mockStaff)
+    expect(fetchMock).toHaveBeenCalledWith('/staff/42', {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer stored-access-token',
+      },
+    })
   })
 
   it('createStaff posts payload with auth header', async () => {
@@ -38,6 +83,30 @@ describe('staff API client', () => {
     expect(result).toEqual(mockStaff)
     expect(fetchMock).toHaveBeenCalledWith('/staff', {
       method: 'POST',
+      body: JSON.stringify(payload),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer stored-access-token',
+      },
+    })
+  })
+
+  it('updateStaff patches role and branch', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const updatedStaff = { ...mockStaff, role: 'receptionist' as const, branch_id: 2 }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => updatedStaff,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const payload = { role: 'receptionist' as const, branch_id: 2 }
+    const result = await updateStaff(42, payload)
+
+    expect(result).toEqual(updatedStaff)
+    expect(fetchMock).toHaveBeenCalledWith('/staff/42', {
+      method: 'PATCH',
       body: JSON.stringify(payload),
       headers: {
         'Content-Type': 'application/json',

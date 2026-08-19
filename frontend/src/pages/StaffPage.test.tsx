@@ -21,6 +21,14 @@ const mockBranchManager = {
   branch_id: 1,
 }
 
+const mockBranchManagerNoBranch = {
+  id: 21,
+  email: 'manager.no-branch@demo.test',
+  role: 'branch_manager' as const,
+  tenant_id: 10,
+  branch_id: null,
+}
+
 const mockBranches = [
   {
     id: 1,
@@ -40,6 +48,87 @@ const mockBranches = [
   },
 ]
 
+const mockStaffList = [
+  {
+    id: 5,
+    email: 'existing.counselor@example.test',
+    role: 'counselor' as const,
+    tenant_id: 10,
+    branch_id: 1,
+    created_at: '2026-01-10T10:00:00Z',
+    updated_at: '2026-01-10T10:00:00Z',
+  },
+]
+
+function createFetchMock(handlers: {
+  user: typeof mockOwner | typeof mockBranchManager | typeof mockBranchManagerNoBranch
+  staffList?: typeof mockStaffList
+  createdStaff?: Record<string, unknown>
+  updatedStaff?: Record<string, unknown>
+  createConflict?: boolean
+}) {
+  return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(url)
+
+    if (path.includes('/auth/me')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => handlers.user,
+      }
+    }
+
+    if (path.endsWith('/staff') && init?.method === 'POST') {
+      if (handlers.createConflict) {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ detail: 'A user with this email already exists' }),
+        }
+      }
+      return {
+        ok: true,
+        status: 201,
+        json: async () => handlers.createdStaff,
+      }
+    }
+
+    if (path.match(/\/staff\/\d+$/) && init?.method === 'PATCH') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => handlers.updatedStaff,
+      }
+    }
+
+    if (path.match(/\/staff\/\d+$/) && (!init?.method || init.method === 'GET')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => mockStaffList[0],
+      }
+    }
+
+    if (path.endsWith('/staff')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => handlers.staffList ?? mockStaffList,
+      }
+    }
+
+    if (path.endsWith('/branches')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => mockBranches,
+      }
+    }
+
+    throw new Error(`Unhandled fetch: ${path} ${init?.method ?? 'GET'}`)
+  }) as typeof fetch
+}
+
 function renderStaffPage() {
   return render(
     <AuthProvider>
@@ -55,18 +144,7 @@ describe('StaffPage', () => {
   })
 
   it('renders create form for consultancy owner with branch selector', async () => {
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockOwner,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockBranches,
-      }) as typeof fetch
+    globalThis.fetch = createFetchMock({ user: mockOwner })
 
     renderStaffPage()
 
@@ -76,6 +154,7 @@ describe('StaffPage', () => {
 
     expect(screen.getByTestId('staff-role')).toBeInTheDocument()
     expect(screen.queryByTestId('staff-branch-readonly')).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Select a branch' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Branch Manager' })).toBeInTheDocument()
   })
 
@@ -90,28 +169,12 @@ describe('StaffPage', () => {
       created_at: '2026-02-01T10:00:00Z',
       updated_at: '2026-02-01T10:00:00Z',
     }
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockOwner,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockBranches,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 201,
-        json: async () => createdStaff,
-      }) as typeof fetch
+    globalThis.fetch = createFetchMock({ user: mockOwner, createdStaff })
 
     renderStaffPage()
 
     await waitFor(() => {
-      expect(screen.getByTestId('staff-email')).toBeInTheDocument()
+      expect(screen.getByTestId('staff-branch')).toBeInTheDocument()
     })
 
     await user.type(screen.getByTestId('staff-email'), 'new.counselor@example.test')
@@ -127,36 +190,35 @@ describe('StaffPage', () => {
     expect(screen.getByTestId('staff-create-success')).toHaveTextContent(
       'Staff account for new.counselor@example.test (Counselor) created',
     )
+
+    const staffCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([url, init]) =>
+        typeof url === 'string' &&
+        url.endsWith('/staff') &&
+        (init as RequestInit | undefined)?.method === 'POST',
+    )
+    expect(staffCalls).toHaveLength(1)
+    const requestInit = staffCalls[0]?.[1] as RequestInit
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      email: 'new.counselor@example.test',
+      role: 'counselor',
+      branch_id: 2,
+    })
   })
 
   it('shows create error from API', async () => {
     const user = userEvent.setup()
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockOwner,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockBranches,
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 409,
-        json: async () => ({ detail: 'A user with this email already exists' }),
-      }) as typeof fetch
+    globalThis.fetch = createFetchMock({ user: mockOwner, createConflict: true })
 
     renderStaffPage()
 
     await waitFor(() => {
-      expect(screen.getByTestId('staff-email')).toBeInTheDocument()
+      expect(screen.getByTestId('staff-branch')).toBeInTheDocument()
     })
 
     await user.type(screen.getByTestId('staff-email'), 'existing@example.test')
     await user.type(screen.getByTestId('staff-password'), 'secure-password')
+    await user.selectOptions(screen.getByTestId('staff-branch'), '1')
     await user.click(screen.getByTestId('staff-create-submit'))
 
     await waitFor(() => {
@@ -169,11 +231,7 @@ describe('StaffPage', () => {
   })
 
   it('renders branch manager form without branch selector or branch manager role', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockBranchManager,
-    }) as typeof fetch
+    globalThis.fetch = createFetchMock({ user: mockBranchManager })
 
     renderStaffPage()
 
@@ -184,6 +242,24 @@ describe('StaffPage', () => {
     expect(screen.queryByTestId('staff-branch')).not.toBeInTheDocument()
     expect(screen.queryByRole('option', { name: 'Branch Manager' })).not.toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Counselor' })).toBeInTheDocument()
+    expect(screen.getByTestId('staff-branch-readonly')).toHaveTextContent(
+      'Staff will be assigned to your branch',
+    )
+    expect(screen.getByTestId('staff-branch-readonly')).not.toHaveTextContent('ID:')
+  })
+
+  it('disables create submit for branch manager without branch assignment', async () => {
+    globalThis.fetch = createFetchMock({ user: mockBranchManagerNoBranch })
+
+    renderStaffPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-create-submit')).toBeDisabled()
+    })
+
+    expect(screen.getByTestId('staff-branch-readonly')).toHaveTextContent(
+      'not assigned to a branch',
+    )
   })
 
   it('creates staff as branch manager using own branch id', async () => {
@@ -197,23 +273,12 @@ describe('StaffPage', () => {
       created_at: '2026-02-01T10:00:00Z',
       updated_at: '2026-02-01T10:00:00Z',
     }
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockBranchManager,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 201,
-        json: async () => createdStaff,
-      }) as typeof fetch
+    globalThis.fetch = createFetchMock({ user: mockBranchManager, createdStaff })
 
     renderStaffPage()
 
     await waitFor(() => {
-      expect(screen.getByTestId('staff-email')).toBeInTheDocument()
+      expect(screen.getByTestId('staff-branch-readonly')).toBeInTheDocument()
     })
 
     await user.type(screen.getByTestId('staff-email'), 'receptionist@example.test')
@@ -226,7 +291,10 @@ describe('StaffPage', () => {
     })
 
     const staffCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([url]) => typeof url === 'string' && url.includes('/staff'),
+      ([url, init]) =>
+        typeof url === 'string' &&
+        url.endsWith('/staff') &&
+        (init as RequestInit | undefined)?.method === 'POST',
     )
     expect(staffCalls).toHaveLength(1)
     const requestInit = staffCalls[0]?.[1] as RequestInit
@@ -234,6 +302,51 @@ describe('StaffPage', () => {
       email: 'receptionist@example.test',
       role: 'receptionist',
       branch_id: 1,
+    })
+  })
+
+  it('loads edit form for existing staff and updates role and branch', async () => {
+    const user = userEvent.setup()
+    const updatedStaff = {
+      ...mockStaffList[0],
+      role: 'receptionist' as const,
+      branch_id: 2,
+    }
+    globalThis.fetch = createFetchMock({ user: mockOwner, updatedStaff })
+
+    renderStaffPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-edit-5')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTestId('staff-edit-5'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-edit-email')).toHaveValue('existing.counselor@example.test')
+    })
+
+    await user.selectOptions(screen.getByTestId('staff-edit-role'), 'receptionist')
+    await user.selectOptions(screen.getByTestId('staff-edit-branch'), '2')
+    await user.click(screen.getByTestId('staff-edit-submit'))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('staff-edit-email')).not.toBeInTheDocument()
+      expect(screen.getByTestId('staff-row-5')).toHaveTextContent('Receptionist')
+      expect(screen.getByTestId('staff-row-5')).toHaveTextContent('Delhi Center')
+    })
+
+    const patchCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([url, init]) =>
+        typeof url === 'string' &&
+        url.endsWith('/staff/5') &&
+        (init as RequestInit | undefined)?.method === 'PATCH',
+    )
+    expect(patchCalls).toHaveLength(1)
+    const requestInit = patchCalls[0]?.[1] as RequestInit
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      role: 'receptionist',
+      branch_id: 2,
     })
   })
 })

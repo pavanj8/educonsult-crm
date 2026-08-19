@@ -27,6 +27,11 @@ class StaffCreateRequest(BaseModel):
         return normalized
 
 
+class StaffUpdateRequest(BaseModel):
+    role: Role | None = None
+    branch_id: int | None = Field(default=None, ge=1)
+
+
 class StaffResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
