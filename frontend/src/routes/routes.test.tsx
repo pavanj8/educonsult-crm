@@ -22,6 +22,14 @@ const mockSuperAdmin = {
   branch_id: null,
 }
 
+const mockConsultancyOwner = {
+  id: 50,
+  email: 'owner@demo.test',
+  role: 'consultancy_owner' as const,
+  tenant_id: 10,
+  branch_id: null,
+}
+
 function LocationStateProbe() {
   const location = useLocation()
   const fromPath =
@@ -168,5 +176,49 @@ describe('AppRouter routes', () => {
 
     expect(screen.queryByTestId('tenants-page')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Tenants' })).not.toBeInTheDocument()
+  })
+
+  it('renders branches page for consultancy owner users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockConsultancyOwner,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      }) as typeof fetch
+
+    renderAppAt('/branches')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('branches-page')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Branches' })).toBeInTheDocument()
+  })
+
+  it('denies branches page to non-consultancy-owner users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockUser,
+    }) as typeof fetch
+
+    renderAppAt('/branches')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('access-denied')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('branches-page')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Branches' })).not.toBeInTheDocument()
   })
 })

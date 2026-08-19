@@ -496,3 +496,69 @@ body {
 .tenant-table tbody tr:hover {
   background: #f9fafb;
 }
+
+/* Branches page */
+.branches-page {
+  max-width: 48rem;
+}
+
+.branches-page__header {
+  margin-bottom: 2rem;
+}
+
+.branches-page__header h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.branches-page__subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.branches-page__section {
+  margin-bottom: 2rem;
+}
+
+.branches-page__section h3 {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+}
+
+.branches-page__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.branches-page__status--error {
+  color: #dc2626;
+}
+
+.branch-table-wrapper {
+  overflow-x: auto;
+}
+
+.branch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.branch-table th,
+.branch-table td {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.branch-table th {
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+}
+
+.branch-table tbody tr:hover {
+  background: #f9fafb;
+}

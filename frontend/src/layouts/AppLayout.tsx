@@ -18,6 +18,13 @@ export default function AppLayout() {
               </Link>
             </nav>
           ) : null}
+          {user?.role === 'consultancy_owner' ? (
+            <nav className="app-header__nav" aria-label="Main">
+              <Link to="/branches" data-testid="nav-branches">
+                Branches
+              </Link>
+            </nav>
+          ) : null}
         </div>
         <NotificationBell />
       </header>
