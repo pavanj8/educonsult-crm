@@ -38,3 +38,4 @@ receive new entries.
 | [0008](0008-agent-harness-adopted-for-delivery.md) | Adopt the Dev/Test/Review agent harness for CRM delivery | Accepted | 2026-08-19 |
 | [0009](0009-agent-harness-github-actions-execution.md) | Agent harness execution model: GitHub Actions, GitHub Issues as tickets, hard test gate | Accepted — implemented, not yet run | 2026-08-19 |
 | [0010](0010-formal-definition-of-done.md) | Formal, written Definition of Done for every epic and task | Accepted — implemented | 2026-08-19 |
+| [0011](0011-auto-merge-agent-harness-prs.md) | Auto-merge agent harness PRs once all gates pass | Accepted — implemented | 2026-08-19 |

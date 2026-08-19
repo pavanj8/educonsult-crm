@@ -120,9 +120,25 @@ jobs:
           fi
 
       - name: Finalize iteration
+        id: finalize
         working-directory: agents
         run: |
           python finalize_iteration.py ${{ steps.issue.outputs.number }} ${{ steps.iteration.outputs.number }} \
             --hard-gate "${{ steps.gate.outcome == 'success' }}" \
             --test "${{ steps.test.outcome == 'success' }}" \
-            --review "${{ steps.review.outcome == 'success' }}"
+            --review "${{ steps.review.outcome == 'success' }}" | tee finalize_output.txt
+          if grep -q "Final status: ready-to-merge" finalize_output.txt; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Auto-merge PR (docs/adr/0011)
+        if: steps.finalize.outputs.ready == 'true'
+        run: |
+          PR_NUMBER=$(gh pr list --head "${{ steps.branch.outputs.name }}" --json number --jq '.[0].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr merge "$PR_NUMBER" --merge --delete-branch
+          else
+            echo "No open PR found for branch ${{ steps.branch.outputs.name }}; skipping auto-merge."
+          fi
