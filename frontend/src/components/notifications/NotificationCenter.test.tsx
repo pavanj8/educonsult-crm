@@ -30,6 +30,7 @@ describe('NotificationCenter', () => {
         notifications={notifications}
         loading={false}
         error={null}
+        actionError={null}
         unreadCount={1}
         onMarkRead={vi.fn()}
         onMarkAllRead={vi.fn()}
@@ -46,6 +47,7 @@ describe('NotificationCenter', () => {
         notifications={notifications}
         loading={false}
         error={null}
+        actionError={null}
         unreadCount={1}
         onMarkRead={vi.fn()}
         onMarkAllRead={vi.fn()}
@@ -59,6 +61,61 @@ describe('NotificationCenter', () => {
     expect(screen.getByRole('button', { name: 'Mark "Stage updated" as read' })).toBeInTheDocument()
   })
 
+  it('shows loading state', () => {
+    render(
+      <NotificationCenter
+        open
+        notifications={[]}
+        loading
+        error={null}
+        actionError={null}
+        unreadCount={0}
+        onMarkRead={vi.fn()}
+        onMarkAllRead={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Loading notifications…')).toBeInTheDocument()
+  })
+
+  it('shows load error state', () => {
+    render(
+      <NotificationCenter
+        open
+        notifications={[]}
+        loading={false}
+        error="Failed to load notifications"
+        actionError={null}
+        unreadCount={0}
+        onMarkRead={vi.fn()}
+        onMarkAllRead={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed to load notifications')
+    expect(screen.queryByText('Stage updated')).not.toBeInTheDocument()
+  })
+
+  it('shows action error while keeping the notification list visible', () => {
+    render(
+      <NotificationCenter
+        open
+        notifications={notifications}
+        loading={false}
+        error={null}
+        actionError="Failed to mark notification as read"
+        unreadCount={1}
+        onMarkRead={vi.fn()}
+        onMarkAllRead={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('notification-action-error')).toHaveTextContent(
+      'Failed to mark notification as read',
+    )
+    expect(screen.getByText('Stage updated')).toBeInTheDocument()
+  })
+
   it('shows empty state when there are no notifications', () => {
     render(
       <NotificationCenter
@@ -66,6 +123,7 @@ describe('NotificationCenter', () => {
         notifications={[]}
         loading={false}
         error={null}
+        actionError={null}
         unreadCount={0}
         onMarkRead={vi.fn()}
         onMarkAllRead={vi.fn()}
@@ -86,6 +144,7 @@ describe('NotificationCenter', () => {
         notifications={notifications}
         loading={false}
         error={null}
+        actionError={null}
         unreadCount={1}
         onMarkRead={onMarkRead}
         onMarkAllRead={onMarkAllRead}

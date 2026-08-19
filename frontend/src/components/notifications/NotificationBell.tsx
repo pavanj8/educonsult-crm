@@ -6,11 +6,14 @@ import NotificationCenter from './NotificationCenter'
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const bellButtonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const {
     notifications,
     unreadCount,
     loading,
     error,
+    actionError,
     reload,
     markRead,
     markAllRead,
@@ -29,6 +32,26 @@ export default function NotificationBell() {
     }
   }, [open])
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        bellButtonRef.current?.focus()
+      }
+    }
+
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (open) {
+      panelRef.current?.focus()
+    }
+  }, [open])
+
   function toggleOpen() {
     const nextOpen = !open
     setOpen(nextOpen)
@@ -40,6 +63,7 @@ export default function NotificationBell() {
   return (
     <div className="notification-bell" ref={containerRef}>
       <button
+        ref={bellButtonRef}
         type="button"
         className="notification-bell__button"
         aria-label="Notifications"
@@ -64,15 +88,18 @@ export default function NotificationBell() {
           </span>
         )}
       </button>
-      <NotificationCenter
-        open={open}
-        notifications={notifications}
-        loading={loading}
-        error={error}
-        unreadCount={unreadCount}
-        onMarkRead={markRead}
-        onMarkAllRead={markAllRead}
-      />
+      <div ref={panelRef} tabIndex={-1} className="notification-bell__panel">
+        <NotificationCenter
+          open={open}
+          notifications={notifications}
+          loading={loading}
+          error={error}
+          actionError={actionError}
+          unreadCount={unreadCount}
+          onMarkRead={markRead}
+          onMarkAllRead={markAllRead}
+        />
+      </div>
     </div>
   )
 }

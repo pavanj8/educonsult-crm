@@ -6,6 +6,7 @@ interface NotificationCenterProps {
   notifications: Notification[]
   loading: boolean
   error: string | null
+  actionError: string | null
   unreadCount: number
   onMarkRead: (id: number) => void
   onMarkAllRead: () => void
@@ -16,6 +17,7 @@ export default function NotificationCenter({
   notifications,
   loading,
   error,
+  actionError,
   unreadCount,
   onMarkRead,
   onMarkAllRead,
@@ -23,6 +25,8 @@ export default function NotificationCenter({
   if (!open) {
     return null
   }
+
+  const showList = !loading && !error && notifications.length > 0
 
   return (
     <div
@@ -50,10 +54,19 @@ export default function NotificationCenter({
           {error}
         </p>
       )}
+      {actionError && (
+        <p
+          className="notification-center__status notification-center__status--error"
+          role="alert"
+          data-testid="notification-action-error"
+        >
+          {actionError}
+        </p>
+      )}
       {!loading && !error && notifications.length === 0 && (
         <p className="notification-center__status">No notifications yet.</p>
       )}
-      {!loading && !error && notifications.length > 0 && (
+      {showList && (
         <ul className="notification-center__list">
           {notifications.map((notification) => (
             <NotificationItem
