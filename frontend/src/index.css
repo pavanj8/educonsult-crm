@@ -784,6 +784,103 @@ body {
   cursor: not-allowed;
 }
 
+.staff-page__status {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.staff-page__status--error {
+  color: #b91c1c;
+}
+
+.staff-page__status--success {
+  color: #047857;
+}
+
+.staff-table-wrapper {
+  overflow-x: auto;
+}
+
+.staff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.staff-table th,
+.staff-table td {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.staff-table th {
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+}
+
+.staff-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.staff-table__row--inactive {
+  color: #6b7280;
+}
+
+.staff-table__status {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.staff-table__status--active {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.staff-table__status--inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.staff-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.staff-table__edit,
+.staff-table__toggle {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.staff-table__toggle:hover:not(:disabled),
+.staff-table__edit:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.staff-table__toggle:focus-visible,
+.staff-table__edit:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.staff-table__toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

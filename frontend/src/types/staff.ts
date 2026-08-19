@@ -25,6 +25,7 @@ export type Staff = {
   role: StaffCreatableRole
   tenant_id: number
   branch_id: number
+  is_active: boolean
   created_at: string
   updated_at: string
 }

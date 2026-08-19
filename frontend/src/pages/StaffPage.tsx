@@ -47,19 +47,25 @@ export default function StaffPage() {
     error: staffError,
     createError,
     updateError,
+    statusError,
     submitting,
+    togglingId,
     createStaff,
     updateStaff,
+    setStaffActiveStatus,
     loadStaffMember,
   } = useStaff()
   const [createSuccessMessage, setCreateSuccessMessage] = useState<string | null>(null)
   const [updateSuccessMessage, setUpdateSuccessMessage] = useState<string | null>(null)
+  const [statusSuccessMessage, setStatusSuccessMessage] = useState<string | null>(null)
   const [createValidationError, setCreateValidationError] = useState<string | null>(null)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const createErrorId = useId()
   const createSuccessId = useId()
   const updateErrorId = useId()
   const updateSuccessId = useId()
+  const statusErrorId = useId()
+  const statusSuccessId = useId()
 
   const creatableRoles = useMemo(
     () => getCreatableRoles(isBranchManager),
@@ -187,6 +193,23 @@ export default function StaffPage() {
   function handleEditCancel() {
     setEditingStaff(null)
     setUpdateSuccessMessage(null)
+  }
+
+  async function handleStatusToggle(member: Staff) {
+    setStatusSuccessMessage(null)
+    const nextActive = !member.is_active
+    try {
+      const updated = await setStaffActiveStatus(member.id, nextActive)
+      setStatusSuccessMessage(
+        nextActive
+          ? `${updated.email} has been reactivated.`
+          : `${updated.email} has been deactivated.`,
+      )
+    } catch (err) {
+      if (!isApiError(err)) {
+        // statusError is set by the hook
+      }
+    }
   }
 
   function branchNameForStaff(branchId: number): string {
@@ -472,6 +495,26 @@ export default function StaffPage() {
 
       <section className="staff-page__section" aria-labelledby="staff-list-heading">
         <h3 id="staff-list-heading">All staff</h3>
+        {statusError ? (
+          <p
+            className="staff-page__status staff-page__status--error"
+            data-testid="staff-status-error"
+            id={statusErrorId}
+            role="alert"
+          >
+            {statusError}
+          </p>
+        ) : null}
+        {statusSuccessMessage ? (
+          <p
+            className="staff-page__status staff-page__status--success"
+            data-testid="staff-status-success"
+            id={statusSuccessId}
+            role="status"
+          >
+            {statusSuccessMessage}
+          </p>
+        ) : null}
         {staffLoading && <p className="staff-page__status">Loading staff…</p>}
         {staffError && (
           <p className="staff-page__status staff-page__status--error" role="alert">
@@ -489,6 +532,7 @@ export default function StaffPage() {
                   <th scope="col">Email</th>
                   <th scope="col">Role</th>
                   <th scope="col">Branch</th>
+                  <th scope="col">Status</th>
                   <th scope="col">
                     <span className="visually-hidden">Actions</span>
                   </th>
@@ -496,19 +540,61 @@ export default function StaffPage() {
               </thead>
               <tbody>
                 {staff.map((member) => (
-                  <tr key={member.id} data-testid={`staff-row-${member.id}`}>
+                  <tr
+                    key={member.id}
+                    data-testid={`staff-row-${member.id}`}
+                    className={member.is_active ? undefined : 'staff-table__row--inactive'}
+                  >
                     <td>{member.email}</td>
                     <td>{STAFF_ROLE_LABELS[member.role]}</td>
                     <td>{branchNameForStaff(member.branch_id)}</td>
                     <td>
-                      <button
-                        className="staff-table__edit"
-                        data-testid={`staff-edit-${member.id}`}
-                        type="button"
-                        onClick={() => void handleEditClick(member)}
+                      <span
+                        className={
+                          member.is_active
+                            ? 'staff-table__status staff-table__status--active'
+                            : 'staff-table__status staff-table__status--inactive'
+                        }
+                        data-testid={`staff-status-${member.id}`}
                       >
-                        Edit
-                      </button>
+                        {member.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="staff-table__actions">
+                        <button
+                          className="staff-table__toggle"
+                          data-testid={`staff-toggle-${member.id}`}
+                          type="button"
+                          disabled={
+                            togglingId === member.id ||
+                            (user?.id != null && user.id === member.id)
+                          }
+                          aria-busy={togglingId === member.id}
+                          title={
+                            user?.id === member.id
+                              ? 'You cannot change your own active status'
+                              : undefined
+                          }
+                          onClick={() => void handleStatusToggle(member)}
+                        >
+                          {togglingId === member.id
+                            ? member.is_active
+                              ? 'Deactivating…'
+                              : 'Reactivating…'
+                            : member.is_active
+                              ? 'Deactivate'
+                              : 'Reactivate'}
+                        </button>
+                        <button
+                          className="staff-table__edit"
+                          data-testid={`staff-edit-${member.id}`}
+                          type="button"
+                          onClick={() => void handleEditClick(member)}
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

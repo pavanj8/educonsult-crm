@@ -55,8 +55,19 @@ const mockStaffList = [
     role: 'counselor' as const,
     tenant_id: 10,
     branch_id: 1,
+    is_active: true,
     created_at: '2026-01-10T10:00:00Z',
     updated_at: '2026-01-10T10:00:00Z',
+  },
+  {
+    id: 6,
+    email: 'inactive.receptionist@example.test',
+    role: 'receptionist' as const,
+    tenant_id: 10,
+    branch_id: 1,
+    is_active: false,
+    created_at: '2026-01-11T10:00:00Z',
+    updated_at: '2026-01-12T10:00:00Z',
   },
 ]
 
@@ -65,7 +76,10 @@ function createFetchMock(handlers: {
   staffList?: typeof mockStaffList
   createdStaff?: Record<string, unknown>
   updatedStaff?: Record<string, unknown>
+  deactivatedStaff?: Record<string, unknown>
+  reactivatedStaff?: Record<string, unknown>
   createConflict?: boolean
+  statusConflict?: boolean
 }) {
   return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     const path = String(url)
@@ -98,6 +112,29 @@ function createFetchMock(handlers: {
         ok: true,
         status: 200,
         json: async () => handlers.updatedStaff,
+      }
+    }
+
+    if (path.match(/\/staff\/\d+\/deactivate$/) && init?.method === 'POST') {
+      if (handlers.statusConflict) {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ detail: 'Staff member is already inactive' }),
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => handlers.deactivatedStaff,
+      }
+    }
+
+    if (path.match(/\/staff\/\d+\/reactivate$/) && init?.method === 'POST') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => handlers.reactivatedStaff,
       }
     }
 
@@ -166,6 +203,7 @@ describe('StaffPage', () => {
       role: 'counselor' as const,
       tenant_id: 10,
       branch_id: 2,
+      is_active: true,
       created_at: '2026-02-01T10:00:00Z',
       updated_at: '2026-02-01T10:00:00Z',
     }
@@ -270,6 +308,7 @@ describe('StaffPage', () => {
       role: 'receptionist' as const,
       tenant_id: 10,
       branch_id: 1,
+      is_active: true,
       created_at: '2026-02-01T10:00:00Z',
       updated_at: '2026-02-01T10:00:00Z',
     }
@@ -347,6 +386,100 @@ describe('StaffPage', () => {
     expect(JSON.parse(String(requestInit.body))).toMatchObject({
       role: 'receptionist',
       branch_id: 2,
+    })
+  })
+
+  it('shows active and inactive status in staff list', async () => {
+    globalThis.fetch = createFetchMock({ user: mockOwner })
+
+    renderStaffPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-status-5')).toHaveTextContent('Active')
+      expect(screen.getByTestId('staff-status-6')).toHaveTextContent('Inactive')
+    })
+
+    expect(screen.getByTestId('staff-toggle-5')).toHaveTextContent('Deactivate')
+    expect(screen.getByTestId('staff-toggle-6')).toHaveTextContent('Reactivate')
+  })
+
+  it('deactivates staff from list and shows success message', async () => {
+    const user = userEvent.setup()
+    const deactivatedStaff = {
+      ...mockStaffList[0],
+      is_active: false,
+    }
+    globalThis.fetch = createFetchMock({ user: mockOwner, deactivatedStaff })
+
+    renderStaffPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-toggle-5')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTestId('staff-toggle-5'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-status-5')).toHaveTextContent('Inactive')
+      expect(screen.getByTestId('staff-toggle-5')).toHaveTextContent('Reactivate')
+      expect(screen.getByTestId('staff-status-success')).toHaveTextContent('deactivated')
+    })
+
+    const deactivateCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([url, init]) =>
+        typeof url === 'string' &&
+        url.endsWith('/staff/5/deactivate') &&
+        (init as RequestInit | undefined)?.method === 'POST',
+    )
+    expect(deactivateCalls).toHaveLength(1)
+  })
+
+  it('reactivates inactive staff from list', async () => {
+    const user = userEvent.setup()
+    const reactivatedStaff = {
+      ...mockStaffList[1],
+      is_active: true,
+    }
+    globalThis.fetch = createFetchMock({ user: mockOwner, reactivatedStaff })
+
+    renderStaffPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-toggle-6')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTestId('staff-toggle-6'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-status-6')).toHaveTextContent('Active')
+      expect(screen.getByTestId('staff-status-success')).toHaveTextContent('reactivated')
+    })
+
+    const reactivateCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([url, init]) =>
+        typeof url === 'string' &&
+        url.endsWith('/staff/6/reactivate') &&
+        (init as RequestInit | undefined)?.method === 'POST',
+    )
+    expect(reactivateCalls).toHaveLength(1)
+  })
+
+  it('shows status error when deactivation fails', async () => {
+    const user = userEvent.setup()
+    globalThis.fetch = createFetchMock({ user: mockOwner, statusConflict: true })
+
+    renderStaffPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-toggle-5')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTestId('staff-toggle-5'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-status-error')).toHaveTextContent(
+        'Staff member is already inactive',
+      )
     })
   })
 })
