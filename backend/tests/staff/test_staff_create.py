@@ -1,4 +1,9 @@
-"""POST /staff endpoint tests (E12, Journey J5, issue #119)."""
+"""POST /staff endpoint tests (E12, Journey J5, issue #119).
+
+General staff creation behaviour (validation, auth, persistence). Branch-scoping
+rules for owner vs branch manager are covered in test_staff_create_branch_scoping.py
+(issue #121).
+"""
 
 from app.auth import create_access_token
 from app.auth.password import verify_password
@@ -8,131 +13,6 @@ from tests.branches.helpers import seed_branch
 from tests.conftest import make_auth_headers
 from tests.factories.users import make_authenticated_user, make_db_user
 from tests.staff.helpers import make_staff_payload
-
-
-def test_owner_can_create_staff_in_any_branch(client, db_session, override_authenticated_user):
-    branch_one = seed_branch(db_session, tenant_id=1, name="Branch One", city="Mumbai")
-    branch_two = seed_branch(db_session, tenant_id=1, name="Branch Two", city="Delhi")
-    override_authenticated_user(make_authenticated_user(Role.CONSULTANCY_OWNER, tenant_id=1))
-
-    response_one = client.post(
-        "/staff",
-        json=make_staff_payload(
-            email="counselor.b1@example.test",
-            branch_id=branch_one.id,
-        ),
-    )
-    response_two = client.post(
-        "/staff",
-        json=make_staff_payload(
-            email="counselor.b2@example.test",
-            role=Role.RECEPTIONIST,
-            branch_id=branch_two.id,
-        ),
-    )
-
-    assert response_one.status_code == 201
-    assert response_one.json()["branch_id"] == branch_one.id
-    assert response_one.json()["tenant_id"] == 1
-    assert response_one.json()["role"] == Role.COUNSELOR.value
-
-    assert response_two.status_code == 201
-    assert response_two.json()["branch_id"] == branch_two.id
-    assert response_two.json()["role"] == Role.RECEPTIONIST.value
-
-
-def test_owner_can_create_branch_manager(client, db_session, override_authenticated_user):
-    branch = seed_branch(db_session, tenant_id=1, name="HQ", city="Pune")
-    override_authenticated_user(make_authenticated_user(Role.CONSULTANCY_OWNER, tenant_id=1))
-
-    response = client.post(
-        "/staff",
-        json=make_staff_payload(
-            email="manager@example.test",
-            role=Role.BRANCH_MANAGER,
-            branch_id=branch.id,
-        ),
-    )
-
-    assert response.status_code == 201
-    assert response.json()["role"] == Role.BRANCH_MANAGER.value
-    assert response.json()["branch_id"] == branch.id
-
-
-def test_branch_manager_can_create_staff_in_own_branch(
-    client, db_session, override_authenticated_user
-):
-    branch = seed_branch(db_session, tenant_id=1, name="Own Branch", city="Chennai")
-    override_authenticated_user(
-        make_authenticated_user(
-            Role.BRANCH_MANAGER,
-            tenant_id=1,
-            branch_id=branch.id,
-        )
-    )
-
-    response = client.post(
-        "/staff",
-        json=make_staff_payload(
-            email="verifier@example.test",
-            role=Role.DOCUMENT_VERIFIER,
-            branch_id=branch.id,
-        ),
-    )
-
-    assert response.status_code == 201
-    assert response.json()["branch_id"] == branch.id
-    assert response.json()["role"] == Role.DOCUMENT_VERIFIER.value
-
-
-def test_branch_manager_cannot_create_staff_in_other_branch(
-    client, db_session, override_authenticated_user
-):
-    own_branch = seed_branch(db_session, tenant_id=1, name="Own Branch", city="Mumbai")
-    other_branch = seed_branch(db_session, tenant_id=1, name="Other Branch", city="Delhi")
-    override_authenticated_user(
-        make_authenticated_user(
-            Role.BRANCH_MANAGER,
-            tenant_id=1,
-            branch_id=own_branch.id,
-        )
-    )
-
-    response = client.post(
-        "/staff",
-        json=make_staff_payload(
-            email="counselor.other@example.test",
-            branch_id=other_branch.id,
-        ),
-    )
-
-    assert response.status_code == 403
-    assert "cannot act on user" in response.json()["detail"]
-
-
-def test_branch_manager_cannot_create_branch_manager(
-    client, db_session, override_authenticated_user
-):
-    branch = seed_branch(db_session, tenant_id=1, name="Own Branch", city="Mumbai")
-    override_authenticated_user(
-        make_authenticated_user(
-            Role.BRANCH_MANAGER,
-            tenant_id=1,
-            branch_id=branch.id,
-        )
-    )
-
-    response = client.post(
-        "/staff",
-        json=make_staff_payload(
-            email="peer.manager@example.test",
-            role=Role.BRANCH_MANAGER,
-            branch_id=branch.id,
-        ),
-    )
-
-    assert response.status_code == 403
-    assert "cannot act on user" in response.json()["detail"]
 
 
 def test_create_staff_success_with_real_jwt(client, db_session):
