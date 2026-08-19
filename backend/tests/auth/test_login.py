@@ -1,3 +1,5 @@
+"""Login endpoint tests (E5, Journey J44, issue #88)."""
+
 import pytest
 
 from app.auth import verify_access_token, verify_refresh_token
@@ -101,6 +103,47 @@ def test_login_rejects_missing_credentials(client):
     response = client.post("/auth/login", json={"email": "user@example.test"})
 
     assert response.status_code == 422
+
+
+def test_login_rejects_missing_email(client):
+    response = client.post("/auth/login", json={"password": "any-password"})
+
+    assert response.status_code == 422
+
+
+def test_login_rejects_empty_email(client):
+    response = client.post(
+        "/auth/login",
+        json={"email": "", "password": "any-password"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_login_rejects_empty_password(client):
+    response = client.post(
+        "/auth/login",
+        json={"email": "user@example.test", "password": ""},
+    )
+
+    assert response.status_code == 422
+
+
+def test_login_trims_email_whitespace(client, db_session):
+    password = "trim-password"
+    make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="counselor@example.test",
+        password=password,
+    )
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "  counselor@example.test  ", "password": password},
+    )
+
+    assert response.status_code == 200
 
 
 def test_login_returns_503_when_database_unavailable(client):
