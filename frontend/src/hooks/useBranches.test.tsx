@@ -60,6 +60,20 @@ describe('useBranches', () => {
     expect(result.current.branches).toHaveLength(0)
   })
 
+  it('skips fetch when disabled', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const { result } = renderHook(() => useBranches({ enabled: false }))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result.current.branches).toHaveLength(0)
+  })
+
   it('sets permission error on 403', async () => {
     localStorage.setItem('access_token', 'test-token')
     globalThis.fetch = vi.fn().mockResolvedValue({

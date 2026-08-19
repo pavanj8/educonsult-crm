@@ -10,15 +10,27 @@ import type { Branch, BranchCreateRequest, BranchUpdateRequest } from '../types/
 
 import { hasAccessToken } from '../store/authStorage'
 
-export function useBranches() {
+type UseBranchesOptions = {
+  enabled?: boolean
+}
+
+export function useBranches(options: UseBranchesOptions = {}) {
+  const enabled = options.enabled ?? true
   const [branches, setBranches] = useState<Branch[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [updateError, setUpdateError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const loadBranches = useCallback(async () => {
+    if (!enabled) {
+      setBranches([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     if (!hasAccessToken()) {
       setBranches([])
       setLoading(false)
@@ -42,7 +54,7 @@ export function useBranches() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [enabled])
 
   useEffect(() => {
     void loadBranches()

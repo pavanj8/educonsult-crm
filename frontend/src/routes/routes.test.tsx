@@ -30,6 +30,14 @@ const mockConsultancyOwner = {
   branch_id: null,
 }
 
+const mockBranchManager = {
+  id: 20,
+  email: 'manager@demo.test',
+  role: 'branch_manager' as const,
+  tenant_id: 10,
+  branch_id: 1,
+}
+
 function LocationStateProbe() {
   const location = useLocation()
   const fromPath =
@@ -220,5 +228,68 @@ describe('AppRouter routes', () => {
 
     expect(screen.queryByTestId('branches-page')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Branches' })).not.toBeInTheDocument()
+  })
+
+  it('renders staff page for consultancy owner users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockConsultancyOwner,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      }) as typeof fetch
+
+    renderAppAt('/staff')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-page')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Staff' })).toBeInTheDocument()
+  })
+
+  it('renders staff page for branch manager users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockBranchManager,
+    }) as typeof fetch
+
+    renderAppAt('/staff')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-page')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Staff' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Branches' })).not.toBeInTheDocument()
+  })
+
+  it('denies staff page to non-manager users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockUser,
+    }) as typeof fetch
+
+    renderAppAt('/staff')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('access-denied')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('staff-page')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Staff' })).not.toBeInTheDocument()
   })
 })

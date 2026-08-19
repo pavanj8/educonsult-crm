@@ -23,6 +23,16 @@ export default function AppLayout() {
               <Link to="/branches" data-testid="nav-branches">
                 Branches
               </Link>
+              <Link to="/staff" data-testid="nav-staff">
+                Staff
+              </Link>
+            </nav>
+          ) : null}
+          {user?.role === 'branch_manager' ? (
+            <nav className="app-header__nav" aria-label="Main">
+              <Link to="/staff" data-testid="nav-staff">
+                Staff
+              </Link>
             </nav>
           ) : null}
         </div>
