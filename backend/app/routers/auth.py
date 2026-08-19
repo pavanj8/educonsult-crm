@@ -57,6 +57,12 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
             detail="Invalid email or password",
         )
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated",
+        )
+
     authenticated_user = _user_to_authenticated_user(user)
     return TokenResponse(
         access_token=create_access_token(authenticated_user),
@@ -92,6 +98,12 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated",
         )
 
     authenticated_user = _user_to_authenticated_user(user)
