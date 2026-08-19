@@ -1,4 +1,4 @@
-"""Owner-only access matrix for branch endpoints (E11, Journey J4, issue #115)."""
+"""Owner-only access matrix for branch endpoints (E11, Journey J4, issue #118)."""
 
 import pytest
 

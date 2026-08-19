@@ -1,4 +1,4 @@
-"""End-to-end branch management flow tests (E11, Journey J4, issue #115)."""
+"""End-to-end branch management flow tests (E11, Journey J4, issue #118)."""
 
 from app.rbac.roles import Role
 from tests.branches.helpers import make_branch_payload
