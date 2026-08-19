@@ -40,5 +40,6 @@ class StaffResponse(BaseModel):
     role: Role
     tenant_id: int
     branch_id: int
+    is_active: bool
     created_at: datetime
     updated_at: datetime

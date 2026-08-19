@@ -1,4 +1,4 @@
-"""Staff management routes (E12; Journey J5)."""
+"""Staff management routes (E12; Journey J5; E13; Journey J6)."""
 
 from typing import Annotated
 
@@ -311,3 +311,81 @@ def update_staff(
 
     db.refresh(staff_user)
     return staff_user
+
+
+def _set_staff_active_status(
+    staff_id: int,
+    *,
+    is_active: bool,
+    current_user: AuthenticatedUser,
+    db: Session,
+) -> User:
+    """Deactivate or reactivate a staff account when the caller has permission."""
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+    if staff_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot change your own active status",
+        )
+
+    staff_user = _get_staff_member(staff_id, current_user, db)
+
+    if staff_user.is_active == is_active:
+        state = "active" if is_active else "inactive"
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Staff member is already {state}",
+        )
+
+    staff_user.is_active = is_active
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(staff_user)
+    return staff_user
+
+
+@router.post("/{staff_id}/deactivate", response_model=StaffResponse)
+def deactivate_staff(
+    staff_id: int,
+    current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.STAFF_DEACTIVATE))
+    ],
+    db: Session = Depends(get_db),
+) -> User:
+    """Deactivate a staff account (owner or branch manager)."""
+    return _set_staff_active_status(
+        staff_id,
+        is_active=False,
+        current_user=current_user,
+        db=db,
+    )
+
+
+@router.post("/{staff_id}/reactivate", response_model=StaffResponse)
+def reactivate_staff(
+    staff_id: int,
+    current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.STAFF_DEACTIVATE))
+    ],
+    db: Session = Depends(get_db),
+) -> User:
+    """Reactivate a previously deactivated staff account (owner or branch manager)."""
+    return _set_staff_active_status(
+        staff_id,
+        is_active=True,
+        current_user=current_user,
+        db=db,
+    )

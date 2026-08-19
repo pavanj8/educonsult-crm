@@ -17,6 +17,7 @@ def test_user_model_has_required_columns():
         "role",
         "tenant_id",
         "branch_id",
+        "is_active",
         "created_at",
         "updated_at",
     }
@@ -57,6 +58,7 @@ def test_user_persists_role_scoped_rows(
     assert user.role == role
     assert user.tenant_id == tenant_id
     assert user.branch_id == branch_id
+    assert user.is_active is True
 
 
 def test_user_email_is_unique(db_session):
