@@ -6,12 +6,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token, create_refresh_token, verify_password
+from app.auth import (
+    InvalidTokenError,
+    TokenExpiredError,
+    create_access_token,
+    create_refresh_token,
+    verify_password,
+    verify_refresh_token,
+)
 from app.db.database import get_db
 from app.models.user import User
 from app.rbac.dependencies import get_current_user
 from app.rbac.user import AuthenticatedUser
-from app.schemas.auth import LoginRequest, TokenResponse, UserMeResponse
+from app.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserMeResponse
 
 router = APIRouter()
 
@@ -39,6 +46,36 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
+        )
+
+    authenticated_user = _user_to_authenticated_user(user)
+    return TokenResponse(
+        access_token=create_access_token(authenticated_user),
+        refresh_token=create_refresh_token(authenticated_user),
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    """Exchange a valid refresh token for new JWT access and refresh tokens."""
+    try:
+        token_user = verify_refresh_token(payload.refresh_token)
+    except TokenExpiredError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired",
+        ) from None
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        ) from None
+
+    user = db.get(User, token_user.id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
         )
 
     authenticated_user = _user_to_authenticated_user(user)

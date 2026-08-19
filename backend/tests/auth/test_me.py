@@ -1,6 +1,6 @@
 import pytest
 
-from app.auth import create_access_token, create_refresh_token
+from app.auth import create_access_token
 from app.rbac.roles import Role
 from tests.conftest import make_auth_headers
 from tests.factories.users import make_authenticated_user, make_db_user
@@ -104,3 +104,35 @@ def test_me_rejects_token_for_deleted_user(client):
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid access token"}
+
+
+def test_me_uses_current_user_record(client, db_session):
+    password = "current-user-password"
+    user = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="counselor@current-me.test",
+        password=password,
+    )
+    stale_user = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=user.id,
+        tenant_id=user.tenant_id,
+        branch_id=user.branch_id,
+    )
+    stale_access = create_access_token(stale_user)
+
+    user.role = Role.BRANCH_MANAGER
+    user.email = "updated@current-me.test"
+    db_session.commit()
+
+    response = client.get("/auth/me", headers=make_auth_headers(stale_access))
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": user.id,
+        "email": "updated@current-me.test",
+        "role": "branch_manager",
+        "tenant_id": user.tenant_id,
+        "branch_id": user.branch_id,
+    }
