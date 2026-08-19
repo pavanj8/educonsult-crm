@@ -8,3 +8,13 @@ export type Branch = {
   created_at: string
   updated_at: string
 }
+
+export type BranchCreateRequest = {
+  name: string
+  city: string
+}
+
+export type BranchUpdateRequest = {
+  name?: string
+  city?: string
+}
