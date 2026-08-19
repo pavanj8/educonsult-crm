@@ -4,12 +4,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import AppLayout from '../layouts/AppLayout'
 import HomePage from '../pages/HomePage'
+import LoginPage from '../pages/LoginPage'
 import NotFoundPage from '../pages/NotFoundPage'
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
           <Route path="*" element={<NotFoundPage />} />
@@ -38,5 +40,12 @@ describe('routing shell', () => {
     renderAt('/unknown-route')
 
     expect(screen.getByText('Page not found')).toBeInTheDocument()
+  })
+
+  it('renders the login page at /login without the app layout', () => {
+    renderAt('/login')
+
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()
   })
 })
