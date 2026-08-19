@@ -6,8 +6,13 @@ from tests.conftest import make_auth_headers
 from tests.factories.users import make_authenticated_user, make_db_user
 
 
-def _create_tenant_payload(*, name: str = "Apex EduConsult", slug: str = "apex"):
-    return {"name": name, "slug": slug}
+def _create_tenant_payload(
+    *,
+    name: str = "Apex EduConsult",
+    slug: str = "apex",
+    owner_email: str = "owner@apex.test",
+):
+    return {"name": name, "slug": slug, "owner_email": owner_email}
 
 
 def test_create_tenant_success_as_super_admin(client, override_authenticated_user):
@@ -85,7 +90,11 @@ def test_create_tenant_rejects_duplicate_slug(client, override_authenticated_use
 
     duplicate = client.post(
         "/tenants",
-        json=_create_tenant_payload(name="Another Consultancy", slug="apex"),
+        json=_create_tenant_payload(
+            name="Another Consultancy",
+            slug="apex",
+            owner_email="other-owner@apex.test",
+        ),
     )
 
     assert duplicate.status_code == 409

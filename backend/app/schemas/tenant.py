@@ -6,11 +6,13 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class TenantCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     slug: str = Field(min_length=1, max_length=100)
+    owner_email: str = Field(min_length=1, max_length=255)
 
     @field_validator("name")
     @classmethod
@@ -30,6 +32,16 @@ class TenantCreateRequest(BaseModel):
             raise ValueError(
                 "Slug must contain only lowercase letters, numbers, and hyphens"
             )
+        return normalized
+
+    @field_validator("owner_email")
+    @classmethod
+    def normalize_owner_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("Owner email must not be empty")
+        if not _EMAIL_PATTERN.match(normalized):
+            raise ValueError("Owner email must be a valid email address")
         return normalized
 
 
