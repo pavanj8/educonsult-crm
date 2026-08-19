@@ -2,19 +2,44 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.auth import InvalidTokenError, TokenExpiredError, verify_access_token
 from app.rbac.permissions import Permission, role_has_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 
+_bearer_scheme = HTTPBearer(auto_error=False)
 
-def get_current_user() -> AuthenticatedUser:
-    """Return the authenticated user. JWT verification is wired in E5 (auth login)."""
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+
+def get_current_user(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(_bearer_scheme),
+    ],
+) -> AuthenticatedUser:
+    """Return the authenticated user from a valid Bearer access token."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        return verify_access_token(credentials.credentials)
+    except TokenExpiredError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
 
 
 def require_role(*allowed_roles: Role) -> Callable[..., AuthenticatedUser]:

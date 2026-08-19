@@ -18,7 +18,7 @@ TEST_DATABASE_URL = "sqlite://"
 
 
 def make_auth_headers(access_token: str = "test-access-token") -> dict[str, str]:
-    """Return Authorization headers for API requests (JWT verification wired in E5)."""
+    """Return Authorization headers for API requests."""
     return {"Authorization": f"Bearer {access_token}"}
 
 
