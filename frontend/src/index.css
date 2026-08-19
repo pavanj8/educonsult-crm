@@ -15,6 +15,35 @@ body {
   min-height: 100vh;
 }
 
+.auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.login-page h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.login-page p {
+  margin: 0;
+  color: #6b7280;
+}
+
 .app-layout {
   min-height: 100vh;
   display: flex;
