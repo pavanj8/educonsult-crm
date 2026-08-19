@@ -1,0 +1,54 @@
+name: Agent Harness Queue Picker
+
+# Paces backlog processing so a large batch of issues can be queued once
+# and then trickle through unattended -- no laptop, no chat session, no
+# human needing to trigger each one. See docs/adr/0011 and the "even if I
+# close my laptop it should work" requirement behind docs/adr/0009.
+#
+# Why this exists instead of just labeling many issues at once: GitHub's
+# `concurrency:` group on agent-harness.yml only holds "1 running + 1
+# queued" per group when cancel-in-progress is false -- it is not an
+# unbounded FIFO queue. Labeling 96 issues within seconds in practice
+# cancelled 94 of them, keeping only the very last one. This workflow
+# instead triggers exactly one untouched issue at a time, waits for the
+# harness to be fully idle before picking the next, and is paced by its
+# own schedule rather than a burst of near-simultaneous label events.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+  actions: read
+
+jobs:
+  pick-next:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Skip if a harness run is already active or queued
+        id: busy
+        run: |
+          ACTIVE=$(gh run list -R ${{ github.repository }} --workflow=agent-harness.yml --limit 10 --json status \
+            --jq '[.[] | select(.status=="in_progress" or .status=="queued")] | length')
+          echo "Active/queued harness runs: $ACTIVE"
+          if [ "$ACTIVE" -gt 0 ]; then
+            echo "busy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "busy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pick next untouched MVP task and trigger it
+        if: steps.busy.outputs.busy == 'false'
+        run: |
+          NEXT=$(gh issue list -R ${{ github.repository }} --label "task,phase:mvp" --state open --limit 300 --json number,labels \
+            --jq '[.[] | select([.labels[].name] | any(startswith("agent:")) | not)] | sort_by(.number) | .[0].number // empty')
+          if [ -n "$NEXT" ]; then
+            echo "Triggering harness for issue #$NEXT"
+            gh issue edit "$NEXT" -R ${{ github.repository }} --add-label "agent:ready-for-dev"
+          else
+            echo "No untouched, open phase:mvp task issues remain -- nothing to queue."
+          fi

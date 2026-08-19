@@ -47,6 +47,18 @@ as-is; re-add `agent:ready-for-dev` (or comment `/dev-agent` again) to run
 another iteration on the same branch. A repo-wide `concurrency:` group on
 the workflow means only one iteration runs at a time.
 
+## Processing a large backlog unattended
+
+Don't add `agent:ready-for-dev` to many issues in a tight loop — the
+workflow's `concurrency:` group only holds "1 running + 1 queued" per
+group (not an unbounded FIFO), so a burst of triggers gets almost all of
+them cancelled (see `docs/adr/0012` for what happened when this was
+tried). Instead, `.github/workflows/agent-harness-queue-picker.yml` runs
+on a 5-minute cron, and whenever the harness is idle, triggers exactly
+one untouched `task` + `phase:mvp` issue at a time. To queue a batch:
+leave the issues with no `agent:*` label and the picker finds them on its
+own; nothing else needs to run.
+
 ## Required repo setup (one-time)
 
 1. ✅ **Secret**: `CURSOR_API_KEY` set in repo Settings -> Secrets and
