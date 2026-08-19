@@ -23,6 +23,17 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  # Serializes every harness run repo-wide (not per-issue): with many
+  # issues labeled agent:ready-for-dev in quick succession, GitHub queues
+  # them one at a time instead of running Dev Agents in parallel from the
+  # same stale main, which would risk merge conflicts between tickets that
+  # touch overlapping files (e.g. multiple Docker Compose service tasks).
+  # cancel-in-progress: false means queued runs wait their turn rather than
+  # cancelling each other.
+  group: agent-harness-queue
+  cancel-in-progress: false
+
 jobs:
   run-harness:
     if: >
