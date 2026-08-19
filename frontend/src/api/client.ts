@@ -1,6 +1,12 @@
+import { getAccessToken } from '../store/authStorage'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export type ApiError = Error & { status: number }
+
+type ApiFetchInit = RequestInit & {
+  skipAuth?: boolean
+}
 
 function createApiError(message: string, status: number): ApiError {
   const error = new Error(message) as ApiError
@@ -14,29 +20,42 @@ export function isApiError(err: unknown): err is ApiError {
 }
 
 function authHeaders(): HeadersInit {
-  const token = localStorage.getItem('access_token')
+  const token = getAccessToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-function errorMessageForStatus(status: number): string {
-  if (status === 401 || status === 403) {
-    return 'Sign in to view notifications'
+async function parseErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: string | Array<{ msg?: string }> }
+    if (typeof body.detail === 'string') {
+      return body.detail
+    }
+    if (Array.isArray(body.detail) && body.detail.length > 0) {
+      return body.detail[0]?.msg ?? 'Request failed'
+    }
+  } catch {
+    // Fall through to status-based defaults.
   }
-  return 'Failed to load notifications'
+
+  if (response.status === 401 || response.status === 403) {
+    return 'Not authenticated'
+  }
+  return 'Request failed'
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
+  const { skipAuth = false, ...requestInit } = init ?? {}
   const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
+    ...requestInit,
     headers: {
       'Content-Type': 'application/json',
-      ...authHeaders(),
-      ...init?.headers,
+      ...(skipAuth ? {} : authHeaders()),
+      ...requestInit.headers,
     },
   })
 
   if (!response.ok) {
-    throw createApiError(errorMessageForStatus(response.status), response.status)
+    throw createApiError(await parseErrorMessage(response), response.status)
   }
 
   if (response.status === 204) {
