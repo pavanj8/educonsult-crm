@@ -8,9 +8,7 @@ import {
 } from '../api/notifications'
 import type { Notification } from '../types/notification'
 
-function hasAccessToken(): boolean {
-  return localStorage.getItem('access_token') !== null
-}
+import { hasAccessToken } from '../store/authStorage'
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -35,8 +33,11 @@ export function useNotifications() {
       setNotifications(data.items ?? [])
       setUnreadCount(data.unread_count ?? 0)
     } catch (err) {
-      const message = isApiError(err) ? err.message : 'Failed to load notifications'
-      setError(message)
+      if (isApiError(err) && (err.status === 401 || err.status === 403)) {
+        setError('Sign in to view notifications')
+      } else {
+        setError('Failed to load notifications')
+      }
     } finally {
       setLoading(false)
     }
