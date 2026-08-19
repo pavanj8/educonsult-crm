@@ -5,8 +5,8 @@ from sqlalchemy import String, create_engine, inspect
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.database as database_module
-from app.database import get_db
+import app.db.database as database_module
+from app.db.database import get_db
 from app.models.base import Base, TenantScopedBase
 
 
