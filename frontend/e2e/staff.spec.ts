@@ -30,13 +30,26 @@ const mockStaffList = [
     role: 'counselor',
     tenant_id: 10,
     branch_id: 1,
+    is_active: true,
     created_at: '2026-01-10T10:00:00Z',
     updated_at: '2026-01-10T10:00:00Z',
+  },
+  {
+    id: 6,
+    email: 'inactive.receptionist@example.test',
+    role: 'receptionist',
+    tenant_id: 10,
+    branch_id: 1,
+    is_active: false,
+    created_at: '2026-01-11T10:00:00Z',
+    updated_at: '2026-01-12T10:00:00Z',
   },
 ]
 
 async function mockStaffApi(page: Page): Promise<void> {
-  await page.route('**/staff**', async (route: Route) => {
+  const staffState = mockStaffList.map((member) => ({ ...member }))
+
+  const handleStaffRoute = async (route: Route) => {
     if (route.request().resourceType() === 'document') {
       await route.continue()
       return
@@ -44,26 +57,29 @@ async function mockStaffApi(page: Page): Promise<void> {
 
     const url = route.request().url()
     const method = route.request().method()
+    const pathname = new URL(url).pathname
 
-    if (method === 'GET' && /\/staff\/\d+$/.test(url)) {
+    if (method === 'GET' && pathname === '/staff') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(mockStaffList[0]),
+        body: JSON.stringify(staffState),
       })
       return
     }
 
-    if (method === 'GET' && url.endsWith('/staff')) {
+    if (method === 'GET' && /^\/staff\/\d+$/.test(pathname)) {
+      const staffId = Number(pathname.split('/').pop())
+      const member = staffState.find((item) => item.id === staffId) ?? staffState[0]
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(mockStaffList),
+        body: JSON.stringify({ ...member }),
       })
       return
     }
 
-    if (method === 'POST' && url.endsWith('/staff')) {
+    if (method === 'POST' && pathname === '/staff') {
       const body = route.request().postDataJSON() as {
         email: string
         password: string
@@ -79,6 +95,7 @@ async function mockStaffApi(page: Page): Promise<void> {
           role: body.role,
           tenant_id: 10,
           branch_id: body.branch_id,
+          is_active: true,
           created_at: '2026-02-01T10:00:00Z',
           updated_at: '2026-02-01T10:00:00Z',
         }),
@@ -86,25 +103,60 @@ async function mockStaffApi(page: Page): Promise<void> {
       return
     }
 
-    if (method === 'PATCH' && /\/staff\/\d+$/.test(url)) {
+    if (method === 'POST' && /^\/staff\/\d+\/deactivate$/.test(pathname)) {
+      const staffId = Number(pathname.split('/')[2])
+      const member = staffState.find((item) => item.id === staffId)
+      if (!member) {
+        await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
+        return
+      }
+      member.is_active = false
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...member }),
+      })
+      return
+    }
+
+    if (method === 'POST' && /^\/staff\/\d+\/reactivate$/.test(pathname)) {
+      const staffId = Number(pathname.split('/')[2])
+      const member = staffState.find((item) => item.id === staffId)
+      if (!member) {
+        await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
+        return
+      }
+      member.is_active = true
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...member }),
+      })
+      return
+    }
+
+    if (method === 'PATCH' && /^\/staff\/\d+$/.test(pathname)) {
       const body = route.request().postDataJSON() as {
         role: string
         branch_id: number
       }
+      const staffId = Number(pathname.split('/').pop())
+      const member = staffState.find((item) => item.id === staffId) ?? staffState[0]
+      member.role = body.role
+      member.branch_id = body.branch_id
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          ...mockStaffList[0],
-          role: body.role,
-          branch_id: body.branch_id,
-        }),
+        body: JSON.stringify({ ...member }),
       })
       return
     }
 
     await route.continue()
-  })
+  }
+
+  await page.route('**/staff', handleStaffRoute)
+  await page.route('**/staff/**', handleStaffRoute)
 }
 
 async function mockBranchesApi(page: Page, branches = mockBranches): Promise<void> {
@@ -258,5 +310,76 @@ test.describe('Staff account creation', () => {
     await expect(page.getByTestId('access-denied')).toBeVisible()
     await expect(page.getByTestId('staff-page')).not.toBeVisible()
     await expect(page.getByTestId('nav-staff')).not.toBeVisible()
+  })
+})
+
+test.describe('Staff deactivation and reactivation', () => {
+  test('consultancy owner sees active and inactive status in staff list', async ({
+    consultancyOwnerPage,
+    page,
+  }) => {
+    void consultancyOwnerPage
+    await mockStaffApi(page)
+    await mockBranchesApi(page)
+
+    await gotoPath(page, '/staff')
+
+    await expect(page.getByTestId('staff-status-5')).toHaveText('Active')
+    await expect(page.getByTestId('staff-status-6')).toHaveText('Inactive')
+    await expect(page.getByTestId('staff-toggle-5')).toHaveText('Deactivate')
+    await expect(page.getByTestId('staff-toggle-6')).toHaveText('Reactivate')
+  })
+
+  test('consultancy owner can deactivate and reactivate staff', async ({
+    consultancyOwnerPage,
+    page,
+  }) => {
+    void consultancyOwnerPage
+    await mockStaffApi(page)
+    await mockBranchesApi(page)
+
+    await gotoPath(page, '/staff')
+
+    const deactivateRequest = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' && request.url().includes('/staff/5/deactivate'),
+    )
+
+    await page.getByTestId('staff-toggle-5').click()
+    await deactivateRequest
+
+    await expect(page.getByTestId('staff-status-5')).toHaveText('Inactive')
+    await expect(page.getByTestId('staff-status-success')).toContainText('deactivated')
+
+    const reactivateRequest = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' && request.url().includes('/staff/5/reactivate'),
+    )
+
+    await page.getByTestId('staff-toggle-5').click()
+    await reactivateRequest
+
+    await expect(page.getByTestId('staff-status-5')).toHaveText('Active')
+    await expect(page.getByTestId('staff-status-success')).toContainText('reactivated')
+  })
+
+  test('branch manager can reactivate inactive staff in own branch', async ({
+    branchManagerPage,
+    page,
+  }) => {
+    void branchManagerPage
+    await mockStaffApi(page)
+
+    await gotoPath(page, '/staff')
+
+    const reactivateRequest = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' && request.url().includes('/staff/6/reactivate'),
+    )
+
+    await page.getByTestId('staff-toggle-6').click()
+    await reactivateRequest
+
+    await expect(page.getByTestId('staff-status-6')).toHaveText('Active')
   })
 })

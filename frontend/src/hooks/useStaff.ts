@@ -3,8 +3,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { isApiError } from '../api/client'
 import {
   createStaff as createStaffApi,
+  deactivateStaff as deactivateStaffApi,
   fetchStaff,
   fetchStaffById,
+  reactivateStaff as reactivateStaffApi,
   updateStaff as updateStaffApi,
 } from '../api/staff'
 import type { Staff, StaffCreateRequest, StaffUpdateRequest } from '../types/staff'
@@ -17,7 +19,9 @@ export function useStaff() {
   const [error, setError] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [updateError, setUpdateError] = useState<string | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   const loadStaff = useCallback(async () => {
     if (!hasAccessToken()) {
@@ -91,16 +95,38 @@ export function useStaff() {
     }
   }, [])
 
+  const setStaffActiveStatus = useCallback(async (id: number, active: boolean) => {
+    setTogglingId(id)
+    setStatusError(null)
+    try {
+      const updated = active ? await reactivateStaffApi(id) : await deactivateStaffApi(id)
+      setStaff((prev) => prev.map((member) => (member.id === id ? updated : member)))
+      return updated
+    } catch (err) {
+      if (isApiError(err)) {
+        setStatusError(err.message)
+      } else {
+        setStatusError(active ? 'Failed to reactivate staff account' : 'Failed to deactivate staff account')
+      }
+      throw err
+    } finally {
+      setTogglingId(null)
+    }
+  }, [])
+
   return {
     staff,
     loading,
     error,
     createError,
     updateError,
+    statusError,
     submitting,
+    togglingId,
     reload: loadStaff,
     loadStaffMember,
     createStaff,
     updateStaff,
+    setStaffActiveStatus,
   }
 }

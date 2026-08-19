@@ -22,3 +22,15 @@ export async function updateStaff(id: number, payload: StaffUpdateRequest): Prom
     body: JSON.stringify(payload),
   })
 }
+
+export async function deactivateStaff(id: number): Promise<Staff> {
+  return apiFetch<Staff>(`/staff/${id}/deactivate`, {
+    method: 'POST',
+  })
+}
+
+export async function reactivateStaff(id: number): Promise<Staff> {
+  return apiFetch<Staff>(`/staff/${id}/reactivate`, {
+    method: 'POST',
+  })
+}

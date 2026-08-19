@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createStaff,
+  deactivateStaff,
   fetchStaff,
   fetchStaffById,
+  reactivateStaff,
   updateStaff,
 } from './staff'
 
@@ -13,6 +15,7 @@ const mockStaff = {
   role: 'counselor' as const,
   tenant_id: 10,
   branch_id: 1,
+  is_active: true,
   created_at: '2026-01-15T10:00:00Z',
   updated_at: '2026-01-15T10:00:00Z',
 }
@@ -133,6 +136,49 @@ describe('staff API client', () => {
     ).rejects.toMatchObject({
       message: 'A user with this email already exists',
       status: 409,
+    })
+  })
+
+  it('deactivateStaff posts to deactivate endpoint', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const inactiveStaff = { ...mockStaff, is_active: false }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => inactiveStaff,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const result = await deactivateStaff(42)
+
+    expect(result).toEqual(inactiveStaff)
+    expect(fetchMock).toHaveBeenCalledWith('/staff/42/deactivate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer stored-access-token',
+      },
+    })
+  })
+
+  it('reactivateStaff posts to reactivate endpoint', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockStaff,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const result = await reactivateStaff(42)
+
+    expect(result).toEqual(mockStaff)
+    expect(fetchMock).toHaveBeenCalledWith('/staff/42/reactivate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer stored-access-token',
+      },
     })
   })
 })
