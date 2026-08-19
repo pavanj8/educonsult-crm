@@ -8,10 +8,34 @@ Usage: python3 scripts/setup_github_issues.py
 Requires: `gh` CLI authenticated, run from repo root.
 """
 import json
+import re
 import subprocess
 import sys
+from pathlib import Path
 
 REPO = "pavanj8/educonsult-crm"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DOD_SOURCE = REPO_ROOT / "docs" / "definition-of-done.md"
+
+
+def load_dod_checklist() -> str:
+    """Derives the checklist embedded in every epic/task issue body directly
+    from docs/definition-of-done.md, so there is exactly one source of
+    truth -- editing that file is all that's needed to change what's shown
+    on GitHub too. See docs/adr/0011 (supersedes the hand-synced constant
+    from docs/adr/0010).
+    """
+    text = DOD_SOURCE.read_text()
+    items = re.findall(r"^- \[ \] .+$", text, flags=re.MULTILINE)
+    if not items:
+        raise RuntimeError(
+            f"No '- [ ] ...' checklist items found in {DOD_SOURCE} -- has its "
+            "format changed? Update this extractor to match."
+        )
+    return "## Definition of Done\n" + "\n".join(items) + "\n\nFull detail: `docs/definition-of-done.md`.\n"
+
+
+DOD_CHECKLIST = load_dod_checklist()
 
 
 def gh_api(method, path, fields=None):
@@ -573,7 +597,8 @@ def main():
         body = (
             f"**Traceability:** {epic['trace']}\n\n"
             f"**Description:** {epic['desc']}\n\n"
-            f"_Tasks will be linked below as they are created._\n"
+            f"_Tasks will be linked below as they are created._\n\n"
+            f"{DOD_CHECKLIST}"
         )
         cmd = [
             "gh", "issue", "create", "-R", REPO,
@@ -601,7 +626,10 @@ def main():
             continue
         for task_title, task_desc in epic["tasks"]:
             labels = f"task,area:{epic['area']},phase:{epic['phase']}"
-            body = f"Part of #{epic_num} ({epic['key']}: {epic['title']})\n\n{task_desc}".strip()
+            body = (
+                f"Part of #{epic_num} ({epic['key']}: {epic['title']})\n\n"
+                f"{task_desc}\n\n{DOD_CHECKLIST}"
+            ).strip()
             cmd = [
                 "gh", "issue", "create", "-R", REPO,
                 "--title", f"[{epic['key']}] {task_title}",
@@ -629,7 +657,9 @@ def main():
         body = (
             f"**Traceability:** {epic['trace']}\n\n"
             f"**Description:** {epic['desc']}\n\n"
-            f"## Tasks\n{checklist}\n"
+            f"## Tasks\n{checklist}\n\n"
+            f"An epic is Done only once every task above is Done.\n\n"
+            f"{DOD_CHECKLIST}"
         )
         r = subprocess.run(
             ["gh", "issue", "edit", str(epic_num), "-R", REPO, "--body", body],
