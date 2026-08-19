@@ -1,4 +1,5 @@
 import json
+import sys
 from subprocess import run
 
 import pytest
@@ -95,7 +96,7 @@ def test_seed_demo_data_rejects_incomplete_catalog() -> None:
 
 def test_seed_cli_validate_only_exits_zero() -> None:
     completed = run(
-        ["python", "-m", "app.seed", "--validate-only", "--json"],
+        [sys.executable, "-m", "app.seed", "--validate-only", "--json"],
         check=False,
         capture_output=True,
         text=True,
