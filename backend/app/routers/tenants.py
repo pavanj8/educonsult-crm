@@ -50,3 +50,46 @@ def create_tenant(
 
     db.refresh(tenant)
     return tenant
+
+
+@router.get("", response_model=list[TenantResponse])
+def list_tenants(
+    _current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.TENANT_READ))
+    ],
+    db: Session = Depends(get_db),
+) -> list[Tenant]:
+    """List all consultancy tenants (super admin only)."""
+    try:
+        return db.query(Tenant).order_by(Tenant.id).all()
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+
+@router.get("/{tenant_id}", response_model=TenantResponse)
+def get_tenant(
+    tenant_id: int,
+    _current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.TENANT_READ))
+    ],
+    db: Session = Depends(get_db),
+) -> Tenant:
+    """Retrieve a single consultancy tenant by id (super admin only)."""
+    try:
+        tenant = db.get(Tenant, tenant_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+
+    return tenant
