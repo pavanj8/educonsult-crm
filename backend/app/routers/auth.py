@@ -1,5 +1,7 @@
 """Authentication routes (E5; Journey J44)."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -14,8 +16,9 @@ from app.auth import (
 )
 from app.db.database import get_db
 from app.models.user import User
+from app.rbac.dependencies import get_current_user
 from app.rbac.user import AuthenticatedUser
-from app.schemas.auth import LoginRequest, RefreshRequest, TokenResponse
+from app.schemas.auth import LoginRequest, MeResponse, RefreshRequest, TokenResponse
 
 router = APIRouter()
 
@@ -79,4 +82,27 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     return TokenResponse(
         access_token=create_access_token(authenticated_user),
         refresh_token=create_refresh_token(authenticated_user),
+    )
+
+
+@router.get("/me", response_model=MeResponse)
+def me(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    db: Session = Depends(get_db),
+) -> MeResponse:
+    """Return the authenticated user's profile for session hydration."""
+    user = db.get(User, current_user.id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        tenant_id=user.tenant_id,
+        branch_id=user.branch_id,
     )
