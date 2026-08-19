@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "30da6e4e72f6"
+HEAD_REVISION = "a1b2c3d4e5f6"
 
 
 def _alembic_config() -> Config:
@@ -48,7 +48,9 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "alembic_version" in inspect(connection).get_table_names()
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
         assert version == HEAD_REVISION
-        assert "users" in inspect(connection).get_table_names()
+        table_names = inspect(connection).get_table_names()
+        assert "users" in table_names
+        assert "tenants" in table_names
 
 
 def test_alembic_downgrade_base_clears_revision(tmp_path, monkeypatch):
