@@ -99,6 +99,62 @@ describe('LoginPage', () => {
     expect(localStorage.getItem('refresh_token')).toBe('test-refresh-token')
   })
 
+  it('navigates to the preserved return path after successful login', async () => {
+    const user = userEvent.setup()
+    mockLoginSuccess()
+
+    render(
+      <AuthProvider>
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: '/login',
+              state: { from: { pathname: '/students/42' } },
+            },
+          ]}
+        >
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/students/42" element={<p>Student detail</p>} />
+            <Route path="/" element={<p>Welcome to EduConsult CRM</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByTestId('login-email'), 'counselor@demo.test')
+    await user.type(screen.getByTestId('login-password'), 'demo-password')
+    await user.click(screen.getByTestId('login-submit'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Student detail')).toBeInTheDocument()
+    })
+  })
+
+  it('redirects already-authenticated users away from the login page', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockUser,
+      }),
+    )
+
+    renderLogin()
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to EduConsult CRM')).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).not.toBeInTheDocument()
+  })
+
   it('trims email whitespace before submitting', async () => {
     const user = userEvent.setup()
     const fetchMock = vi

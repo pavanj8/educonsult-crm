@@ -1,48 +1,108 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import AppLayout from '../layouts/AppLayout'
-import HomePage from '../pages/HomePage'
-import LoginPage from '../pages/LoginPage'
-import NotFoundPage from '../pages/NotFoundPage'
 import { AuthProvider } from '../store/authStore'
+import { AppRoutes } from './index'
+import { LOGIN_PATH } from './ProtectedRoute'
 
-function renderAt(path: string) {
+const mockUser = {
+  id: 1,
+  email: 'counselor@demo.test',
+  role: 'counselor' as const,
+  tenant_id: 10,
+  branch_id: 1,
+}
+
+function LocationStateProbe() {
+  const location = useLocation()
+  const fromPath =
+    location.state && typeof location.state === 'object' && 'from' in location.state
+      ? (location.state.from as { pathname?: string }).pathname ?? ''
+      : ''
+
+  return <div data-testid="redirect-from">{fromPath}</div>
+}
+
+function renderAppAt(path: string) {
   return render(
     <AuthProvider>
       <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<AppLayout />}>
-            <Route index element={<HomePage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
+        <LocationStateProbe />
+        <AppRoutes />
       </MemoryRouter>
     </AuthProvider>,
   )
 }
 
-describe('routing shell', () => {
-  it('renders the app layout and home page at /', () => {
+describe('AppRouter routes', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('redirects unauthenticated users to the public login page', async () => {
+    renderAppAt('/')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('login-email')).toBeInTheDocument()
+    expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+  })
+
+  it('renders the login page directly without auth', async () => {
+    renderAppAt(LOGIN_PATH)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+  })
+
+  it('redirects unauthenticated deep links to login with return path in state', async () => {
+    renderAppAt('/students/42')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('redirect-from')).toHaveTextContent('/students/42')
+  })
+
+  it('renders the app layout and home page for authenticated users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ items: [], unread_count: 0 }),
+      json: async () => mockUser,
     }) as typeof fetch
 
-    renderAt('/')
+    renderAppAt('/')
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to EduConsult CRM')).toBeInTheDocument()
+    })
 
     expect(screen.getByRole('heading', { name: 'EduConsult CRM' })).toBeInTheDocument()
-    expect(screen.getByText('Welcome to EduConsult CRM')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument()
   })
 
-  it('renders the not found page for unknown routes', () => {
-    renderAt('/unknown-route')
+  it('renders the not found page for unknown authenticated routes', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockUser,
+    }) as typeof fetch
 
-    expect(screen.getByText('Page not found')).toBeInTheDocument()
+    renderAppAt('/unknown-route')
+
+    await waitFor(() => {
+      expect(screen.getByText('Page not found')).toBeInTheDocument()
+    })
   })
 
   it('renders the login page at /login without the app layout', async () => {
@@ -52,7 +112,7 @@ describe('routing shell', () => {
       json: async () => ({ detail: 'Not authenticated' }),
     }) as typeof fetch
 
-    renderAt('/login')
+    renderAppAt('/login')
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()

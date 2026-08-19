@@ -5,6 +5,7 @@ import {
   loginThroughForm,
   loginTokensForRole,
   makeAuthHeaders,
+  mockAuthMe,
   mockLoginFailure,
   setAuthSession,
 } from './helpers/auth.js'
@@ -31,8 +32,11 @@ test.describe('Login flow smoke test', () => {
   test('successful login stores tokens via mocked /auth/login', async ({ loginPage, page }) => {
     void loginPage
 
+    await mockAuthMe(page)
     await loginThroughForm(page, DEMO_LOGIN)
     await page.waitForURL('/')
+
+    await expect(page.getByText('Welcome to EduConsult CRM')).toBeVisible()
 
     await expect
       .poll(async () =>
@@ -77,8 +81,11 @@ test.describe('Login flow smoke test', () => {
   test('counselor role login issues role-scoped tokens', async ({ counselorPage, page }) => {
     void counselorPage
 
+    await mockAuthMe(page)
     await loginThroughForm(page, DEMO_LOGIN)
     await page.waitForURL('/')
+
+    await expect(page.getByText('Welcome to EduConsult CRM')).toBeVisible()
 
     const expected = loginTokensForRole('counselor')
     await expect

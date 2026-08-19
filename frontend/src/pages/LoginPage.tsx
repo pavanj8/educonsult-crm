@@ -1,16 +1,35 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { isApiError } from '../api/client'
 import { useAuth } from '../store/authStore'
 
+function postLoginPath(location: ReturnType<typeof useLocation>): string {
+  const state = location.state
+  if (state && typeof state === 'object' && 'from' in state) {
+    const from = state.from as { pathname?: string } | undefined
+    const pathname = from?.pathname
+    if (typeof pathname === 'string' && pathname.startsWith('/') && pathname !== '/login') {
+      return pathname
+    }
+  }
+  return '/'
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login, clearError } = useAuth()
+  const location = useLocation()
+  const { login, clearError, isAuthenticated, isLoading } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const errorId = useId()
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate(postLoginPath(location), { replace: true })
+    }
+  }, [isAuthenticated, isLoading, location, navigate])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -26,7 +45,7 @@ export default function LoginPage() {
 
     try {
       await login(trimmedEmail, passwordValue)
-      navigate('/', { replace: true })
+      navigate(postLoginPath(location), { replace: true })
     } catch (err) {
       if (isApiError(err)) {
         setError(err.message)
@@ -36,6 +55,16 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if ((isLoading && !submitting) || isAuthenticated) {
+    return (
+      <main className="login-page">
+        <div className="auth-loading" role="status" aria-live="polite" aria-label="Loading">
+          Loading…
+        </div>
+      </main>
+    )
   }
 
   return (

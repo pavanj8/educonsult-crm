@@ -3,6 +3,7 @@ import { test as base } from '@playwright/test'
 import {
   accessTokenForRole,
   loginTokensForRole,
+  mockAuthMe,
   mockLoginApi,
   setAuthSession,
   type UserRole,
@@ -29,6 +30,7 @@ export const test = base.extend<AppFixtures>({
   },
 
   authenticatedPage: async ({ page }, use) => {
+    await mockAuthMe(page)
     await setAuthSession(page, accessTokenForRole('counselor'))
     await gotoHome(page)
     await use()

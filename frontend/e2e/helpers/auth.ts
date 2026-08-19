@@ -33,6 +33,14 @@ export const DEMO_LOGIN: LoginCredentials = {
   password: 'demo-password',
 }
 
+export const DEMO_USER = {
+  id: 1,
+  email: 'counselor@demo.test',
+  role: 'counselor' as UserRole,
+  tenant_id: 10,
+  branch_id: 1,
+}
+
 const ROLE_TOKENS: Record<UserRole, string> = {
   super_admin: 'test-token-super-admin',
   consultancy_owner: 'test-token-consultancy-owner',
@@ -54,6 +62,34 @@ export function loginTokensForRole(role: UserRole): LoginTokens {
     refresh_token: `refresh-${role}`,
     token_type: 'bearer',
   }
+}
+
+export async function mockAuthMe(
+  page: Page,
+  user: typeof DEMO_USER = DEMO_USER,
+): Promise<void> {
+  await page.route('**/auth/me', async (route: Route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue()
+      return
+    }
+
+    const authHeader = route.request().headers()['authorization']
+    if (!authHeader?.startsWith('Bearer ')) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Not authenticated' }),
+      })
+      return
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(user),
+    })
+  })
 }
 
 export async function setAuthSession(page: Page, accessToken: string, refreshToken?: string): Promise<void> {
