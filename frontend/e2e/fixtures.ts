@@ -2,6 +2,7 @@ import { test as base } from '@playwright/test'
 
 import {
   accessTokenForRole,
+  CONSULTANCY_OWNER_USER,
   loginTokensForRole,
   mockAuthMe,
   mockLoginApi,
@@ -17,6 +18,7 @@ type AppFixtures = {
   authenticatedPage: void
   counselorPage: void
   superAdminPage: void
+  consultancyOwnerPage: void
 }
 
 export const test = base.extend<AppFixtures>({
@@ -48,6 +50,13 @@ export const test = base.extend<AppFixtures>({
   superAdminPage: async ({ page }, use) => {
     await mockAuthMe(page, SUPER_ADMIN_USER)
     await setAuthSession(page, accessTokenForRole('super_admin'))
+    await gotoHome(page)
+    await use()
+  },
+
+  consultancyOwnerPage: async ({ page }, use) => {
+    await mockAuthMe(page, CONSULTANCY_OWNER_USER)
+    await setAuthSession(page, accessTokenForRole('consultancy_owner'))
     await gotoHome(page)
     await use()
   },
