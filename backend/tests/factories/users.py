@@ -1,5 +1,8 @@
+from datetime import datetime, timezone
 from typing import Any
 
+from app.auth.password import hash_password
+from app.models.user import User
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 
@@ -53,3 +56,34 @@ def make_authenticated_user(
         tenant_id=resolved_tenant_id,
         branch_id=resolved_branch_id,
     )
+
+
+def make_db_user(
+    db_session,
+    role: Role,
+    *,
+    email: str | None = None,
+    password: str = "test-password",
+    tenant_id: int | None | Any = _AUTO,
+    branch_id: int | None | Any = _AUTO,
+) -> User:
+    """Persist a ``User`` row with a bcrypt password hash for integration tests."""
+    auth_user = make_authenticated_user(
+        role,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+    )
+    now = datetime.now(timezone.utc)
+    user = User(
+        email=email or f"{role.value}-{next_test_id()}@example.test",
+        password_hash=hash_password(password),
+        role=auth_user.role,
+        tenant_id=auth_user.tenant_id,
+        branch_id=auth_user.branch_id,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
