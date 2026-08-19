@@ -1,12 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import AppLayout from '../layouts/AppLayout'
-import HomePage from '../pages/HomePage'
-import NotFoundPage from '../pages/NotFoundPage'
 import { AuthProvider } from '../store/authStore'
-import ProtectedRoute, { LOGIN_PATH } from './ProtectedRoute'
+import { AppRoutes } from './index'
+import { LOGIN_PATH } from './ProtectedRoute'
 
 const mockUser = {
   id: 1,
@@ -16,43 +14,60 @@ const mockUser = {
   branch_id: 1,
 }
 
-function TestRouter({ initialPath }: { initialPath: string }) {
-  return (
-    <MemoryRouter initialEntries={[initialPath]}>
-      <Routes>
-        <Route path={LOGIN_PATH} element={<div>Login page</div>} />
-        <Route element={<ProtectedRoute />}>
-          <Route element={<AppLayout />}>
-            <Route index element={<HomePage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Route>
-      </Routes>
-    </MemoryRouter>
-  )
+function LocationStateProbe() {
+  const location = useLocation()
+  const fromPath =
+    location.state && typeof location.state === 'object' && 'from' in location.state
+      ? (location.state.from as { pathname?: string }).pathname ?? ''
+      : ''
+
+  return <div data-testid="redirect-from">{fromPath}</div>
 }
 
-function renderAt(path: string) {
+function renderAppAt(path: string) {
   return render(
     <AuthProvider>
-      <TestRouter initialPath={path} />
+      <MemoryRouter initialEntries={[path]}>
+        <LocationStateProbe />
+        <AppRoutes />
+      </MemoryRouter>
     </AuthProvider>,
   )
 }
 
-describe('routing shell', () => {
+describe('AppRouter routes', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     localStorage.clear()
   })
 
-  it('redirects unauthenticated users to login', async () => {
-    renderAt('/')
+  it('redirects unauthenticated users to the public login page', async () => {
+    renderAppAt('/')
 
     await waitFor(() => {
-      expect(screen.getByText('Login page')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    })
+    expect(screen.getByText('Please sign in to continue to EduConsult CRM.')).toBeInTheDocument()
+    expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+  })
+
+  it('renders the login page directly without auth', async () => {
+    renderAppAt(LOGIN_PATH)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     })
     expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+  })
+
+  it('redirects unauthenticated deep links to login with return path in state', async () => {
+    renderAppAt('/students/42')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('redirect-from')).toHaveTextContent('/students/42')
   })
 
   it('renders the app layout and home page for authenticated users', async () => {
@@ -64,7 +79,7 @@ describe('routing shell', () => {
       json: async () => mockUser,
     }) as typeof fetch
 
-    renderAt('/')
+    renderAppAt('/')
 
     await waitFor(() => {
       expect(screen.getByText('Welcome to EduConsult CRM')).toBeInTheDocument()
@@ -83,7 +98,7 @@ describe('routing shell', () => {
       json: async () => mockUser,
     }) as typeof fetch
 
-    renderAt('/unknown-route')
+    renderAppAt('/unknown-route')
 
     await waitFor(() => {
       expect(screen.getByText('Page not found')).toBeInTheDocument()

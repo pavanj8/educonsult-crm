@@ -10,7 +10,7 @@ export default function ProtectedRoute() {
 
   if (isLoading) {
     return (
-      <div className="auth-loading" role="status" aria-live="polite">
+      <div className="auth-loading" role="status" aria-live="polite" aria-label="Loading">
         Loading…
       </div>
     )

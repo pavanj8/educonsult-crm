@@ -1,12 +1,27 @@
 import { expect, test } from './fixtures.js'
 import { mockAuthMe } from './helpers/auth.js'
-import { gotoHome, LOGIN_PATH } from './helpers/navigation.js'
+import { gotoHome, gotoPath, LOGIN_PATH } from './helpers/navigation.js'
 
 test.describe('Protected routes', () => {
   test('unauthenticated visit to home redirects to login', async ({ page }) => {
     await gotoHome(page)
 
     await expect(page).toHaveURL(LOGIN_PATH)
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+    await expect(page.getByText('Please sign in to continue to EduConsult CRM.')).toBeVisible()
+  })
+
+  test('unauthenticated deep link redirects to login and preserves return path', async ({ page }) => {
+    await gotoPath(page, '/students/42')
+
+    await expect(page).toHaveURL(LOGIN_PATH)
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+
+    const returnPath = await page.evaluate(() => {
+      const state = window.history.state as { usr?: { from?: { pathname?: string } } } | null
+      return state?.usr?.from?.pathname ?? null
+    })
+    expect(returnPath).toBe('/students/42')
   })
 
   test('authenticated visit to home loads the app shell', async ({ page }) => {

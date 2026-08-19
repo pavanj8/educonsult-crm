@@ -36,7 +36,7 @@ describe('ProtectedRoute', () => {
 
     renderProtected()
 
-    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Loading…')
+    expect(screen.getByRole('status', { name: 'Loading' })).toHaveTextContent('Loading…')
     expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
     expect(screen.queryByText('Login page')).not.toBeInTheDocument()
   })
