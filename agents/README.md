@@ -40,12 +40,12 @@ see `docs/adr/0009`). Triggers:
 
 One workflow run = one iteration, sequentially: Dev Agent -> commit+push ->
 hard gate -> Test Agent -> Review Agent -> open/update a PR -> finalize
-labels + summary comment. If anything fails, the issue gets
-`agent:needs-rework` and the PR stays open with the branch as-is; re-add
-`agent:ready-for-dev` (or comment `/dev-agent` again) to run another
-iteration on the same branch. Auto-merge is intentionally not implemented
-yet — a green `agent:ready-to-merge` still needs a human to merge the PR
-(which then closes the issue, since the PR body says "Closes #N").
+labels + summary comment -> auto-merge if green
+(`docs/adr/0011-auto-merge-agent-harness-prs.md`). If anything fails, the
+issue gets `agent:needs-rework` and the PR stays open with the branch
+as-is; re-add `agent:ready-for-dev` (or comment `/dev-agent` again) to run
+another iteration on the same branch. A repo-wide `concurrency:` group on
+the workflow means only one iteration runs at a time.
 
 ## Required repo setup (one-time)
 
@@ -80,13 +80,13 @@ python finalize_iteration.py 123 1 --hard-gate true --test true --review true
 
 ## Known gaps (tracked, not yet resolved)
 
-- `backend/` doesn't exist yet in this repo — `test_agent.py` degrades
-  gracefully (PASS-by-N/A) until the scaffolding ticket lands, per
-  `agents/target_app.py`'s conventions. Once `backend/app/main.py` exists,
-  confirm it actually matches those conventions (module path, `/health`
-  endpoint, `DATABASE_OVERRIDE` env var support for test isolation).
 - No auto-looping across iterations yet (docs/adr/0009's "deferred"
-  alternative) — a human/comment must trigger each retry.
+  alternative) — a human/comment must trigger each retry on a
+  `agent:needs-rework` issue; nothing retries it automatically.
 - `check_test_gate.py`'s test-to-code mapping is a repo-wide heuristic
   (did *any* test change when *any* app code changed), not per-ticket
   traceability.
+- GitHub's `Closes #N` PR-body keyword has not reliably auto-closed the
+  issue on every merge done via `gh pr merge` in practice; worth
+  double-checking, or closing the issue explicitly as a fallback in the
+  auto-merge workflow step.
