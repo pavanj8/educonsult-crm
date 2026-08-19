@@ -6,18 +6,21 @@ import AppLayout from '../layouts/AppLayout'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import NotFoundPage from '../pages/NotFoundPage'
+import { AuthProvider } from '../store/authStore'
 
 function renderAt(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route element={<AppLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<AppLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
   )
 }
 
@@ -42,10 +45,16 @@ describe('routing shell', () => {
     expect(screen.getByText('Page not found')).toBeInTheDocument()
   })
 
-  it('renders the login page at /login without the app layout', () => {
+  it('renders the login page at /login without the app layout', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: 'Not authenticated' }),
+    }) as typeof fetch
+
     renderAt('/login')
 
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()
   })
 })

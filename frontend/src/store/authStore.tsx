@@ -88,12 +88,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null)
       try {
         const tokens = await loginApi({ email, password })
+        if (typeof tokens.access_token !== 'string' || tokens.access_token.length === 0) {
+          throw new Error('Unable to sign in')
+        }
         setTokens(tokens.access_token, tokens.refresh_token)
         const profile = await fetchMe()
         setUser(profile)
       } catch (err) {
         logout()
-        setError(authErrorMessage(err, 'Invalid email or password'))
+        const message =
+          err instanceof Error && err.message.length > 0
+            ? err.message
+            : authErrorMessage(err, 'Invalid email or password')
+        setError(message)
         throw err
       } finally {
         setIsLoading(false)

@@ -121,6 +121,28 @@ describe('AuthProvider', () => {
     expect(localStorage.getItem('access_token')).toBeNull()
   })
 
+  it('login rejects responses missing access_token', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ refresh_token: 'refresh-only' }),
+    }) as typeof fetch
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    await expect(result.current.login('counselor@demo.test', 'demo-password')).rejects.toThrow()
+
+    await waitFor(() => {
+      expect(result.current.error).toBe('Unable to sign in')
+    })
+
+    expect(localStorage.getItem('access_token')).toBeNull()
+  })
+
   it('logout clears tokens and user state', async () => {
     localStorage.setItem('access_token', 'stored-access-token')
     localStorage.setItem('refresh_token', 'stored-refresh-token')
