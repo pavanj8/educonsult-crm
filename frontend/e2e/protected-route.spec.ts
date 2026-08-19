@@ -8,7 +8,7 @@ test.describe('Protected routes', () => {
 
     await expect(page).toHaveURL(LOGIN_PATH)
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-    await expect(page.getByText('Please sign in to continue to EduConsult CRM.')).toBeVisible()
+    await expect(page.getByTestId('login-email')).toBeVisible()
   })
 
   test('unauthenticated deep link redirects to login and preserves return path', async ({ page }) => {

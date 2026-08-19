@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -22,6 +23,8 @@ from app.schemas.auth import LoginRequest, MeResponse, RefreshRequest, TokenResp
 
 router = APIRouter()
 
+_DB_UNAVAILABLE_DETAIL = "Authentication service is temporarily unavailable"
+
 
 def _user_to_authenticated_user(user: User) -> AuthenticatedUser:
     return AuthenticatedUser(
@@ -36,11 +39,17 @@ def _user_to_authenticated_user(user: User) -> AuthenticatedUser:
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """Authenticate with email and password; return JWT access and refresh tokens."""
     normalized_email = payload.email.strip().lower()
-    user = (
-        db.query(User)
-        .filter(func.lower(User.email) == normalized_email)
-        .one_or_none()
-    )
+    try:
+        user = (
+            db.query(User)
+            .filter(func.lower(User.email) == normalized_email)
+            .one_or_none()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
 
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
@@ -71,7 +80,14 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
             detail="Invalid refresh token",
         ) from None
 
-    user = db.get(User, token_user.id)
+    try:
+        user = db.get(User, token_user.id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

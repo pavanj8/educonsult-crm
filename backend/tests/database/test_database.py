@@ -71,6 +71,27 @@ def test_get_db_yields_session_and_closes(monkeypatch, sqlite_engine):
     assert closed == [True]
 
 
+def test_get_db_rolls_back_on_exception(monkeypatch, sqlite_engine):
+    test_session_local = sessionmaker(autocommit=False, autoflush=False, bind=sqlite_engine)
+    rolled_back: list[bool] = []
+    original_rollback = test_session_local.class_.rollback
+
+    def tracking_rollback(self):
+        rolled_back.append(True)
+        return original_rollback(self)
+
+    monkeypatch.setattr(test_session_local.class_, "rollback", tracking_rollback)
+    monkeypatch.setattr(database_module, "SessionLocal", test_session_local)
+
+    generator = get_db()
+    session = next(generator)
+    with pytest.raises(RuntimeError):
+        generator.throw(RuntimeError("simulated handler failure"))
+
+    assert rolled_back == [True]
+    session.close()
+
+
 def test_tenant_scoped_base_has_required_columns():
     mapper = inspect(_SampleTenantModel)
     column_names = {column.key for column in mapper.columns}

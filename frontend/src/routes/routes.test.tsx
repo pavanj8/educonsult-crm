@@ -47,7 +47,7 @@ describe('AppRouter routes', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     })
-    expect(screen.getByText('Please sign in to continue to EduConsult CRM.')).toBeInTheDocument()
+    expect(screen.getByTestId('login-email')).toBeInTheDocument()
     expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
   })
 
@@ -103,5 +103,18 @@ describe('AppRouter routes', () => {
     await waitFor(() => {
       expect(screen.getByText('Page not found')).toBeInTheDocument()
     })
+  })
+
+  it('renders the login page at /login without the app layout', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: 'Not authenticated' }),
+    }) as typeof fetch
+
+    renderAppAt('/login')
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()
   })
 })

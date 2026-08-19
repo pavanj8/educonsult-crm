@@ -1,6 +1,8 @@
 import pytest
 
 from app.auth import verify_access_token, verify_refresh_token
+from app.db.database import get_db
+from app.main import app
 from app.rbac.roles import Role
 from tests.factories.users import make_db_user
 
@@ -99,3 +101,41 @@ def test_login_rejects_missing_credentials(client):
     response = client.post("/auth/login", json={"email": "user@example.test"})
 
     assert response.status_code == 422
+
+
+def test_login_returns_503_when_database_unavailable(client):
+    from unittest.mock import MagicMock
+
+    from sqlalchemy.exc import OperationalError
+
+    mock_session = MagicMock()
+    mock_session.query.side_effect = OperationalError("stmt", {}, Exception("no such table"))
+
+    def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = client.post(
+            "/auth/login",
+            json={"email": "nobody@example.com", "password": "WrongPass1!"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Authentication service is temporarily unavailable",
+    }
+
+
+def test_health_remains_available_after_failed_login(client):
+    client.post(
+        "/auth/login",
+        json={"email": "nobody@example.com", "password": "WrongPass1!"},
+    )
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
