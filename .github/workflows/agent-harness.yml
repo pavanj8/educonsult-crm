@@ -86,13 +86,32 @@ jobs:
         run: |
           BRANCH="agent/issue-${{ steps.issue.outputs.number }}"
           git fetch origin
+          git config user.name "agent-harness-bot"
+          git config user.email "agent-harness-bot@users.noreply.github.com"
           if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
             git checkout -B "$BRANCH" "origin/$BRANCH"
+            # Bring a resumed branch up to date with main so it inherits merged
+            # fixes (e.g. lint cleanups) instead of running stale copies of
+            # shared files like backend/tests (docs/adr/0019 follow-up).
+            # Protected paths (tooling/docs/CI) are authoritative on main and
+            # legitimately diverge as the harness evolves, so any conflict there
+            # is auto-resolved in main's favor; a real conflict in PRODUCT code
+            # aborts loudly for manual resolution.
+            git merge --no-commit --no-ff origin/main || true
+            for p in agents docs .github harness-demo .cursor; do
+              git checkout origin/main -- "$p" 2>/dev/null || true
+            done
+            git add -A
+            if git diff --name-only --diff-filter=U | grep -q .; then
+              echo "::error::Merge conflict outside protected paths in $BRANCH; needs manual resolution."
+              git merge --abort
+              exit 1
+            fi
+            # Complete the merge commit (no-op if the branch was already current).
+            git commit --no-edit -m "Sync $BRANCH with main" 2>/dev/null || true
           else
             git checkout -B "$BRANCH" origin/main
           fi
-          git config user.name "agent-harness-bot"
-          git config user.email "agent-harness-bot@users.noreply.github.com"
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Refresh harness tooling from main (protected paths)

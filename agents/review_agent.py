@@ -39,6 +39,45 @@ PERSPECTIVES = [
     "Test Engineer",
 ]
 
+# Structured final-report tool (docs/adr/0019 follow-up). The agent calls this
+# to deliver its verdict instead of emitting a ```json block in free text,
+# which silently produced UNKNOWN when the model ran long or formatted loosely.
+REPORT_TOOL = {
+    "name": "submit_report",
+    "description": (
+        "Submit your FINAL structured review report. Call this exactly once, "
+        "when you have finished reviewing from all five perspectives. Calling "
+        "it ends the session, so do all your analysis first."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "enum": ["PASS", "FAIL"]},
+            "issue_number": {"type": "integer"},
+            "iteration": {"type": "integer"},
+            "findings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "perspective": {
+                            "type": "string",
+                            "enum": PERSPECTIVES,
+                        },
+                        "severity": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]},
+                        "issue": {"type": "string"},
+                        "location": {"type": "string"},
+                        "recommendation": {"type": "string"},
+                    },
+                    "required": ["perspective", "severity", "issue", "recommendation"],
+                },
+            },
+            "summary": {"type": "string"},
+        },
+        "required": ["status", "findings", "summary"],
+    },
+}
+
 
 def read_text(path: Path) -> str:
     return path.read_text() if path.exists() else f"[missing: {path}]"
@@ -125,28 +164,17 @@ context beyond the diff hunks shown above.
 
 This is review iteration {iteration} for this issue.
 
-## Final report format
-End your response with a fenced ```json block with EXACTLY this shape
-(empty list for "findings" if there are none):
-{{
-  "status": "PASS" or "FAIL",
-  "issue_number": {issue['number']},
-  "iteration": {iteration},
-  "findings": [
-    {{
-      "perspective": "Security Analyst" | "Software Architect" | "Senior Developer" | "UX Architect" | "Test Engineer",
-      "severity": "HIGH" or "MEDIUM" or "LOW",
-      "issue": "what is wrong",
-      "location": "file/function or diff hunk it refers to",
-      "recommendation": "concrete fix"
-    }}
-  ],
-  "summary": "one paragraph overall verdict"
-}}
+## Finishing — deliver your report via the tool
+When (and only when) you have finished reviewing from all five perspectives,
+call the `submit_report` tool with your verdict. Do NOT print the report as
+text; the tool is the report. Use an empty "findings" list if there are none.
+Each finding needs: perspective, severity (HIGH/MEDIUM/LOW), issue, location,
+recommendation. Set issue_number={issue['number']} and iteration={iteration}.
 
 Overall "status" is FAIL if there is any HIGH severity finding from any
 perspective, otherwise PASS (MEDIUM/LOW findings should still be listed but
-don't block).
+don't block). Be efficient — once you have reviewed the diff from every
+perspective, submit; do not keep re-running the whole test suite.
 """
 
 
@@ -160,7 +188,7 @@ def run_review_agent(issue: dict, model: str, diff: str, iteration: int) -> tupl
     )
 
     print(f"--- Review Agent starting for issue #{issue['number']} (model={model}) ---\n")
-    return minimax_agent.run_agent("review-agent", prompt, model, REPO_ROOT)
+    return minimax_agent.run_agent("review-agent", prompt, model, REPO_ROOT, report_tool=REPORT_TOOL)
 
 
 def extract_json_report(final_text: str) -> dict | None:
