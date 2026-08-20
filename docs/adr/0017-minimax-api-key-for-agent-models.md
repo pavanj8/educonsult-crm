@@ -1,6 +1,6 @@
 # ADR-0017: MiniMax API key for agent harness model inference
 
-**Status**: Accepted — implemented
+**Status**: Superseded by [ADR-0018](0018-revert-minimax-sdk-model-ids.md)
 **Date**: 2026-08-20
 
 ## Context

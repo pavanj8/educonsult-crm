@@ -44,4 +44,6 @@ receive new entries.
 | [0014](0014-local-sdk-runtime-model-subset.md) | Local SDK runtime only executes a subset of listed models | Accepted — implemented | 2026-08-19 |
 | [0015](0015-auto-retry-needs-rework.md) | Auto-retry `agent:needs-rework` with Test/Review feedback | Accepted — implemented | 2026-08-19 |
 | [0016](0016-pipeline-parallelism.md) | Pipeline parallelism: Dev, Test, and Review on different tickets | Accepted — implemented | 2026-08-19 |
-| [0017](0017-minimax-api-key-for-agent-models.md) | MiniMax API key for agent harness model inference | Accepted — implemented | 2026-08-20 |
+| [0017](0017-minimax-api-key-for-agent-models.md) | MiniMax API key for agent harness model inference | Superseded by ADR-0018 | 2026-08-20 |
+| [0018](0018-revert-minimax-sdk-model-ids.md) | Revert MiniMax model IDs — not valid on Cursor SDK local runtime | Superseded by ADR-0019 | 2026-08-20 |
+| [0019](0019-minimax-agent-loop-replaces-cursor-sdk.md) | Replace the Cursor SDK engine with a direct-MiniMax agent loop | Accepted — implemented | 2026-08-20 |

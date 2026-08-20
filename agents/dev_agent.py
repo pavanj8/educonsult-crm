@@ -5,7 +5,7 @@ Actions workflow (.github/workflows/agent-harness.yml) on a branch checked
 out from `main`, but can also be run manually for debugging.
 
 Usage:
-    export CURSOR_API_KEY=cursor_...
+    export MINIMAX_API_KEY=...
     python agents/dev_agent.py <issue_number> --iteration 1
 """
 from __future__ import annotations
@@ -19,19 +19,16 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from cursor_sdk import Agent, CursorAgentError, LocalAgentOptions
-
 import github_ticket_utils as ticket_utils
 import llm_env
-import sdk_run
+import minimax_agent
 import target_app
 
 llm_env.configure_minimax_env()
 
 REPO_ROOT = target_app.REPO_ROOT
-# Fast/cheap tier for Dev. With MINIMAX_API_KEY set, defaults to
-# MiniMax-M2.5-highspeed; otherwise composer-2.5 (docs/adr/0017).
-DEFAULT_MODEL = os.environ.get("DEV_AGENT_MODEL", "composer-2.5")
+# Fast/cheap MiniMax tier for Dev (docs/adr/0019). Overridable via env.
+DEFAULT_MODEL = os.environ.get("DEV_AGENT_MODEL", llm_env.DEFAULT_DEV_MODEL)
 
 
 def read_text(path: Path) -> str:
@@ -149,28 +146,7 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
     )
 
     print(f"--- Dev Agent starting for issue #{issue['number']} (model={model}) ---\n")
-
-    try:
-        with Agent.create(
-            model=model,
-            api_key=llm_env.cursor_api_key(),
-            local=LocalAgentOptions(cwd=str(REPO_ROOT), auto_review=False),
-        ) as agent:
-            run = agent.send(prompt)
-            print(f"[dev-agent] agent_id={agent.agent_id} run_id={run.id}")
-            final_text_parts: list[str] = []
-            for message in run.messages():
-                if message.type == "assistant":
-                    for block in message.message.content:
-                        if getattr(block, "type", None) == "text":
-                            sys.stdout.write(block.text)
-                            sys.stdout.flush()
-                            final_text_parts.append(block.text)
-            result = run.wait()
-            return sdk_run.finish_run("dev-agent", result, "".join(final_text_parts))
-    except CursorAgentError as err:
-        print(f"[dev-agent] STARTUP FAILURE: {err}", file=sys.stderr)
-        return "startup_error", str(err)
+    return minimax_agent.run_agent("dev-agent", prompt, model, REPO_ROOT)
 
 
 def git_files_changed() -> list[str]:
@@ -192,7 +168,7 @@ def run_pytest_independently() -> tuple[int, str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Dev Agent: implement a GitHub Issue via Cursor SDK")
+    parser = argparse.ArgumentParser(description="Dev Agent: implement a GitHub Issue via MiniMax")
     parser.add_argument("issue_number", type=int)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--iteration", type=int, default=1)
