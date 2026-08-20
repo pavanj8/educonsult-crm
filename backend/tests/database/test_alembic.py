@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "f7a8b9c0d1e2"
+HEAD_REVISION = "f8a9b0c1d2e3"
 
 
 def _alembic_config() -> Config:
@@ -54,6 +54,9 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "branches" in table_names
         assert "stage_transitions" in table_names
         assert "applications" in table_names
+        assert "countries" in table_names
+        assert "universities" in table_names
+        assert "programs" in table_names
         user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
         assert "is_active" in user_columns
         assert "name" in user_columns

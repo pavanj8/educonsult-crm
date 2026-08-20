@@ -37,10 +37,37 @@ class DemoUserRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class DemoCountryRecord:
+    id: int
+    tenant_id: int
+    name: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True)
+class DemoUniversityRecord:
+    id: int
+    tenant_id: int
+    country_id: int
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class DemoProgramRecord:
+    id: int
+    tenant_id: int
+    university_id: int
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class DemoCatalog:
     tenants: tuple[DemoTenantRecord, ...]
     branches: tuple[DemoBranchRecord, ...]
     users: tuple[DemoUserRecord, ...]
+    countries: tuple[DemoCountryRecord, ...]
+    universities: tuple[DemoUniversityRecord, ...]
+    programs: tuple[DemoProgramRecord, ...]
 
 
 def _user(
@@ -198,7 +225,71 @@ def build_demo_catalog() -> DemoCatalog:
             branch_id=3,
         ),
     )
-    return DemoCatalog(tenants=tenants, branches=branches, users=users)
+    countries = (
+        DemoCountryRecord(id=1, tenant_id=1, name="Canada", code="CA"),
+        DemoCountryRecord(id=2, tenant_id=1, name="United Kingdom", code="GB"),
+        DemoCountryRecord(id=3, tenant_id=2, name="Australia", code="AU"),
+    )
+    universities = (
+        DemoUniversityRecord(
+            id=10,
+            tenant_id=1,
+            country_id=1,
+            name="University of Toronto",
+        ),
+        DemoUniversityRecord(
+            id=11,
+            tenant_id=1,
+            country_id=1,
+            name="University of British Columbia",
+        ),
+        DemoUniversityRecord(
+            id=20,
+            tenant_id=1,
+            country_id=2,
+            name="University of Manchester",
+        ),
+        DemoUniversityRecord(
+            id=30,
+            tenant_id=2,
+            country_id=3,
+            name="University of Melbourne",
+        ),
+    )
+    programs = (
+        DemoProgramRecord(
+            id=100,
+            tenant_id=1,
+            university_id=10,
+            name="Computer Science MSc",
+        ),
+        DemoProgramRecord(
+            id=101,
+            tenant_id=1,
+            university_id=10,
+            name="Business Administration MBA",
+        ),
+        DemoProgramRecord(
+            id=110,
+            tenant_id=1,
+            university_id=11,
+            name="Data Science MSc",
+        ),
+        DemoProgramRecord(
+            id=200,
+            tenant_id=2,
+            university_id=30,
+            name="Engineering PhD",
+        ),
+    )
+    return DemoCatalog(
+        tenants=tenants,
+        branches=branches,
+        users=users,
+        countries=countries,
+        universities=universities,
+        programs=programs,
+    )
 
 
 _DEMO_CATALOG: DemoCatalog | None = None
