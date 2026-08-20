@@ -39,10 +39,14 @@ ADR builds that different architecture.
    still boots the backend on `127.0.0.1` *inside that runner*. No personal
    machine is involved. "Local" only ever meant "in the runner," never the
    owner's Mac.
-4. **Keep `CURSOR_API_KEY` dormant.** The secret and workflow env var stay in
-   place but no agent consumes them (`llm_env.cursor_api_key()` is retained,
-   unused), mirroring how `MINIMAX_API_KEY` was kept dormant under ADR-0018.
-   `cursor-sdk` stays in `requirements.txt` but is no longer imported.
+4. **Keep `CURSOR_API_KEY` dormant, but remove the `cursor-sdk` package.** The
+   secret and workflow env var stay in place but no agent consumes them
+   (`llm_env.cursor_api_key()` is retained, unused). The `cursor-sdk`
+   *package*, however, must be **uninstalled**: the egress probe (see
+   Consequences) showed that its mere presence on the path reroutes the
+   `openai` client onto the Cursor gateway — the actual cause of the
+   "MiniMax model IDs rejected with Cursor's catalog" symptom. It is removed
+   from `agents/requirements.txt`.
 5. **Model tiering preserved (ADR-0013).** Dev uses the cheap tier
    (`MiniMax-M2.5-highspeed`), Test + Review use the stronger tier
    (`MiniMax-M3`). All overridable via `*_AGENT_MODEL` workflow env.
@@ -74,3 +78,14 @@ ADR builds that different architecture.
 - China-region deployments set `MINIMAX_BASE_URL` to the `.com` endpoint.
 - `agents/sdk_run.py` (Cursor-specific run diagnostics) is left in place but
   unreferenced; a future cleanup ADR may remove it.
+- **Egress probe finding (2026-08-20).** The first two Dev runs returned
+  Cursor's catalog despite `base_url=https://api.minimax.io/v1`. A dedicated
+  probe (`agents/egress_probe.py`, workflow `minimax-egress-probe.yml`) run on
+  the GitHub runner proved: egress to `api.minimax.io` works (real DNS, no
+  proxy), the `openai` client honors `base_url`, and the key is valid (HTTP
+  429, not 401). The differentiator was that the agent env also installed
+  `cursor-sdk`, whose presence hijacks the `openai` client. Fix: drop the
+  package. Second finding: the MiniMax **Token Plan is out of credits** (HTTP
+  429 `rate_limit_error` 2056, "Upgrade your Token Plan or purchase Credits");
+  the harness cannot run for real until credits are topped up. The probe
+  workflow/script are one-off and may be deleted once resolved.

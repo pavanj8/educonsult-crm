@@ -1,6 +1,10 @@
 # MiniMax is OpenAI-compatible; the harness engine (minimax_agent.py) drives
 # the agents through this client (docs/adr/0019).
 openai>=1.30
-# Kept installed but no longer imported: the Cursor SDK engine was replaced by
-# MiniMax (docs/adr/0019). Left in place alongside a dormant CURSOR_API_KEY.
-cursor-sdk==1.0.28
+
+# NOTE: cursor-sdk is intentionally NOT installed. The egress probe
+# (docs/adr/0019 follow-up) showed that merely having cursor-sdk on the path
+# reroutes the `openai` client onto the Cursor gateway (identical openai
+# version, destination flips), which is exactly why MiniMax model IDs were
+# rejected with Cursor's catalog. The CURSOR_API_KEY env var can stay set
+# (dormant) for a possible rollback, but the package must be absent.
