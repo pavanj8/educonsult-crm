@@ -34,10 +34,7 @@ export default function UniversitySelect({
         label="Target university"
         value={value}
         onChange={onChange}
-        options={universities.map((university) => ({
-          id: university.id,
-          label: university.name,
-        }))}
+        options={universities.map((university) => ({ id: university.id, label: university.name }))}
         loading={loading}
         disabled={disabled}
         waitingForUpstream={waitingForCountry}

@@ -18,6 +18,26 @@ const MOCK_COUNTRIES = [{ id: 1, tenant_id: 10, name: 'Canada', code: 'CA' }]
 const MOCK_UNIVERSITIES = [{ id: 10, tenant_id: 10, country_id: 1, name: 'University of Toronto' }]
 const MOCK_PROGRAMS = [{ id: 100, tenant_id: 10, university_id: 10, name: 'Computer Science MSc' }]
 
+async function waitForSelectOption(
+  page: import('@playwright/test').Page,
+  selectTestId: string,
+  optionLabel: string,
+) {
+  await expect(
+    page.getByTestId(selectTestId).locator('option', { hasText: optionLabel }),
+  ).toHaveCount(1, { timeout: 5000 })
+}
+
+async function expectSelectOptionAbsent(
+  page: import('@playwright/test').Page,
+  selectTestId: string,
+  optionLabel: string,
+) {
+  await expect(
+    page.getByTestId(selectTestId).locator('option', { hasText: optionLabel }),
+  ).toHaveCount(0)
+}
+
 async function mockMasterDataRoutes(page: import('@playwright/test').Page) {
   await page.route('**/tenants/apex/countries', async (route) => {
     await route.fulfill({
@@ -89,14 +109,14 @@ async function fillRegisterForm(
   data = VALID_REGISTRATION,
 ) {
   await page.getByTestId('register-tenant-slug').fill(data.tenantSlug)
-  await expect(page.getByRole('option', { name: 'Canada' })).toBeVisible({ timeout: 5000 })
+  await waitForSelectOption(page, 'register-target-country', 'Canada')
   if (data.countryId) {
     await page.getByTestId('register-target-country').selectOption(data.countryId)
-    await expect(page.getByRole('option', { name: 'University of Toronto' })).toBeVisible()
+    await waitForSelectOption(page, 'register-target-university', 'University of Toronto')
   }
   if (data.universityId) {
     await page.getByTestId('register-target-university').selectOption(data.universityId)
-    await expect(page.getByRole('option', { name: 'Computer Science MSc' })).toBeVisible()
+    await waitForSelectOption(page, 'register-target-program', 'Computer Science MSc')
   }
   if (data.programId) {
     await page.getByTestId('register-target-program').selectOption(data.programId)
@@ -224,5 +244,83 @@ test.describe('Student registration form', () => {
     await page.getByRole('link', { name: 'Create an account' }).click()
     await expect(page).toHaveURL(REGISTER_PATH)
     await expect(page.getByRole('heading', { name: 'Create student account' })).toBeVisible()
+  })
+
+  test('slower previous slug response does not replace current country options', async ({
+    page,
+  }) => {
+    let resolveSlow: (() => void) | null = null
+    const slowReady = new Promise<void>((resolve) => {
+      resolveSlow = resolve
+    })
+
+    await page.route('**/tenants/slow/countries', async (route) => {
+      await slowReady
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([{ id: 99, tenant_id: 10, name: 'Stale Country', code: 'ST' }]),
+      })
+    })
+
+    await page.route('**/tenants/fast/countries', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(MOCK_COUNTRIES),
+      })
+    })
+
+    await page.goto(REGISTER_PATH)
+    await page.getByTestId('register-tenant-slug').fill('slow')
+    await page.waitForTimeout(350)
+    await page.getByTestId('register-tenant-slug').fill('fast')
+
+    await waitForSelectOption(page, 'register-target-country', 'Canada')
+    await expectSelectOptionAbsent(page, 'register-target-country', 'Stale Country')
+
+    resolveSlow?.()
+    await page.waitForTimeout(300)
+    await waitForSelectOption(page, 'register-target-country', 'Canada')
+    await expectSelectOptionAbsent(page, 'register-target-country', 'Stale Country')
+  })
+
+  test('unknown consultancy shows country error alert inside study preferences fieldset', async ({
+    page,
+  }) => {
+    await page.route('**/tenants/missing/countries', async (route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Tenant not found' }),
+      })
+    })
+
+    await page.goto(REGISTER_PATH)
+    await page.getByTestId('register-tenant-slug').fill('missing')
+
+    const fieldset = page.getByRole('group', { name: 'Study preferences' })
+    await expect(fieldset.getByTestId('register-countries-error')).toBeVisible({ timeout: 5000 })
+    await expect(fieldset.getByTestId('register-countries-error')).toHaveText(
+      'Consultancy not found',
+    )
+  })
+
+  test('changing country clears university and program selections', async ({ page }) => {
+    await mockMasterDataRoutes(page)
+    await page.goto(REGISTER_PATH)
+
+    await page.getByTestId('register-tenant-slug').fill(VALID_REGISTRATION.tenantSlug)
+    await waitForSelectOption(page, 'register-target-country', 'Canada')
+    await page.getByTestId('register-target-country').selectOption(VALID_REGISTRATION.countryId)
+    await waitForSelectOption(page, 'register-target-university', 'University of Toronto')
+    await page.getByTestId('register-target-university').selectOption(VALID_REGISTRATION.universityId)
+    await waitForSelectOption(page, 'register-target-program', 'Computer Science MSc')
+    await page.getByTestId('register-target-program').selectOption(VALID_REGISTRATION.programId)
+
+    await page.getByTestId('register-target-country').selectOption('')
+
+    await expect(page.getByTestId('register-target-university')).toHaveValue('')
+    await expect(page.getByTestId('register-target-program')).toHaveValue('')
   })
 })
