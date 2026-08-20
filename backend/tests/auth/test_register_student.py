@@ -1,9 +1,6 @@
 """Signup validation tests for POST /auth/register-student (E16, Journey J9, issue #140)."""
 
-<<<<<<< HEAD
 from datetime import date, timedelta
-=======
->>>>>>> origin/main
 
 from app.auth import verify_access_token, verify_refresh_token
 from app.auth.password import verify_password
@@ -17,50 +14,16 @@ from tests.auth.register_student_helpers import (
 from tests.branches.helpers import seed_branch
 from tests.master_data.helpers import seed_master_data_chain
 
-<<<<<<< HEAD
-=======
-VALID_PASSWORD = "StudentPass1!"
+# Re-export ``make_register_student_payload`` (and ``VALID_PASSWORD``) so that
+# other tests in this package -- notably
+# ``tests.auth.test_register_student_master_data`` (issue #139) -- can keep
+# importing them from this module without depending on the internal helper
+# module directly.
+__all__ = [
+    "VALID_PASSWORD",
+    "make_register_student_payload",
+]
 
-
-def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "apex") -> Tenant:
-    tenant = Tenant(name=name, slug=slug)
-    db_session.add(tenant)
-    db_session.commit()
-    db_session.refresh(tenant)
-    return tenant
-
-
-def make_register_student_payload(
-    *,
-    tenant_slug: str = "apex",
-    branch_id: int = 1,
-    email: str = "new.student@example.test",
-    password: str = VALID_PASSWORD,
-    name: str = "Rahul Kumar",
-    phone: str = "+91-9876543210",
-    date_of_birth: str = "2000-05-15",
-    target_country_id: int | None = None,
-    target_university_id: int | None = None,
-    target_program_id: int | None = None,
-) -> dict:
-    payload = {
-        "tenant_slug": tenant_slug,
-        "branch_id": branch_id,
-        "email": email,
-        "password": password,
-        "name": name,
-        "phone": phone,
-        "date_of_birth": date_of_birth,
-    }
-    if target_country_id is not None:
-        payload["target_country_id"] = target_country_id
-    if target_university_id is not None:
-        payload["target_university_id"] = target_university_id
-    if target_program_id is not None:
-        payload["target_program_id"] = target_program_id
-    return payload
-
->>>>>>> origin/main
 
 def test_register_student_success(client, db_session):
     tenant = create_tenant(db_session)

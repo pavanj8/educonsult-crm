@@ -27,9 +27,9 @@ def make_register_student_payload(
     name: str = "Rahul Kumar",
     phone: str = "+91-9876543210",
     date_of_birth: str = "2000-05-15",
-    target_country_id: int | None = 10,
-    target_university_id: int | None = 20,
-    target_program_id: int | None = 30,
+    target_country_id: int | None = None,
+    target_university_id: int | None = None,
+    target_program_id: int | None = None,
 ) -> dict:
     payload = {
         "tenant_slug": tenant_slug,
