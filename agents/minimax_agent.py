@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """Direct-MiniMax agent loop -- the harness's execution engine (docs/adr/0019).
 
-Replaces the Cursor SDK local runtime. ADR-0018 established that `cursor_sdk`
-validates model IDs against Cursor's own catalog and rejects MiniMax IDs, so
-MiniMax inference could not be routed through `Agent.create()`. Rather than pay
-for Cursor inference, ADR-0019 drops the Cursor engine entirely and drives the
-agents with this self-contained tool-calling loop over MiniMax's
-OpenAI-compatible `chat/completions` API.
+Replaces the Cursor SDK local runtime. Drives the agents with a self-contained
+tool-calling loop over MiniMax's **Anthropic-compatible** Messages API (via the
+`anthropic` client pointed at ANTHROPIC_BASE_URL). Rather than pay for Cursor
+inference, ADR-0019 drops the Cursor engine entirely.
 
 The loop gives the model the same capabilities the Cursor local runtime did --
 read files, write files, list directories, run shell commands -- all scoped to
 a working directory. It runs entirely in-process inside the GitHub Actions job
-(never a personal machine), exactly like the Cursor SDK did before; the Test
-Agent still boots the backend on 127.0.0.1 *inside that runner*.
+(never a personal machine); the Test Agent still boots the backend on
+127.0.0.1 *inside that runner*.
 
-`CURSOR_API_KEY` is intentionally NOT consumed here. It stays configured in the
-workflows/secrets but dormant, mirroring how `MINIMAX_API_KEY` was kept dormant
-before this ADR.
+`CURSOR_API_KEY` is intentionally NOT consumed here, and the cursor-sdk package
+is not installed (its presence hijacks HTTP clients onto the Cursor gateway --
+docs/adr/0019 follow-up).
 """
 from __future__ import annotations
 
@@ -30,73 +28,64 @@ import llm_env
 
 # Safety rails. A run that needs more than this many model turns is almost
 # certainly stuck; failing closed here surfaces as agent:needs-rework rather
-# than burning the MiniMax token budget indefinitely.
+# than burning the token budget indefinitely.
 MAX_TURNS = 80
+# Anthropic Messages API requires an explicit output cap per call.
+MAX_TOKENS = int(os.environ.get("AGENT_MAX_TOKENS", "16384"))
 COMMAND_TIMEOUT_SEC = 600
 # Keep individual tool results from blowing the context window. Tail-truncate
 # so the most recent (usually most relevant) output survives.
 MAX_TOOL_OUTPUT_CHARS = 60_000
 MAX_FILE_READ_CHARS = 120_000
 
+# Anthropic tool schema: {name, description, input_schema}.
 TOOLS = [
     {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read a UTF-8 text file, relative to the working directory.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Path relative to the working directory."},
-                },
-                "required": ["path"],
+        "name": "read_file",
+        "description": "Read a UTF-8 text file, relative to the working directory.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Path relative to the working directory."},
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "write_file",
+        "description": "Create or overwrite a UTF-8 text file (parent dirs are created).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Path relative to the working directory."},
+                "content": {"type": "string", "description": "Full new file contents."},
+            },
+            "required": ["path", "content"],
+        },
+    },
+    {
+        "name": "list_dir",
+        "description": "List the entries of a directory relative to the working directory.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Directory path (default '.')."},
             },
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "write_file",
-            "description": "Create or overwrite a UTF-8 text file (parent dirs are created).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Path relative to the working directory."},
-                    "content": {"type": "string", "description": "Full new file contents."},
-                },
-                "required": ["path", "content"],
+        "name": "run_command",
+        "description": (
+            "Run a shell command in the working directory and return its combined "
+            "stdout/stderr and exit code. Use this for git, pytest, python, grep, etc."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Shell command to execute."},
+                "timeout": {"type": "integer", "description": f"Seconds (default {COMMAND_TIMEOUT_SEC})."},
             },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_dir",
-            "description": "List the entries of a directory relative to the working directory.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Directory path (default '.')."},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "run_command",
-            "description": (
-                "Run a shell command in the working directory and return its combined "
-                "stdout/stderr and exit code. Use this for git, pytest, python, grep, etc."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {"type": "string", "description": "Shell command to execute."},
-                    "timeout": {"type": "integer", "description": f"Seconds (default {COMMAND_TIMEOUT_SEC})."},
-                },
-                "required": ["command"],
-            },
+            "required": ["command"],
         },
     },
 ]
@@ -172,20 +161,6 @@ def _dispatch(name: str, args: dict, cwd: Path) -> str:
         return f"ERROR: {name} failed: {err}"
 
 
-def _assistant_dict(msg) -> dict:
-    d: dict = {"role": "assistant", "content": msg.content or ""}
-    if msg.tool_calls:
-        d["tool_calls"] = [
-            {
-                "id": tc.id,
-                "type": "function",
-                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-            }
-            for tc in msg.tool_calls
-        ]
-    return d
-
-
 def run_agent(
     prefix: str,
     prompt: str,
@@ -194,18 +169,18 @@ def run_agent(
     *,
     max_turns: int = MAX_TURNS,
 ) -> tuple[str, str]:
-    """Drive a MiniMax tool-calling agent to completion.
+    """Drive a MiniMax (Anthropic Messages API) tool-calling agent to completion.
 
     Returns ``(status, text)`` where ``status`` is one of ``completed``,
     ``error``, or ``max_turns`` and ``text`` is the concatenated assistant
-    prose (the callers parse a trailing ```json block out of it, same as they
-    did with the Cursor SDK output). On a hard failure ``text`` is a diagnostic
-    string so the GitHub issue comment is never a bare "UNKNOWN".
+    prose (the callers parse a trailing ```json block out of it). On a hard
+    failure ``text`` is a diagnostic string so the GitHub issue comment is
+    never a bare "UNKNOWN".
     """
     cwd = Path(cwd).resolve()
     try:
         client = llm_env.minimax_client()
-    except RuntimeError as err:
+    except Exception as err:  # noqa: BLE001 -- missing token / client init
         print(f"[{prefix}] STARTUP FAILURE: {err}", file=sys.stderr)
         return "error", str(err)
 
@@ -214,39 +189,46 @@ def run_agent(
 
     for turn in range(1, max_turns + 1):
         try:
-            resp = client.chat.completions.create(
-                model=model, messages=messages, tools=TOOLS, temperature=0.2,
+            resp = client.messages.create(
+                model=model, max_tokens=MAX_TOKENS, tools=TOOLS, messages=messages,
             )
-        except Exception as err:  # noqa: BLE001 -- network/model-id failures land here
+        except Exception as err:  # noqa: BLE001 -- auth/model/rate-limit failures
             hint = (
-                f"MiniMax API call failed on turn {turn} (model={model!r}): {err}. "
-                f"If this is an invalid-model error, verify the ID against your "
-                f"MiniMax account catalog (docs/adr/0019)."
+                f"MiniMax (Anthropic API) call failed on turn {turn} (model={model!r}): "
+                f"{err}. If this is an invalid-model or auth/quota error, verify the "
+                f"model ID, ANTHROPIC_AUTH_TOKEN, and Token Plan balance (docs/adr/0019)."
             )
             print(f"[{prefix}] {hint}", file=sys.stderr)
             return "error", hint
 
-        msg = resp.choices[0].message
-        messages.append(_assistant_dict(msg))
-        if msg.content:
-            sys.stdout.write(msg.content)
-            sys.stdout.flush()
-            final_text_parts.append(msg.content)
+        assistant_blocks: list[dict] = []
+        tool_uses: list = []
+        for block in resp.content:
+            if block.type == "text":
+                sys.stdout.write(block.text)
+                sys.stdout.flush()
+                final_text_parts.append(block.text)
+                assistant_blocks.append({"type": "text", "text": block.text})
+            elif block.type == "tool_use":
+                assistant_blocks.append(
+                    {"type": "tool_use", "id": block.id, "name": block.name, "input": block.input}
+                )
+                tool_uses.append(block)
+        messages.append({"role": "assistant", "content": assistant_blocks})
 
-        tool_calls = msg.tool_calls or []
-        if not tool_calls:
-            print(f"\n\n--- {prefix} finished: status=completed turns={turn} ---")
+        if resp.stop_reason != "tool_use":
+            print(f"\n\n--- {prefix} finished: stop_reason={resp.stop_reason} turns={turn} ---")
             return "completed", "".join(final_text_parts)
 
-        for tc in tool_calls:
-            try:
-                args = json.loads(tc.function.arguments or "{}")
-            except json.JSONDecodeError as err:
-                result = f"ERROR: could not parse arguments for {tc.function.name}: {err}"
-            else:
-                print(f"\n[{prefix}] tool: {tc.function.name}({json.dumps(args)[:200]})")
-                result = _dispatch(tc.function.name, args, cwd)
-            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+        tool_results: list[dict] = []
+        for tu in tool_uses:
+            args = tu.input if isinstance(tu.input, dict) else {}
+            print(f"\n[{prefix}] tool: {tu.name}({json.dumps(args)[:200]})")
+            result = _dispatch(tu.name, args, cwd)
+            tool_results.append(
+                {"type": "tool_result", "tool_use_id": tu.id, "content": result}
+            )
+        messages.append({"role": "user", "content": tool_results})
 
     hint = (
         f"Agent exceeded {max_turns} turns without producing a final message "

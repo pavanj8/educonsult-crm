@@ -25,8 +25,9 @@ ADR builds that different architecture.
 ## Decision
 
 1. **New engine.** Add `agents/minimax_agent.py`: a self-contained
-   tool-calling loop over MiniMax's OpenAI-compatible `chat/completions` API
-   (via the `openai` client pointed at `MINIMAX_BASE_URL`). It exposes the same
+   tool-calling loop over MiniMax's Anthropic-compatible Messages API (via the
+   `anthropic` client pointed at `ANTHROPIC_BASE_URL`, authenticated with
+   `ANTHROPIC_AUTH_TOKEN`). It exposes the same
    capabilities the Cursor local runtime gave the agents — `read_file`,
    `write_file`, `list_dir`, `run_command` — scoped to the repo working
    directory, with a max-turns rail and per-tool output truncation.
@@ -75,7 +76,13 @@ ADR builds that different architecture.
   closed (`agent:needs-rework`) with the diagnostic from `minimax_agent`.
 - MiniMax tool-calling fidelity now determines agent quality; if it under-uses
   tools, revisit the loop (system prompt, temperature, or a stronger tier).
-- China-region deployments set `MINIMAX_BASE_URL` to the `.com` endpoint.
+- China-region deployments set `ANTHROPIC_BASE_URL` to the `.com` endpoint
+  (`https://api.minimaxi.com/anthropic`).
+- **Protocol note.** The engine initially used MiniMax's OpenAI-compatible
+  `/v1` endpoint via the `openai` client; it was switched to MiniMax's
+  Anthropic-compatible `/anthropic` Messages API via the `anthropic` client
+  (`ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`). The tool loop uses Anthropic
+  tool-use blocks (`tool_use` / `tool_result`) accordingly.
 - `agents/sdk_run.py` (Cursor-specific run diagnostics) is left in place but
   unreferenced; a future cleanup ADR may remove it.
 - **Egress probe finding (2026-08-20).** The first two Dev runs returned

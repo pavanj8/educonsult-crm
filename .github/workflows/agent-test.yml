@@ -29,8 +29,8 @@ jobs:
     env:
       # CURSOR_API_KEY kept provisioned but dormant (docs/adr/0019).
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-      MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-      MINIMAX_BASE_URL: https://api.minimax.io/v1
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TEST_AGENT_MODEL: MiniMax-M3
     steps:
