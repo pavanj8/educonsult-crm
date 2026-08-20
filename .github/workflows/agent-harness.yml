@@ -108,6 +108,20 @@ jobs:
         continue-on-error: true
         run: python dev_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --model "$DEV_AGENT_MODEL"
 
+      - name: Ruff auto-fix backstop (docs/adr/0019 follow-up)
+        # Best-effort: auto-fixes import-order (I) and unused imports (F401)
+        # the Dev Agent may have left, so lint-only misses don't block the PR.
+        # Unfixable errors still surface in the CI Backend "Ruff lint" gate.
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -d backend ]; then
+            python -m pip install ruff==0.16.3
+            (cd backend && ruff check --fix . || true)
+          else
+            echo "no backend/ yet -- skipping ruff backstop"
+          fi
+
       - name: Commit Dev Agent changes
         id: commit
         run: |
