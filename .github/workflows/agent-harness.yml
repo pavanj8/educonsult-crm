@@ -50,7 +50,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Asymmetric model tiering (docs/adr/0013): cheap MiniMax model to
       # write, stronger MiniMax model to verify (docs/adr/0019).
-      DEV_AGENT_MODEL: MiniMax-M2.5-highspeed
+      DEV_AGENT_MODEL: MiniMax-M3
 
     steps:
       - name: Determine issue number
