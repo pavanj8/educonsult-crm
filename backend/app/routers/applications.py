@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
 from app.models.application import Application
+from app.models.program import Program
+from app.models.university import University
 from app.models.user import User
 from app.pipeline.stages import PipelineStage
 from app.rbac import Permission
@@ -57,6 +59,49 @@ def _get_active_student(
     return student
 
 
+def _validate_university_and_program(
+    db: Session,
+    *,
+    tenant_id: int,
+    university_id: int,
+    program_id: int,
+) -> None:
+    """Reject university_id/program_id that don't exist or belong to another tenant.
+
+    Both references must exist and belong to the caller's tenant; the program
+    must additionally belong to the university. This guards the multi-tenancy
+    boundary (Requirement §1) and the data-integrity expectation that an
+    application references valid master data (Requirement §5; J11 "university +
+    program").
+    """
+    try:
+        university = db.get(University, university_id)
+        program = db.get(Program, program_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if university is None or university.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid university",
+        )
+
+    if program is None or program.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid program",
+        )
+
+    if program.university_id != university.id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Program does not belong to the selected university",
+        )
+
+
 @router.post(
     "",
     response_model=ApplicationResponse,
@@ -72,6 +117,13 @@ def create_application(
 ) -> Application:
     """Create a new university/program application for the authenticated student."""
     student = _get_active_student(current_user, db)
+
+    _validate_university_and_program(
+        db,
+        tenant_id=student.tenant_id,
+        university_id=payload.university_id,
+        program_id=payload.program_id,
+    )
 
     application = Application(
         tenant_id=student.tenant_id,

@@ -39,6 +39,14 @@ const mockBranchManager = {
   branch_id: 1,
 }
 
+const mockStudent = {
+  id: 8,
+  email: 'student@demo.test',
+  role: 'student' as const,
+  tenant_id: 10,
+  branch_id: 1,
+}
+
 function LocationStateProbe() {
   const location = useLocation()
   const fromPath =
@@ -303,5 +311,42 @@ describe('AppRouter routes', () => {
 
     expect(screen.queryByTestId('staff-page')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Staff' })).not.toBeInTheDocument()
+  })
+
+  it('renders student dashboard for student users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockStudent,
+    }) as typeof fetch
+
+    renderAppAt('/dashboard')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('student-dashboard-page')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument()
+  })
+
+  it('denies student dashboard to non-student users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockUser,
+    }) as typeof fetch
+
+    renderAppAt('/dashboard')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('access-denied')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('student-dashboard-page')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
   })
 })
