@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import AppLayout from '../layouts/AppLayout'
 import BranchesPage from '../pages/BranchesPage'
+import CounselorDashboardPage from '../pages/CounselorDashboardPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import RegisterStudentPage from '../pages/RegisterStudentPage'
@@ -9,6 +10,7 @@ import NotFoundPage from '../pages/NotFoundPage'
 import StaffPage from '../pages/StaffPage'
 import TenantsPage from '../pages/TenantsPage'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
+import CounselorRoute from './CounselorRoute'
 import ProtectedRoute, { LOGIN_PATH } from './ProtectedRoute'
 import StaffManagerRoute from './StaffManagerRoute'
 import SuperAdminRoute from './SuperAdminRoute'
@@ -30,6 +32,9 @@ export function AppRoutes() {
           </Route>
           <Route element={<StaffManagerRoute />}>
             <Route path="staff" element={<StaffPage />} />
+          </Route>
+          <Route element={<CounselorRoute />}>
+            <Route path="counselor/queue" element={<CounselorDashboardPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
