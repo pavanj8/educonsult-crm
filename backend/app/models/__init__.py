@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-from app.models.application import Application, ApplicationStage
-=======
 from app.models.application import Application
->>>>>>> origin/main
 from app.models.base import Base, TenantScopedBase
 from app.models.branch import Branch
 from app.models.country import Country
@@ -14,15 +10,6 @@ from app.models.user import User
 
 __all__ = [
     "Application",
-<<<<<<< HEAD
-    "ApplicationStage",
-    "Base",
-    "TenantScopedBase",
-    "Branch",
-    "Tenant",
-    "User",
-]
-=======
     "Base",
     "TenantScopedBase",
     "Branch",
@@ -33,4 +20,3 @@ __all__ = [
     "University",
     "User",
 ]
->>>>>>> origin/main

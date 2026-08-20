@@ -1,15 +1,9 @@
 from datetime import datetime, timezone
 
-<<<<<<< HEAD
 from sqlalchemy import inspect, select
-
-from app.models.application import Application, ApplicationStage
-=======
-from sqlalchemy import inspect
 
 from app.models.application import Application
 from app.pipeline.stages import PipelineStage
->>>>>>> origin/main
 
 
 def test_application_model_has_required_columns():
@@ -31,15 +25,9 @@ def test_application_persists_row(db_session):
     application = Application(
         tenant_id=1,
         student_id=10,
-<<<<<<< HEAD
-        university_id=20,
-        program_id=30,
-        stage=ApplicationStage.REGISTERED,
-=======
         university_id=100,
         program_id=200,
         stage=PipelineStage.REGISTERED,
->>>>>>> origin/main
         created_at=now,
         updated_at=now,
     )
@@ -48,23 +36,23 @@ def test_application_persists_row(db_session):
     db_session.refresh(application)
 
     assert application.id is not None
-<<<<<<< HEAD
     assert application.tenant_id == 1
     assert application.student_id == 10
-    assert application.university_id == 20
-    assert application.program_id == 30
-    assert application.stage == ApplicationStage.REGISTERED
+    assert application.university_id == 100
+    assert application.program_id == 200
+    assert application.stage == PipelineStage.REGISTERED
     assert application.created_at is not None
     assert application.updated_at is not None
 
 
 def test_application_stage_defaults_to_registered(db_session):
+    """A newly-created application defaults to the REGISTERED pipeline stage (J11)."""
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,
         student_id=10,
-        university_id=20,
-        program_id=30,
+        university_id=100,
+        program_id=200,
         created_at=now,
         updated_at=now,
     )
@@ -72,17 +60,18 @@ def test_application_stage_defaults_to_registered(db_session):
     db_session.commit()
     db_session.refresh(application)
 
-    assert application.stage == ApplicationStage.REGISTERED
+    assert application.stage == PipelineStage.REGISTERED
 
 
 def test_application_stage_persists_snake_case_value(db_session):
+    """The stage column stores the snake_case enum value (e.g. 'document_verification')."""
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,
         student_id=10,
-        university_id=20,
-        program_id=30,
-        stage=ApplicationStage.DOCUMENT_VERIFICATION,
+        university_id=100,
+        program_id=200,
+        stage=PipelineStage.DOCUMENT_VERIFICATION,
         created_at=now,
         updated_at=now,
     )
@@ -92,26 +81,27 @@ def test_application_stage_persists_snake_case_value(db_session):
     stored_stage = db_session.execute(
         select(Application.__table__.c.stage).where(Application.__table__.c.student_id == 10)
     ).scalar_one()
-    assert stored_stage == ApplicationStage.DOCUMENT_VERIFICATION.value
+    assert stored_stage == PipelineStage.DOCUMENT_VERIFICATION.value
 
 
 def test_student_can_have_multiple_applications_with_independent_stages(db_session):
+    """A student can have multiple applications, each with its own pipeline stage (J11)."""
     now = datetime.now(timezone.utc)
     first = Application(
         tenant_id=1,
         student_id=10,
-        university_id=20,
-        program_id=30,
-        stage=ApplicationStage.COUNSELING,
+        university_id=100,
+        program_id=200,
+        stage=PipelineStage.COUNSELING,
         created_at=now,
         updated_at=now,
     )
     second = Application(
         tenant_id=1,
         student_id=10,
-        university_id=21,
-        program_id=31,
-        stage=ApplicationStage.APPLICATION_SUBMITTED,
+        university_id=101,
+        program_id=201,
+        stage=PipelineStage.APPLICATION_SUBMITTED,
         created_at=now,
         updated_at=now,
     )
@@ -121,8 +111,5 @@ def test_student_can_have_multiple_applications_with_independent_stages(db_sessi
     db_session.refresh(second)
 
     assert first.id != second.id
-    assert first.stage == ApplicationStage.COUNSELING
-    assert second.stage == ApplicationStage.APPLICATION_SUBMITTED
-=======
-    assert application.stage == PipelineStage.REGISTERED
->>>>>>> origin/main
+    assert first.stage == PipelineStage.COUNSELING
+    assert second.stage == PipelineStage.APPLICATION_SUBMITTED
