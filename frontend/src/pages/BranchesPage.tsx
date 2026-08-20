@@ -41,8 +41,10 @@ export default function BranchesPage() {
     setCreateSuccessMessage(null)
 
     const formData = new FormData(event.currentTarget)
-    const name = typeof formData.get('name') === 'string' ? formData.get('name')!.trim() : ''
-    const city = typeof formData.get('city') === 'string' ? formData.get('city')!.trim() : ''
+    const rawName = formData.get('name')
+    const rawCity = formData.get('city')
+    const name = typeof rawName === 'string' ? rawName.trim() : ''
+    const city = typeof rawCity === 'string' ? rawCity.trim() : ''
 
     try {
       const created = await createBranch({ name, city })
@@ -64,8 +66,10 @@ export default function BranchesPage() {
     setUpdateSuccessMessage(null)
 
     const formData = new FormData(event.currentTarget)
-    const name = typeof formData.get('name') === 'string' ? formData.get('name')!.trim() : ''
-    const city = typeof formData.get('city') === 'string' ? formData.get('city')!.trim() : ''
+    const rawName = formData.get('name')
+    const rawCity = formData.get('city')
+    const name = typeof rawName === 'string' ? rawName.trim() : ''
+    const city = typeof rawCity === 'string' ? rawCity.trim() : ''
 
     try {
       const updated = await updateBranch(editingBranch.id, { name, city })
