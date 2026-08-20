@@ -79,12 +79,3 @@ def override_authenticated_user() -> Generator[Callable[[AuthenticatedUser], Non
 
     yield _override
     app.dependency_overrides.pop(get_current_user, None)
-
-
-# Ensure the test counseling applications table is created alongside app models.
-# Import it here so Base.metadata.create_all() (called in the db_engine fixture)
-
-# Ensure the test counseling applications table is created alongside app models.
-# Import it here so Base.metadata.create_all() (called in the db_engine fixture)
-# creates the table in the SQLite in-memory DB.
-from tests.counseling.helpers import _TestApplication  # noqa: F401

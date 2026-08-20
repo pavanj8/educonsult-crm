@@ -5,6 +5,7 @@ Validates:
 - Scoping: a counselor sees only their own assigned applications, not others'.
 - Filtering: stage, student_name query parameters narrow the result set.
 - Auth & permissions: unauthenticated, wrong-role, and cross-tenant calls are rejected.
+- Input validation: stage enum and length limits on query parameters.
 """
 
 from app.rbac import Role
@@ -238,6 +239,29 @@ def test_queue_stage_filter_case_insensitive(
     assert len(data) == 1
 
 
+def test_queue_rejects_invalid_stage(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """Invalid stage values return 422 with allowed values in error detail."""
+    branch = seed_branch(db_session, tenant_id=1)
+    counselor = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=50,
+        tenant_id=1,
+        branch_id=branch.id,
+    )
+    override_authenticated_user(counselor)
+
+    response = client.get(f"{counseling_queue_url()}?stage=invalid_stage")
+
+    assert response.status_code == 422
+    data = response.json()
+    assert "Invalid stage" in data["detail"]
+    assert "Allowed values" in data["detail"]
+
+
 # ---------------------------------------------------------------------------
 # Filtering: student_name (partial match)
 # ---------------------------------------------------------------------------
@@ -345,6 +369,52 @@ def test_queue_combines_stage_and_student_name_filters(
     assert len(data) == 1
     assert data[0]["student_name"] == "Ravi Kumar"
     assert data[0]["stage"] == "counseling"
+
+
+# ---------------------------------------------------------------------------
+# Input validation: length limits
+# ---------------------------------------------------------------------------
+
+
+def test_queue_rejects_empty_student_name(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """Empty student_name query parameter returns 422."""
+    branch = seed_branch(db_session, tenant_id=1)
+    counselor = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=51,
+        tenant_id=1,
+        branch_id=branch.id,
+    )
+    override_authenticated_user(counselor)
+
+    response = client.get(f"{counseling_queue_url()}?student_name=")
+
+    assert response.status_code == 422
+
+
+def test_queue_rejects_student_name_exceeds_max_length(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """student_name exceeding max length returns 422."""
+    branch = seed_branch(db_session, tenant_id=1)
+    counselor = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=52,
+        tenant_id=1,
+        branch_id=branch.id,
+    )
+    override_authenticated_user(counselor)
+
+    long_name = "A" * 300  # exceeds 255 char limit
+    response = client.get(f"{counseling_queue_url()}?student_name={long_name}")
+
+    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------

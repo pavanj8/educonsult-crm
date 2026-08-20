@@ -29,8 +29,8 @@ ApplicationStage = type(
 
 
 APPLICATION_STAGE_ENUM = Enum(
+    *_application_stage_values,
     name="application_stage",
-    **{v: v for v in _application_stage_values},
     native_enum=True,
     create_constraint=False,
 )
