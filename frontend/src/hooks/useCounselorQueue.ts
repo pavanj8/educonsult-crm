@@ -4,7 +4,7 @@ import {
   fetchCounselorQueue,
   fetchCounselorQueueCounts,
 } from '../api/counselor'
-import type { ApplicationWithStudent, CounselorQueueFilter, PipelineStage, StageCount } from '../types/application'
+import type { ApplicationWithStudent, CounselorQueueFilter, StageCount } from '../types/application'
 
 interface UseCounselorQueueResult {
   applications: ApplicationWithStudent[]

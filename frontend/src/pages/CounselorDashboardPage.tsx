@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react'
 
-import { isApiError } from '../api/client'
 import { STAGE_COLORS, STAGE_LABELS, type PipelineStage } from '../types/application'
 import { useCounselorQueue } from '../hooks/useCounselorQueue'
 
