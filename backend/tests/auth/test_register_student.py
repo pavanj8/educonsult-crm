@@ -2,6 +2,7 @@
 
 from app.auth import verify_access_token, verify_refresh_token
 from app.auth.password import verify_password
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.rbac.roles import Role
 from tests.branches.helpers import seed_branch
@@ -9,9 +10,7 @@ from tests.branches.helpers import seed_branch
 VALID_PASSWORD = "StudentPass1!"
 
 
-def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "apex") -> object:
-    from app.models.tenant import Tenant
-
+def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "apex") -> Tenant:
     tenant = Tenant(name=name, slug=slug)
     db_session.add(tenant)
     db_session.commit()

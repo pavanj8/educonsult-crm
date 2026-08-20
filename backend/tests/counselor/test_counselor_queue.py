@@ -5,9 +5,15 @@ the authenticated counselor.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import Generator
+from unittest.mock import MagicMock
 
-import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
+from app.db.database import get_db
+from app.main import app as fastapi_app
 from app.models.application import PipelineStage
 from app.rbac.roles import Role
 from tests.counselor.helpers import seed_application
@@ -298,24 +304,69 @@ def test_queue_orders_by_created_at_desc(client, db_session, override_authentica
     assert data[2]["student_email"] == "first@example.test"
 
 
-@pytest.mark.skip(reason="FK CASCADE prevents NULL student_id; unreachable in normal operation")
-def test_queue_skips_applications_with_missing_student():
-    """Applications with deleted students are skipped rather than returning fake data.
+def test_queue_skips_applications_with_missing_student(client, db_session, override_authenticated_user):
+    """Applications whose student was deleted (FK CASCADE) or has invalid student_id are silently omitted."""
+    counselor = _seed_counselor(db_session)
+    student = _seed_student(db_session, email="orphan.student@example.test")
 
-    Note: This scenario is unreachable via normal FK cascades, but documents the
-    expected behavior if the FK constraint is ever relaxed.
-    """
-    # This scenario would require manually NULLing the student_id or removing CASCADE
-    # which is not possible with the current schema, so we skip it
-    pass
+    # Create a valid application
+    seed_application(db_session, student_id=student, assigned_counselor_id=counselor)
+
+    # Insert an application with a non-existent student_id via raw SQL.
+    # This bypasses the ORM so we can create an orphaned record that the FK
+    # constraint (ON DELETE CASCADE) would normally prevent.
+    now = datetime.now(timezone.utc)
+    with db_session.bind.connect() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO applications "
+                "(tenant_id, student_id, assigned_counselor_id, stage, "
+                "loan_opted_in, created_at, updated_at) "
+                "VALUES (:t, :s, :c, :st, :lo, :ca, :ua)"
+            ),
+            {
+                "t": 1,
+                "s": 999999,  # student does not exist
+                "c": counselor,
+                "st": PipelineStage.REGISTERED.value,
+                "lo": False,
+                "ca": now,
+                "ua": now,
+            },
+        )
+    db_session.commit()
+
+    override_authenticated_user(make_authenticated_user(Role.COUNSELOR, user_id=counselor))
+
+    response = client.get("/counselor/queue")
+
+    assert response.status_code == 200
+    data = response.json()
+    # The orphan application (student_id=999999) must be absent
+    assert all(app["student_id"] != 999999 for app in data)
 
 
-@pytest.mark.skip(reason="DB unavailability requires complex SQLAlchemy session mocking")
-def test_queue_handles_db_unavailable_gracefully():
-    """Returns 503 when database is unavailable.
+def test_queue_handles_db_unavailable_gracefully(client, db_session, override_authenticated_user):
+    """Returns 503 when database is unavailable."""
+    counselor = _seed_counselor(db_session)
+    student = _seed_student(db_session)
+    seed_application(db_session, student_id=student, assigned_counselor_id=counselor)
 
-    Note: Testing this requires complex mocking of SQLAlchemy session/connection
-    which is difficult to do reliably with FastAPI TestClient. The endpoint
-    correctly catches OperationalError and returns 503 in production.
-    """
-    pass
+    override_authenticated_user(make_authenticated_user(Role.COUNSELOR, user_id=counselor))
+
+    # Build a mock session that raises OperationalError on .scalars() and .get()
+    failing_session = MagicMock(spec=Session)
+    failing_session.scalars.side_effect = OperationalError("statement", {}, "connection refused")
+    failing_session.get.side_effect = OperationalError("statement", {}, "connection refused")
+
+    def _failing_get_db() -> Generator[Session, None, None]:
+        yield failing_session
+
+    fastapi_app.dependency_overrides[get_db] = _failing_get_db
+
+    try:
+        response = client.get("/counselor/queue")
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Counselor service is temporarily unavailable"
+    finally:
+        fastapi_app.dependency_overrides.pop(get_db, None)
