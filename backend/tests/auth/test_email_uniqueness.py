@@ -1,4 +1,4 @@
-"""Unit tests for email uniqueness validation (E16; issue #137)."""
+"""Unit tests for email uniqueness validation (E16; issue #140)."""
 
 import pytest
 from fastapi import HTTPException

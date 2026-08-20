@@ -1,58 +1,21 @@
-"""POST /auth/register-student endpoint tests (E16, Journey J9, issue #136)."""
+"""Signup validation tests for POST /auth/register-student (E16, Journey J9, issue #140)."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from app.auth import verify_access_token, verify_refresh_token
 from app.auth.password import verify_password
-from app.models.tenant import Tenant
 from app.models.user import User
 from app.rbac.roles import Role
+from tests.auth.register_student_helpers import (
+    VALID_PASSWORD,
+    create_tenant,
+    make_register_student_payload,
+)
 from tests.branches.helpers import seed_branch
-
-VALID_PASSWORD = "StudentPass1!"
-
-
-def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "apex") -> Tenant:
-    tenant = Tenant(name=name, slug=slug)
-    db_session.add(tenant)
-    db_session.commit()
-    db_session.refresh(tenant)
-    return tenant
-
-
-def make_register_student_payload(
-    *,
-    tenant_slug: str = "apex",
-    branch_id: int = 1,
-    email: str = "new.student@example.test",
-    password: str = VALID_PASSWORD,
-    name: str = "Rahul Kumar",
-    phone: str = "+91-9876543210",
-    date_of_birth: str = "2000-05-15",
-    target_country_id: int | None = 10,
-    target_university_id: int | None = 20,
-    target_program_id: int | None = 30,
-) -> dict:
-    payload = {
-        "tenant_slug": tenant_slug,
-        "branch_id": branch_id,
-        "email": email,
-        "password": password,
-        "name": name,
-        "phone": phone,
-        "date_of_birth": date_of_birth,
-    }
-    if target_country_id is not None:
-        payload["target_country_id"] = target_country_id
-    if target_university_id is not None:
-        payload["target_university_id"] = target_university_id
-    if target_program_id is not None:
-        payload["target_program_id"] = target_program_id
-    return payload
 
 
 def test_register_student_success(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -90,7 +53,7 @@ def test_register_student_success(client, db_session):
 
 
 def test_register_student_persists_hashed_password(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     plain_password = VALID_PASSWORD
 
@@ -110,7 +73,7 @@ def test_register_student_persists_hashed_password(client, db_session):
 
 
 def test_register_student_normalizes_email(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -126,7 +89,7 @@ def test_register_student_normalizes_email(client, db_session):
 
 
 def test_register_student_normalizes_tenant_slug(client, db_session):
-    tenant = _create_tenant(db_session, slug="apex")
+    tenant = create_tenant(db_session, slug="apex")
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -142,8 +105,28 @@ def test_register_student_normalizes_tenant_slug(client, db_session):
     assert response.json()["tenant_id"] == tenant.id
 
 
+def test_register_student_strips_name_and_phone(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="strip.fields@example.test",
+            name="  Rahul Kumar  ",
+            phone="  +91-9876543210  ",
+        ),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "Rahul Kumar"
+    assert body["phone"] == "+91-9876543210"
+
+
 def test_register_student_allows_optional_target_fields(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -167,7 +150,7 @@ def test_register_student_allows_optional_target_fields(client, db_session):
 
 
 def test_register_student_can_login_after_registration(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     password = VALID_PASSWORD
 
@@ -206,7 +189,7 @@ def test_register_student_rejects_unknown_tenant(client, db_session):
 
 
 def test_register_student_rejects_unknown_branch(client, db_session):
-    _create_tenant(db_session)
+    create_tenant(db_session)
 
     response = client.post(
         "/auth/register-student",
@@ -218,8 +201,8 @@ def test_register_student_rejects_unknown_branch(client, db_session):
 
 
 def test_register_student_rejects_cross_tenant_branch(client, db_session):
-    tenant = _create_tenant(db_session, slug="apex")
-    other_tenant = _create_tenant(db_session, name="Other Consultancy", slug="other")
+    tenant = create_tenant(db_session, slug="apex")
+    other_tenant = create_tenant(db_session, name="Other Consultancy", slug="other")
     other_branch = seed_branch(db_session, tenant_id=other_tenant.id, name="Other Branch")
 
     response = client.post(
@@ -236,7 +219,7 @@ def test_register_student_rejects_cross_tenant_branch(client, db_session):
 
 
 def test_register_student_rejects_invalid_email(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -251,7 +234,7 @@ def test_register_student_rejects_invalid_email(client, db_session):
 
 
 def test_register_student_rejects_invalid_tenant_slug(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -266,7 +249,7 @@ def test_register_student_rejects_invalid_tenant_slug(client, db_session):
 
 
 def test_register_student_rejects_missing_required_fields(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -282,8 +265,40 @@ def test_register_student_rejects_missing_required_fields(client, db_session):
     assert response.status_code == 422
 
 
+def test_register_student_rejects_whitespace_only_name(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="blank.name@example.test",
+            name="   ",
+        ),
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_whitespace_only_phone(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="blank.phone@example.test",
+            phone="   ",
+        ),
+    )
+
+    assert response.status_code == 422
+
+
 def test_register_student_rejects_weak_password(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -299,7 +314,7 @@ def test_register_student_rejects_weak_password(client, db_session):
 
 
 def test_register_student_rejects_short_password(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -315,7 +330,7 @@ def test_register_student_rejects_short_password(client, db_session):
 
 
 def test_register_student_rejects_whitespace_only_password(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -331,7 +346,7 @@ def test_register_student_rejects_whitespace_only_password(client, db_session):
 
 
 def test_register_student_rejects_future_date_of_birth(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -347,7 +362,7 @@ def test_register_student_rejects_future_date_of_birth(client, db_session):
 
 
 def test_register_student_rejects_implausible_date_of_birth(client, db_session):
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
 
     response = client.post(
@@ -356,6 +371,39 @@ def test_register_student_rejects_implausible_date_of_birth(client, db_session):
             branch_id=branch.id,
             email="old.dob@example.test",
             date_of_birth="1860-01-01",
+        ),
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_student_under_minimum_age(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    too_young_dob = (date.today() - timedelta(days=365 * 9)).isoformat()
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="young.student@example.test",
+            date_of_birth=too_young_dob,
+        ),
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_invalid_target_country_id(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="bad.country@example.test",
+            target_country_id=0,
         ),
     )
 
