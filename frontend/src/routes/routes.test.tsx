@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider } from '../store/authStore'
 import { AppRoutes } from './index'
+import { REGISTER_PATH } from './paths'
 import { LOGIN_PATH } from './ProtectedRoute'
 
 const mockUser = {
@@ -82,6 +83,17 @@ describe('AppRouter routes', () => {
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     })
     expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+  })
+
+  it('renders the registration page directly without auth', async () => {
+    renderAppAt(REGISTER_PATH)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Create student account' })).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('register-email')).toBeInTheDocument()
+    expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()
   })
 
   it('redirects unauthenticated deep links to login with return path in state', async () => {

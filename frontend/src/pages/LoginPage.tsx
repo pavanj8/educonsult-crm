@@ -1,8 +1,9 @@
 import { useEffect, useId, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { isApiError } from '../api/client'
+import { REGISTER_PATH } from '../routes/paths'
 import { useAuth } from '../store/authStore'
 
 function postLoginPath(location: ReturnType<typeof useLocation>): string {
@@ -114,6 +115,12 @@ export default function LoginPage() {
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+        <p className="login-page__footer">
+          New student?{' '}
+          <Link to={REGISTER_PATH} className="login-page__link">
+            Create an account
+          </Link>
+        </p>
       </div>
     </main>
   )

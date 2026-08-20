@@ -285,10 +285,43 @@ body {
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
 }
 
+.login-page__card--wide {
+  max-width: 28rem;
+}
+
 .login-page__card h1 {
   margin: 0 0 1.5rem;
   font-size: 1.5rem;
   text-align: center;
+}
+
+.login-page__subtitle {
+  margin: -0.75rem 0 1.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.login-page__footer {
+  margin: 1.25rem 0 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.login-page__link {
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.login-page__link:hover {
+  text-decoration: underline;
+}
+
+.login-page__link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .login-form {
@@ -304,6 +337,25 @@ body {
   font-size: 0.875rem;
   font-weight: 500;
   color: #374151;
+}
+
+.login-form__section {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-form__section legend {
+  padding: 0;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
 }
 
 .login-form__field input {

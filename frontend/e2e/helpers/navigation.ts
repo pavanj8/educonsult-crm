@@ -1,11 +1,12 @@
 import type { Page } from '@playwright/test'
 
 import { LOGIN_PATH } from './auth.js'
+import { REGISTER_PATH } from '../../src/routes/paths.js'
 
 /** Login page path on the Vite dev-server origin. */
 export const LOGIN_FORM_PATH = LOGIN_PATH
 
-export { LOGIN_PATH }
+export { LOGIN_PATH, REGISTER_PATH }
 
 export async function gotoHome(page: Page): Promise<void> {
   await page.goto('/')
