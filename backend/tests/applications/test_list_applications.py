@@ -325,6 +325,62 @@ def test_list_applications_rejects_invalid_access_token(client):
     assert response.json()["detail"] == "Invalid access token"
 
 
+def test_list_applications_excludes_other_tenant_applications(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    branch_a = seed_branch(db_session, tenant_id=tenant_a.id, name="Branch A")
+    branch_b = seed_branch(db_session, tenant_id=tenant_b.id, name="Branch B")
+    student_a = _seed_student(
+        db_session,
+        tenant_a.id,
+        branch_a.id,
+        email="student-a@example.test",
+    )
+    student_b = _seed_student(
+        db_session,
+        tenant_b.id,
+        branch_b.id,
+        email="student-b@example.test",
+    )
+    own = _seed_application(
+        db_session,
+        tenant_id=tenant_a.id,
+        student_id=student_a.id,
+        university_id=101,
+        program_id=201,
+    )
+    _seed_application(
+        db_session,
+        tenant_id=tenant_b.id,
+        student_id=student_b.id,
+        university_id=999,
+        program_id=888,
+    )
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.STUDENT,
+            user_id=student_a.id,
+            tenant_id=tenant_a.id,
+            branch_id=branch_a.id,
+        )
+    )
+
+    response = client.get(
+        "/applications",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["id"] == own.id
+    assert body[0]["tenant_id"] == tenant_a.id
+
+
 def test_list_applications_rejects_non_student_jwt(client, db_session):
     tenant = _create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
