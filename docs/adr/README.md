@@ -44,3 +44,9 @@ receive new entries.
 | [0014](0014-local-sdk-runtime-model-subset.md) | Local SDK runtime only executes a subset of listed models | Accepted — implemented | 2026-08-19 |
 | [0015](0015-auto-retry-needs-rework.md) | Auto-retry `agent:needs-rework` with Test/Review feedback | Accepted — implemented | 2026-08-19 |
 | [0016](0016-pipeline-parallelism.md) | Pipeline parallelism: Dev, Test, and Review on different tickets | Accepted — implemented | 2026-08-19 |
+| [0017](0017-minimax-api-key-for-agent-models.md) | MiniMax API key for agent harness model inference | Superseded by ADR-0018 | 2026-08-20 |
+| [0018](0018-revert-minimax-sdk-model-ids.md) | Revert MiniMax model IDs — not valid on Cursor SDK local runtime | Superseded by ADR-0019 | 2026-08-20 |
+| [0019](0019-minimax-agent-loop-replaces-cursor-sdk.md) | Replace the Cursor SDK engine with a direct-MiniMax agent loop | Accepted — implemented | 2026-08-20 |
+| [0020](0020-unified-gate-and-ci-feedback-loop.md) | Unified check gate (`scripts/check.sh`) + CI-failure feedback loop | Accepted — implemented | 2026-08-20 |
+| [0021](0021-agent-latency-context-pack.md) | Cut agent latency with a context pack + efficiency prompts | Accepted — implemented | 2026-08-20 |
+| [0022](0022-event-driven-pipeline-chain.md) | Event-driven pipeline chain (don't depend on the picker cron) | Accepted — implemented | 2026-08-20 |

@@ -28,39 +28,47 @@ export type LoginTokens = {
   token_type?: string
 }
 
+export type AuthenticatedUser = {
+  id: number
+  email: string
+  role: UserRole
+  tenant_id: number | null
+  branch_id: number | null
+}
+
 export const DEMO_LOGIN: LoginCredentials = {
   email: 'counselor@demo.test',
   password: 'demo-password',
 }
 
-export const DEMO_USER = {
+export const DEMO_USER: AuthenticatedUser = {
   id: 1,
   email: 'counselor@demo.test',
-  role: 'counselor' as UserRole,
+  role: 'counselor',
   tenant_id: 10,
   branch_id: 1,
 }
 
-export const SUPER_ADMIN_USER = {
+export const SUPER_ADMIN_USER: AuthenticatedUser = {
   id: 99,
   email: 'super_admin@demo.test',
-  role: 'super_admin' as UserRole,
+  role: 'super_admin',
   tenant_id: null,
   branch_id: null,
 }
 
-export const CONSULTANCY_OWNER_USER = {
+export const CONSULTANCY_OWNER_USER: AuthenticatedUser = {
   id: 50,
   email: 'owner@demo.test',
-  role: 'consultancy_owner' as UserRole,
+  role: 'consultancy_owner',
   tenant_id: 10,
   branch_id: null,
 }
 
-export const BRANCH_MANAGER_USER = {
+export const BRANCH_MANAGER_USER: AuthenticatedUser = {
   id: 20,
   email: 'manager@demo.test',
-  role: 'branch_manager' as UserRole,
+  role: 'branch_manager',
   tenant_id: 10,
   branch_id: 1,
 }
@@ -98,7 +106,7 @@ export function loginTokensForRole(role: UserRole): LoginTokens {
 
 export async function mockAuthMe(
   page: Page,
-  user: typeof DEMO_USER = DEMO_USER,
+  user: AuthenticatedUser = DEMO_USER,
 ): Promise<void> {
   await page.route('**/auth/me', async (route: Route) => {
     if (route.request().method() !== 'GET') {

@@ -1,0 +1,35 @@
+name: Agent Pipeline Chain
+
+# Keeps the backlog draining WITHOUT relying on the queue-picker's cron.
+# GitHub throttles scheduled workflows hard (a */2 cron often fires only every
+# 10-30 min, or is skipped under load), which stalls the harness whenever no
+# merge/needs-rework event happens to kick the picker (docs/adr/0022).
+#
+# This fires whenever a Dev run COMPLETES (any conclusion) and kicks the queue
+# picker for the next ticket. Because the Dev run is already finished, the
+# picker's "is a Dev active?" guard passes and it dispatches the next eligible
+# issue -- a continuous, event-driven chain. It also lets Dev(next) start while
+# Test/Review(prev) are still running (pipeline parallelism, docs/adr/0016).
+# When no eligible issue remains, the picker dispatches nothing and the chain
+# naturally goes quiet until the next trigger (a fresh issue, a merge, or the
+# cron cold-start).
+
+on:
+  workflow_run:
+    workflows: ["Agent Harness (Dev)"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  chain:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Kick the queue picker for the next ticket
+        run: |
+          echo "Dev run ${{ github.event.workflow_run.id }} completed (${{ github.event.workflow_run.conclusion }}); kicking picker."
+          gh workflow run agent-harness-queue-picker.yml -R ${{ github.repository }} --ref main

@@ -1,1 +1,10 @@
-cursor-sdk==1.0.28
+# MiniMax's Anthropic-compatible Messages API drives the harness engine
+# (minimax_agent.py) via ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN
+# (docs/adr/0019).
+anthropic>=0.40
+
+# NOTE: cursor-sdk is intentionally NOT installed. The egress probe
+# (docs/adr/0019 follow-up) showed that merely having cursor-sdk on the path
+# reroutes HTTP clients onto the Cursor gateway (which is why MiniMax model
+# IDs were rejected with Cursor's catalog). The CURSOR_API_KEY env var can
+# stay set (dormant) for a possible rollback, but the package must be absent.
