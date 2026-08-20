@@ -89,7 +89,7 @@ async function fillRegisterForm(
   data = VALID_REGISTRATION,
 ) {
   await page.getByTestId('register-tenant-slug').fill(data.tenantSlug)
-  await expect(page.getByRole('option', { name: 'Canada' })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'Canada' })).toBeVisible({ timeout: 5000 })
   if (data.countryId) {
     await page.getByTestId('register-target-country').selectOption(data.countryId)
     await expect(page.getByRole('option', { name: 'University of Toronto' })).toBeVisible()
@@ -132,8 +132,45 @@ test.describe('Student registration form', () => {
   test('successful registration stores tokens via mocked /auth/register-student', async ({
     page,
   }) => {
+    let registerRequestBody: Record<string, unknown> | null = null
     await mockMasterDataRoutes(page)
-    await mockRegisterStudentSuccess(page)
+    await page.route('**/auth/register-student', async (route) => {
+      registerRequestBody = route.request().postDataJSON() as Record<string, unknown>
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 42,
+          email: VALID_REGISTRATION.email,
+          role: 'student',
+          tenant_id: 10,
+          branch_id: 1,
+          name: VALID_REGISTRATION.name,
+          phone: VALID_REGISTRATION.phone,
+          date_of_birth: VALID_REGISTRATION.dateOfBirth,
+          target_country_id: 1,
+          target_university_id: 10,
+          target_program_id: 100,
+          access_token: 'student-access-token',
+          refresh_token: 'student-refresh-token',
+          token_type: 'bearer',
+          created_at: '2026-01-01T00:00:00Z',
+        }),
+      })
+    })
+    await page.route('**/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 42,
+          email: VALID_REGISTRATION.email,
+          role: 'student',
+          tenant_id: 10,
+          branch_id: 1,
+        }),
+      })
+    })
     await page.goto(REGISTER_PATH)
 
     await fillRegisterForm(page)
@@ -141,6 +178,11 @@ test.describe('Student registration form', () => {
     await page.waitForURL('/')
 
     await expect(page.getByText('Welcome to EduConsult CRM')).toBeVisible()
+    expect(registerRequestBody).toMatchObject({
+      target_country_id: 1,
+      target_university_id: 10,
+      target_program_id: 100,
+    })
 
     await expect
       .poll(async () =>

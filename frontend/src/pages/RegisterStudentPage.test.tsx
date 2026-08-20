@@ -123,7 +123,7 @@ async function fillRegisterForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByTestId('register-tenant-slug'), 'apex')
   await waitFor(() => {
     expect(screen.getByRole('option', { name: 'Canada' })).toBeInTheDocument()
-  })
+  }, { timeout: 3000 })
   await user.type(screen.getByTestId('register-branch-id'), '1')
   await user.type(screen.getByTestId('register-name'), 'Rahul Kumar')
   await user.type(screen.getByTestId('register-email'), 'new.student@example.test')
@@ -463,6 +463,36 @@ describe('RegisterStudentPage', () => {
     expect(
       screen.queryByRole('heading', { name: 'Create student account' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('clears university and program when country changes', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', createFetchMock({}))
+
+    renderRegister()
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Create student account' })).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByTestId('register-tenant-slug'), 'apex')
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Canada' })).toBeInTheDocument()
+    })
+    await user.selectOptions(screen.getByTestId('register-target-country'), '1')
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'University of Toronto' })).toBeInTheDocument()
+    })
+    await user.selectOptions(screen.getByTestId('register-target-university'), '10')
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Computer Science MSc' })).toBeInTheDocument()
+    })
+    await user.selectOptions(screen.getByTestId('register-target-program'), '100')
+
+    await user.selectOptions(screen.getByTestId('register-target-country'), '')
+
+    expect(screen.getByTestId('register-target-university')).toHaveValue('')
+    expect(screen.getByTestId('register-target-program')).toHaveValue('')
   })
 
   it('shows a generic error when the network request fails', async () => {

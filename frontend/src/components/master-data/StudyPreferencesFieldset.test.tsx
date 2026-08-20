@@ -102,11 +102,35 @@ describe('StudyPreferencesFieldset', () => {
     })
   })
 
-  it('disables university and program selects until upstream values are chosen', () => {
+  it('disables university and program selects until upstream values are chosen', async () => {
     vi.stubGlobal('fetch', mockMasterDataFetch())
     render(<ControlledFieldset />)
 
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Canada' })).toBeInTheDocument()
+    })
+
     expect(screen.getByTestId('register-target-university')).toBeDisabled()
     expect(screen.getByTestId('register-target-program')).toBeDisabled()
+    expect(screen.getByText('Select a country first')).toBeInTheDocument()
+  })
+
+  it('shows an error alert when country loading fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Tenant not found' }),
+      }),
+    )
+
+    render(<ControlledFieldset tenantSlug="missing" />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('register-countries-error')).toHaveTextContent(
+        'Consultancy not found',
+      )
+    })
   })
 })

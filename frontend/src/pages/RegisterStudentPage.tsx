@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { isApiError } from '../api/client'
 import StudyPreferencesFieldset from '../components/master-data/StudyPreferencesFieldset'
+import { useDebouncedTenantSlug } from '../hooks/useMasterData'
 import { LOGIN_PATH } from '../routes/ProtectedRoute'
 import { useAuth } from '../store/authStore'
 import { REGISTER_PATH } from '../routes/paths'
@@ -31,7 +32,8 @@ export default function RegisterStudentPage() {
   const { registerStudent, clearError, isAuthenticated, isLoading } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [tenantSlug, setTenantSlug] = useState('')
+  const [tenantSlugInput, setTenantSlugInput] = useState('')
+  const tenantSlug = useDebouncedTenantSlug(tenantSlugInput)
   const [countryId, setCountryId] = useState<number | ''>('')
   const [universityId, setUniversityId] = useState<number | ''>('')
   const [programId, setProgramId] = useState<number | ''>('')
@@ -126,7 +128,7 @@ export default function RegisterStudentPage() {
                 placeholder="e.g. apex"
                 aria-describedby={error ? errorId : undefined}
                 onChange={(event) => {
-                  setTenantSlug(event.target.value)
+                  setTenantSlugInput(event.target.value)
                   setCountryId('')
                   setUniversityId('')
                   setProgramId('')

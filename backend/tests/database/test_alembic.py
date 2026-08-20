@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "e5f6a7b8c9d0"
+HEAD_REVISION = "f6a7b8c9d0e1"
 
 
 def _alembic_config() -> Config:
@@ -60,6 +60,9 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "target_country_id" in user_columns
         assert "target_university_id" in user_columns
         assert "target_program_id" in user_columns
+        assert "countries" in table_names
+        assert "universities" in table_names
+        assert "programs" in table_names
 
 
 def test_alembic_downgrade_base_clears_revision(tmp_path, monkeypatch):

@@ -378,6 +378,12 @@ body {
   color: #dc2626;
 }
 
+.login-form__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
 .login-form__submit {
   margin-top: 0.5rem;
   padding: 0.625rem 1rem;

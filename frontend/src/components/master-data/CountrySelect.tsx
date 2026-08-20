@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 import StructuredSelect from './StructuredSelect'
 import { useCountries } from '../../hooks/useMasterData'
 
@@ -16,9 +18,11 @@ export default function CountrySelect({
   disabled = false,
   describedBy,
 }: CountrySelectProps) {
+  const errorId = useId()
   const { items: countries, loading, error } = useCountries(tenantSlug, {
     enabled: !disabled,
   })
+  const describedByIds = [describedBy, error ? errorId : undefined].filter(Boolean).join(' ') || undefined
 
   return (
     <>
@@ -33,11 +37,17 @@ export default function CountrySelect({
         placeholder="Select a country"
         emptyMessage="No countries available"
         loadingMessage="Loading countries…"
-        describedBy={describedBy}
+        describedBy={describedByIds}
+        errorId={error ? errorId : undefined}
         data-testid="register-target-country"
       />
       {error ? (
-        <p className="login-form__error" role="alert" data-testid="register-countries-error">
+        <p
+          className="login-form__error"
+          role="alert"
+          id={errorId}
+          data-testid="register-countries-error"
+        >
           {error}
         </p>
       ) : null}
