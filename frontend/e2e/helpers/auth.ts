@@ -73,18 +73,10 @@ export const BRANCH_MANAGER_USER: AuthenticatedUser = {
   branch_id: 1,
 }
 
-export const STUDENT_USER = {
+export const STUDENT_USER: AuthenticatedUser = {
   id: 8,
   email: 'student@demo.test',
-  role: 'student' as UserRole,
-  tenant_id: 10,
-  branch_id: 1,
-}
-
-export const STUDENT_USER = {
-  id: 42,
-  email: 'student@demo.test',
-  role: 'student' as UserRole,
+  role: 'student',
   tenant_id: 10,
   branch_id: 1,
 }

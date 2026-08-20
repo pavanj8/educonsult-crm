@@ -978,26 +978,22 @@ body {
 }
 
 .student-dashboard__section h3 {
-<<<<<<< HEAD
-  margin: 0 0 1rem;
-  font-size: 1.125rem;
-}
-
-.student-dashboard__status {
-  margin: 0;
-=======
   margin: 0 0 0.5rem;
   font-size: 1.125rem;
 }
 
 .student-dashboard__hint {
   margin: 0 0 1rem;
->>>>>>> origin/main
   font-size: 0.875rem;
   color: #6b7280;
 }
 
-<<<<<<< HEAD
+.student-dashboard__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
 .student-dashboard__status--error {
   color: #dc2626;
 }
@@ -1037,7 +1033,8 @@ body {
   font-weight: 600;
   background: #dbeafe;
   color: #1d4ed8;
-=======
+}
+
 .application-form {
   display: flex;
   flex-direction: column;
@@ -1109,5 +1106,4 @@ body {
 .application-form__submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
->>>>>>> origin/main
 }

@@ -1,6 +1,14 @@
-<<<<<<< HEAD
-import { programName, universityName } from '../data/demoMasterData'
+import { useId, useMemo, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
+
+import {
+  DEMO_UNIVERSITIES,
+  programName,
+  programsForUniversity,
+  universityName,
+} from '../data/demoMasterData'
 import { useApplications } from '../hooks/useApplications'
+import { useCreateApplication } from '../hooks/useCreateApplication'
 import { PIPELINE_STAGE_LABELS } from '../types/application'
 
 function formatDate(iso: string): string {
@@ -15,15 +23,6 @@ function formatDate(iso: string): string {
   })
 }
 
-export default function StudentDashboardPage() {
-  const { applications, loading, error } = useApplications()
-=======
-import { useId, useMemo, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
-
-import { DEMO_UNIVERSITIES, programsForUniversity } from '../data/demoMasterData'
-import { useCreateApplication } from '../hooks/useCreateApplication'
-
 function formatStageLabel(stage: string): string {
   return stage
     .split('_')
@@ -32,6 +31,7 @@ function formatStageLabel(stage: string): string {
 }
 
 export default function StudentDashboardPage() {
+  const { applications, loading, error, reload } = useApplications()
   const { submitting, createError, createApplication } = useCreateApplication()
   const [selectedUniversityId, setSelectedUniversityId] = useState<number | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -70,17 +70,16 @@ export default function StudentDashboardPage() {
         university_id: universityIdValue,
         program_id: programIdValue,
       })
-      const university = DEMO_UNIVERSITIES.find((item) => item.id === created.university_id)
-      const program = programsForUniversity(created.university_id).find(
-        (item) => item.id === created.program_id,
-      )
-      const universityLabel = university?.name ?? `University #${created.university_id}`
-      const programLabel = program?.name ?? `Program #${created.program_id}`
+      const universityLabel = universityName(created.university_id)
+      const programLabel =
+        programName(created.university_id, created.program_id) ??
+        `Program #${created.program_id}`
       setSuccessMessage(
         `Application created for ${programLabel} at ${universityLabel}. Current stage: ${formatStageLabel(created.stage)}.`,
       )
       event.currentTarget.reset()
       setSelectedUniversityId(null)
+      await reload()
     } catch {
       // createError is set by the hook
     }
@@ -95,30 +94,27 @@ export default function StudentDashboardPage() {
 
   const errorMessage = validationError ?? createError
   const statusMessage = errorMessage ? errorId : successMessage ? successId : undefined
->>>>>>> origin/main
 
   return (
     <div className="student-dashboard" data-testid="student-dashboard-page">
       <header className="student-dashboard__header">
         <h2>Student dashboard</h2>
         <p className="student-dashboard__subtitle">
-<<<<<<< HEAD
-          View your university applications and track each pipeline stage.
-=======
           Start a new university application or track your study abroad journey.
->>>>>>> origin/main
         </p>
       </header>
 
       <section
         className="student-dashboard__section"
-<<<<<<< HEAD
         aria-labelledby="applications-list-heading"
       >
         <h3 id="applications-list-heading">My applications</h3>
         {loading && <p className="student-dashboard__status">Loading applications…</p>}
         {error && (
-          <p className="student-dashboard__status student-dashboard__status--error" role="alert">
+          <p
+            className="student-dashboard__status student-dashboard__status--error"
+            role="alert"
+          >
             {error}
           </p>
         )}
@@ -140,9 +136,7 @@ export default function StudentDashboardPage() {
                 {applications.map((application) => (
                   <tr key={application.id} data-testid={`application-row-${application.id}`}>
                     <td>{universityName(application.university_id)}</td>
-                    <td>
-                      {programName(application.university_id, application.program_id)}
-                    </td>
+                    <td>{programName(application.university_id, application.program_id)}</td>
                     <td>
                       <span
                         className="application-table__stage"
@@ -159,10 +153,9 @@ export default function StudentDashboardPage() {
           </div>
         )}
       </section>
-    </div>
-  )
-}
-=======
+
+      <section
+        className="student-dashboard__section"
         aria-labelledby="new-application-heading"
       >
         <h3 id="new-application-heading">New application</h3>
@@ -263,4 +256,3 @@ export default function StudentDashboardPage() {
     </div>
   )
 }
->>>>>>> origin/main

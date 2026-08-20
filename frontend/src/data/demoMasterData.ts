@@ -1,10 +1,6 @@
 /**
  * Placeholder master-data options until E14 list APIs are available.
-<<<<<<< HEAD
  * IDs are arbitrary positive integers accepted by GET/POST /applications.
-=======
- * IDs are arbitrary positive integers accepted by POST /applications.
->>>>>>> origin/main
  */
 
 export type DemoUniversity = {
@@ -37,7 +33,6 @@ export const DEMO_PROGRAMS: DemoProgram[] = [
 export function programsForUniversity(universityId: number): DemoProgram[] {
   return DEMO_PROGRAMS.filter((program) => program.university_id === universityId)
 }
-<<<<<<< HEAD
 
 export function universityName(universityId: number): string {
   const university = DEMO_UNIVERSITIES.find((item) => item.id === universityId)
@@ -50,5 +45,3 @@ export function programName(universityId: number, programId: number): string {
   )
   return program?.name ?? `Program #${programId}`
 }
-=======
->>>>>>> origin/main

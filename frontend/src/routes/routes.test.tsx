@@ -40,11 +40,7 @@ const mockBranchManager = {
 }
 
 const mockStudent = {
-<<<<<<< HEAD
   id: 42,
-=======
-  id: 8,
->>>>>>> origin/main
   email: 'student@demo.test',
   role: 'student' as const,
   tenant_id: 10,
@@ -320,7 +316,6 @@ describe('AppRouter routes', () => {
   it('renders student dashboard for student users', async () => {
     localStorage.setItem('access_token', 'stored-access-token')
     localStorage.setItem('refresh_token', 'stored-refresh-token')
-<<<<<<< HEAD
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -333,13 +328,6 @@ describe('AppRouter routes', () => {
         status: 200,
         json: async () => [],
       }) as typeof fetch
-=======
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockStudent,
-    }) as typeof fetch
->>>>>>> origin/main
 
     renderAppAt('/dashboard')
 

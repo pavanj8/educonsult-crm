@@ -34,14 +34,7 @@ export function AppRoutes() {
             <Route path="staff" element={<StaffPage />} />
           </Route>
           <Route element={<StudentRoute />}>
-<<<<<<< HEAD
-            <Route
-              path={STUDENT_DASHBOARD_PATH.slice(1)}
-              element={<StudentDashboardPage />}
-            />
-=======
             <Route path={STUDENT_DASHBOARD_PATH.slice(1)} element={<StudentDashboardPage />} />
->>>>>>> origin/main
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
