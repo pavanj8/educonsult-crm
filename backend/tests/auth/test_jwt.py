@@ -88,7 +88,7 @@ def test_verify_access_token_rejects_tampered_signature():
 
 
 def test_verify_access_token_rejects_token_signed_with_wrong_secret():
-    user = make_authenticated_user(Role.COUNSELOR, user_id=10)
+    make_authenticated_user(Role.COUNSELOR, user_id=10)
     now = datetime.now(UTC)
     payload = {
         "sub": "10",

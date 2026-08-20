@@ -5,31 +5,30 @@ Actions workflow (.github/workflows/agent-harness.yml) on a branch checked
 out from `main`, but can also be run manually for debugging.
 
 Usage:
-    export CURSOR_API_KEY=cursor_...
+    export MINIMAX_API_KEY=...
     python agents/dev_agent.py <issue_number> --iteration 1
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from cursor_sdk import Agent, CursorAgentError, LocalAgentOptions
-
 import github_ticket_utils as ticket_utils
-import sdk_run
+import llm_env
+import minimax_agent
 import target_app
 
+llm_env.configure_minimax_env()
+
 REPO_ROOT = target_app.REPO_ROOT
-# Fast/cheap tier: Dev Agent writes a lot of code across many tickets, and
-# composer-2.5 is purpose-built for agentic coding loops (edit -> run ->
-# fix). Test/Review intentionally use a stronger model instead -- see
-# docs/adr/0013.
-DEFAULT_MODEL = "composer-2.5"
+# Fast/cheap MiniMax tier for Dev (docs/adr/0019). Overridable via env.
+DEFAULT_MODEL = os.environ.get("DEV_AGENT_MODEL", llm_env.DEFAULT_DEV_MODEL)
 
 
 def read_text(path: Path) -> str:
@@ -60,6 +59,36 @@ class DevAgentReport:
         }
 
 
+def build_repo_map() -> str:
+    """A flat listing of existing application/test files, injected into the
+    prompt so the agent doesn't burn model turns running find/ls/grep to
+    discover structure (docs/adr/0021). Bounded so it can't dominate context.
+    """
+    areas = {
+        "backend/app": "**/*.py",
+        "backend/tests": "**/*.py",
+        "frontend/src": "**/*.ts*",
+    }
+    skip = {"__pycache__", "node_modules", "venv", ".venv", ".pytest_cache"}
+    blocks: list[str] = []
+    for rel, pattern in areas.items():
+        base = REPO_ROOT / rel
+        if not base.exists():
+            continue
+        files = [
+            str(f.relative_to(REPO_ROOT))
+            for f in sorted(base.glob(pattern))
+            if f.is_file() and not (skip & set(f.parts))
+        ]
+        if files:
+            shown = files[:250]
+            more = f"\n… (+{len(files) - len(shown)} more)" if len(files) > len(shown) else ""
+            blocks.append(f"#### {rel}/ ({len(files)} files)\n" + "\n".join(shown) + more)
+    if not blocks:
+        return "(no application/test code exists yet — likely an early scaffolding ticket)"
+    return "\n\n".join(blocks)
+
+
 def build_prompt(
     issue: dict,
     requirements: str,
@@ -70,6 +99,7 @@ def build_prompt(
     prior_feedback: str,
 ) -> str:
     protected = ", ".join(target_app.PROTECTED_PATHS)
+    repo_map = build_repo_map()
     if prior_feedback:
         feedback_block = (
             f"## Feedback from prior iterations — you MUST address this\n"
@@ -102,8 +132,23 @@ describe -- nothing more, nothing speculative.
 ## Epics (docs/epics.md)
 {epics}
 
+## Repository map — every existing app/test file (so you do NOT need to explore)
+{repo_map}
+
 ## Definition of Done (docs/definition-of-done.md) -- you must satisfy every item before finishing
 {dod}
+
+## Working efficiently (do this to avoid wasting time)
+- The repository map above already lists every existing file. Do NOT run
+  `find`, `ls`, `tree`, or broad `grep` to discover structure — you have it.
+  Only `read_file` the specific files you will edit or directly depend on
+  (usually the router/model/schema/test for this ticket's area, plus one
+  similar existing file to copy conventions from).
+- Create/modify files with the `write_file` tool. Do NOT write files via shell
+  heredocs (`cat > file << EOF`) — that causes escaping and syntax errors.
+- Run `bash scripts/check.sh backend` (or `frontend`) ONCE when you believe
+  the work is complete; fix exactly what it reports; re-run only after a change.
+  Do not re-run the whole suite after every small edit.
 
 ## Rules
 1. Implement only what this issue's acceptance criteria describe. If you
@@ -122,8 +167,16 @@ describe -- nothing more, nothing speculative.
 5. Follow existing conventions already established in this repo (check
    `backend/` and `frontend/` for prior art before introducing new
    patterns).
-6. Run your own tests (e.g. `pytest` inside `backend/`) and iterate until
-   they pass, before finishing.
+6. Before finishing, run the project's canonical check script and iterate
+   until it passes — this is the EXACT gate CI enforces, so the PR will NOT
+   merge otherwise:
+   - `bash scripts/check.sh backend` for backend changes (runs `ruff check .`
+     + `pytest`), `bash scripts/check.sh frontend` for frontend changes
+     (`npm run lint` + `npm run build`), or `bash scripts/check.sh` for both.
+   - For ruff, run `ruff check --fix .` inside `backend/` first to auto-fix
+     import order (I) and unused imports (F401), then fix what remains (e.g.
+     F841 unused variables) by hand. Do NOT finish while check.sh reports
+     failure.
 7. This is iteration {iteration} for this issue. If the feedback section
    above is non-empty, treating it as optional is a failure.
 
@@ -147,27 +200,7 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
     )
 
     print(f"--- Dev Agent starting for issue #{issue['number']} (model={model}) ---\n")
-
-    try:
-        with Agent.create(
-            model=model,
-            local=LocalAgentOptions(cwd=str(REPO_ROOT), auto_review=False),
-        ) as agent:
-            run = agent.send(prompt)
-            print(f"[dev-agent] agent_id={agent.agent_id} run_id={run.id}")
-            final_text_parts: list[str] = []
-            for message in run.messages():
-                if message.type == "assistant":
-                    for block in message.message.content:
-                        if getattr(block, "type", None) == "text":
-                            sys.stdout.write(block.text)
-                            sys.stdout.flush()
-                            final_text_parts.append(block.text)
-            result = run.wait()
-            return sdk_run.finish_run("dev-agent", result, "".join(final_text_parts))
-    except CursorAgentError as err:
-        print(f"[dev-agent] STARTUP FAILURE: {err}", file=sys.stderr)
-        return "startup_error", str(err)
+    return minimax_agent.run_agent("dev-agent", prompt, model, REPO_ROOT)
 
 
 def git_files_changed() -> list[str]:
@@ -189,7 +222,7 @@ def run_pytest_independently() -> tuple[int, str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Dev Agent: implement a GitHub Issue via Cursor SDK")
+    parser = argparse.ArgumentParser(description="Dev Agent: implement a GitHub Issue via MiniMax")
     parser.add_argument("issue_number", type=int)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--iteration", type=int, default=1)

@@ -17,6 +17,7 @@ from app.auth import (
     verify_refresh_token,
 )
 from app.auth.email_uniqueness import DUPLICATE_EMAIL_DETAIL, ensure_email_available
+from app.auth.master_data_validation import validate_target_master_data
 from app.db.database import get_db
 from app.models.branch import Branch
 from app.models.tenant import Tenant
@@ -162,6 +163,7 @@ def register_student(
         )
 
     ensure_email_available(db, payload.email, unavailable_detail=_DB_UNAVAILABLE_DETAIL)
+    validate_target_master_data(db, tenant.id, payload)
 
     student_user = User(
         email=payload.email,

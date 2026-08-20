@@ -19,6 +19,15 @@ from app.seed import (
 )
 
 
+def test_demo_catalog_includes_master_data() -> None:
+    catalog = get_demo_catalog()
+    assert len(catalog.countries) >= 1
+    assert len(catalog.universities) >= 1
+    assert len(catalog.programs) >= 1
+    apex_countries = [country for country in catalog.countries if country.tenant_id == 1]
+    assert any(country.name == "Canada" for country in apex_countries)
+
+
 def test_demo_catalog_includes_two_tenants() -> None:
     catalog = get_demo_catalog()
     assert len(catalog.tenants) == 2
@@ -80,6 +89,9 @@ def test_seed_demo_data_without_session() -> None:
 def test_seed_demo_data_with_session(db_session) -> None:
     result = seed_demo_data(session=db_session)
     assert result.user_count == 15
+    assert result.country_count == 3
+    assert result.university_count == 4
+    assert result.program_count == 4
 
 
 def test_seed_demo_data_rejects_incomplete_catalog() -> None:
@@ -89,6 +101,9 @@ def test_seed_demo_data_rejects_incomplete_catalog() -> None:
         tenants=catalog.tenants,
         branches=catalog.branches,
         users=incomplete_users,
+        countries=catalog.countries,
+        universities=catalog.universities,
+        programs=catalog.programs,
     )
     with pytest.raises(SeedValidationError, match="missing roles"):
         seed_demo_data(session=None, catalog=broken)

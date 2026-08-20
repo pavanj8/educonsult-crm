@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 /** Application types aligned with backend E18 schemas (Journey J11). */
+=======
+/** Application pipeline stages (Requirements §5; backend pipeline.stages). */
+>>>>>>> origin/main
 
 export type PipelineStage =
   | 'registered'
@@ -24,6 +28,7 @@ export type Application = {
   updated_at: string
 }
 
+<<<<<<< HEAD
 export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   registered: 'Registered',
   counseling: 'Counseling',
@@ -36,4 +41,9 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   enrolled: 'Enrolled',
   rejected: 'Rejected',
   withdrawn: 'Withdrawn',
+=======
+export type CreateApplicationRequest = {
+  university_id: number
+  program_id: number
+>>>>>>> origin/main
 }
