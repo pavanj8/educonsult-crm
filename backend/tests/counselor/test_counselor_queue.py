@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.main import app as fastapi_app
-from app.models.application import PipelineStage
+from app.pipeline.stages import PipelineStage
 from app.rbac.roles import Role
 from tests.counselor.helpers import seed_application
 from tests.factories.users import make_authenticated_user, make_db_user
@@ -62,7 +62,7 @@ def test_queue_returns_assigned_applications(client, db_session, override_authen
     other_student = _seed_student(db_session, email="other.student@example.test")
 
     # Application assigned to the counselor
-    seed_application(db_session, student_id=student, assigned_counselor_id=counselor)
+    valid_app = seed_application(db_session, student_id=student, assigned_counselor_id=counselor)
     # Application assigned to another counselor (should not appear)
     seed_application(db_session, student_id=other_student, assigned_counselor_id=other_counselor)
 
@@ -72,7 +72,7 @@ def test_queue_returns_assigned_applications(client, db_session, override_authen
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
+    assert {app["id"] for app in data} == {valid_app.id}
     assert data[0]["student_id"] == student
 
 
@@ -92,7 +92,7 @@ def test_queue_excludes_unassigned_applications(client, db_session, override_aut
     response = client.get("/counselor/queue")
 
     assert response.status_code == 200
-    assert len(response.json()) == 0
+    assert response.json() == []
 
 
 def test_queue_filters_by_stage(client, db_session, override_authenticated_user):
@@ -227,16 +227,66 @@ def test_queue_requires_authentication(client):
     assert response.json()["detail"] == "Not authenticated"
 
 
-def test_queue_requires_counselor_permission(client, db_session, override_authenticated_user):
-    """Users without APPLICATION_READ_ASSIGNED permission are rejected."""
-    # Create a student (who doesn't have the counselor permission)
+def test_queue_requires_counselor_role(client, db_session, override_authenticated_user):
+    """Only the COUNSELOR role may call this endpoint.
+
+    Branch Manager and Consultancy Owner have their own dashboards and
+    use ``/applications/assigned-to-me`` for cross-role queue views;
+    mixing those role views into this endpoint produced a wrong-data
+    contract for the non-counselor roles, which is why the endpoint is
+    narrowed to COUNSELOR only.
+    """
+    # Student role does not satisfy the COUNSELOR-only gate
     student = _seed_student(db_session)
     override_authenticated_user(make_authenticated_user(Role.STUDENT, user_id=student))
 
     response = client.get("/counselor/queue")
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Insufficient permissions"
+
+
+def test_queue_rejects_branch_manager_role(client, db_session, override_authenticated_user):
+    """Branch Manager is not authorised for the counselor-only queue."""
+    branch_manager = make_db_user(
+        db_session,
+        Role.BRANCH_MANAGER,
+        email="manager@example.test",
+        tenant_id=1,
+        branch_id=1,
+    )
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.BRANCH_MANAGER,
+            user_id=branch_manager.id,
+            tenant_id=1,
+            branch_id=1,
+        )
+    )
+
+    response = client.get("/counselor/queue")
+
+    assert response.status_code == 403
+
+
+def test_queue_rejects_consultancy_owner_role(client, db_session, override_authenticated_user):
+    """Consultancy Owner is not authorised for the counselor-only queue."""
+    owner = make_db_user(
+        db_session,
+        Role.CONSULTANCY_OWNER,
+        email="owner@example.test",
+        tenant_id=1,
+    )
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.CONSULTANCY_OWNER,
+            user_id=owner.id,
+            tenant_id=1,
+        )
+    )
+
+    response = client.get("/counselor/queue")
+
+    assert response.status_code == 403
 
 
 def test_queue_respects_tenant_isolation(client, db_session, override_authenticated_user):
@@ -246,7 +296,7 @@ def test_queue_respects_tenant_isolation(client, db_session, override_authentica
     tenant1_student = _seed_student(db_session, tenant_id=1, email="t1.student@example.test")
     tenant2_student = _seed_student(db_session, tenant_id=2, email="t2.student@example.test")
 
-    seed_application(db_session, tenant_id=1, student_id=tenant1_student, assigned_counselor_id=counselor)
+    valid_app = seed_application(db_session, tenant_id=1, student_id=tenant1_student, assigned_counselor_id=counselor)
     seed_application(db_session, tenant_id=2, student_id=tenant2_student, assigned_counselor_id=tenant2_counselor)
 
     override_authenticated_user(make_authenticated_user(Role.COUNSELOR, user_id=counselor, tenant_id=1))
@@ -255,7 +305,7 @@ def test_queue_respects_tenant_isolation(client, db_session, override_authentica
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
+    assert {app["id"] for app in data} == {valid_app.id}
     assert data[0]["student_email"] == "t1.student@example.test"
 
 
@@ -270,11 +320,11 @@ def test_queue_returns_empty_for_counselor_with_no_applications(client, db_sessi
     assert response.json() == []
 
 
-def test_queue_orders_by_created_at_desc(client, db_session, override_authenticated_user):
-    """Queue returns applications ordered by created_at descending (newest first)."""
+def test_queue_orders_by_id_ascending(client, db_session, override_authenticated_user):
+    """Queue returns applications in stable id order."""
     counselor = _seed_counselor(db_session)
 
-    # Create applications with different timestamps
+    # Create applications with controlled timestamps
     now = datetime.now(timezone.utc)
     student1 = _seed_student(db_session, email="first@example.test")
     student2 = _seed_student(db_session, email="second@example.test")
@@ -285,7 +335,7 @@ def test_queue_orders_by_created_at_desc(client, db_session, override_authentica
     app2 = seed_application(db_session, student_id=student2, assigned_counselor_id=counselor)
     app3 = seed_application(db_session, student_id=student3, assigned_counselor_id=counselor)
 
-    # Set timestamps: oldest first, newest last
+    # Set timestamps so id order does not match chronological order
     app1.created_at = now - timedelta(hours=3)
     app2.created_at = now - timedelta(hours=1)
     app3.created_at = now
@@ -298,19 +348,22 @@ def test_queue_orders_by_created_at_desc(client, db_session, override_authentica
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 3
-    # Newest first (app3), then app2, then app1
-    assert data[0]["student_email"] == "third@example.test"
-    assert data[1]["student_email"] == "second@example.test"
-    assert data[2]["student_email"] == "first@example.test"
+    # Stable id ordering (ascending)
+    assert [app["id"] for app in data] == sorted(app["id"] for app in data)
 
 
 def test_queue_skips_applications_with_missing_student(client, db_session, override_authenticated_user):
-    """Applications whose student was deleted (FK CASCADE) or has invalid student_id are silently omitted."""
+    """Applications whose student was deleted (FK CASCADE) or has invalid student_id are silently omitted.
+
+    Strengthened over a vacuous ``all(... not in ...)`` check: we assert the
+    *valid* application IS in the response (so an empty-list regression would
+    fail this test), and we also assert the orphan id is absent.
+    """
     counselor = _seed_counselor(db_session)
     student = _seed_student(db_session, email="orphan.student@example.test")
 
     # Create a valid application
-    seed_application(db_session, student_id=student, assigned_counselor_id=counselor)
+    valid_app = seed_application(db_session, student_id=student, assigned_counselor_id=counselor)
 
     # Insert an application with a non-existent student_id via raw SQL.
     # This bypasses the ORM so we can create an orphaned record that the FK
@@ -321,8 +374,8 @@ def test_queue_skips_applications_with_missing_student(client, db_session, overr
             text(
                 "INSERT INTO applications "
                 "(tenant_id, student_id, assigned_counselor_id, stage, "
-                "loan_opted_in, created_at, updated_at) "
-                "VALUES (:t, :s, :c, :st, :lo, :ca, :ua)"
+                "loan_opted_in, created_at, updated_at, university_id, program_id) "
+                "VALUES (:t, :s, :c, :st, :lo, :ca, :ua, :u, :p)"
             ),
             {
                 "t": 1,
@@ -332,6 +385,8 @@ def test_queue_skips_applications_with_missing_student(client, db_session, overr
                 "lo": False,
                 "ca": now,
                 "ua": now,
+                "u": 1,
+                "p": 1,
             },
         )
     db_session.commit()
@@ -342,8 +397,12 @@ def test_queue_skips_applications_with_missing_student(client, db_session, overr
 
     assert response.status_code == 200
     data = response.json()
-    # The orphan application (student_id=999999) must be absent
-    assert all(app["student_id"] != 999999 for app in data)
+    valid_ids = {app["id"] for app in data}
+    student_ids = {app["student_id"] for app in data}
+    # The valid application must be present (catches "empty list regression").
+    assert valid_app.id in valid_ids
+    # The orphan student_id must be absent.
+    assert 999999 not in student_ids
 
 
 def test_queue_handles_db_unavailable_gracefully(client, db_session, override_authenticated_user):

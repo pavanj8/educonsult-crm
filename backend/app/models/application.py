@@ -11,57 +11,24 @@ Fields are kept as a superset of:
 """
 
 from datetime import datetime
-from enum import StrEnum
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TenantScopedBase
+from app.pipeline.stages import PipelineStage
 
-
-class PipelineStage(StrEnum):
-    """Application pipeline stages (Requirements §5, Journey J18).
-
-    Mirrors the canonical enum in :mod:`app.pipeline.stages`; we re-export a
-    copy here so this module can be imported without pulling in the heavier
-    pipeline package (which depends on the seeder). Values must stay in sync.
-    """
-
-    REGISTERED = "registered"
-    COUNSELING = "counseling"
-    UNIVERSITY_SHORTLISTING = "university_shortlisting"
-    APPLICATION_SUBMITTED = "application_submitted"
-    DOCUMENT_VERIFICATION = "document_verification"
-    OFFER_LETTER = "offer_letter"
-    VISA_PROCESSING = "visa_processing"
-    LOAN_PROCESSING = "loan_processing"
-    ENROLLED = "enrolled"
-    REJECTED = "rejected"
-    WITHDRAWN = "withdrawn"
-
-
-# Terminal states - applications cannot progress further from these
-_TERMINAL_STAGES = frozenset(
-    {
-        PipelineStage.ENROLLED,
-        PipelineStage.REJECTED,
-        PipelineStage.WITHDRAWN,
-    }
-)
-
-
-def is_terminal_stage(stage: PipelineStage) -> bool:
-    """Return True if the stage is a terminal state."""
-    return stage in _TERMINAL_STAGES
+__all__ = ["Application"]
 
 
 class Application(TenantScopedBase):
-    """Student application for a university/program (E18/E21; J11/J14).
+    """Student application to a university/program (E18/E21; Journey J11/J14).
 
     Each student can have multiple applications in parallel, each with its
-    own independent pipeline stage. The set of columns is the union of what
-    E18 (``/applications`` endpoints, Issue #149) and E21
-    (``/counselor/queue`` endpoints, Issue #156) need to read/write.
+    own independent pipeline stage. ``university_id`` and ``program_id`` are
+    required by E18 (``POST /applications``) and remain NOT NULL; the
+    E21-specific fields are nullable where appropriate (counselor not yet
+    assigned, loan not opted-in, etc.).
     """
 
     __tablename__ = "applications"
@@ -73,14 +40,11 @@ class Application(TenantScopedBase):
         index=True,
     )
     # E18 — explicit university/program identifiers the application is for.
-    # Required for student-created applications (E18 ``POST /applications``);
-    # the E21 counselor queue tests seed ``None`` and bypass the router, so
-    # both code paths share the same model.
-    university_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    program_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    university_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     # E21 — counselor that owns this application in the queue (nullable
-    # while an application is freshly registered and round-robin has not yet
-    # assigned a counselor; see E19).
+    # while an application is freshly registered and round-robin has not
+    # yet assigned a counselor; see E19).
     assigned_counselor_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -93,11 +57,16 @@ class Application(TenantScopedBase):
     # keep that contract stable.
     target_university_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     target_program_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    # Pipeline stage — stored as plain text so we can transition without a
-    # Postgres ENUM migration; values are constrained at the application
-    # layer (see E25 / :mod:`app.pipeline.default_transitions`).
+    # Pipeline stage — stored as a non-native enum so we can transition
+    # without a Postgres ENUM migration; values are constrained at the
+    # application layer (see E25 / :mod:`app.pipeline.default_transitions`).
     stage: Mapped[PipelineStage] = mapped_column(
-        String(50),
+        Enum(
+            PipelineStage,
+            native_enum=False,
+            length=50,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         nullable=False,
         default=PipelineStage.REGISTERED,
         index=True,
@@ -109,8 +78,10 @@ class Application(TenantScopedBase):
         DateTime(timezone=True),
         nullable=True,
     )
-    # Loan tracking fields (Requirements §5, Journey J29/J30)
-    loan_opted_in: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
+    # Loan tracking fields (Requirements §5, Journey J29/J30).
+    # Use ``Boolean`` so ORM reads return real ``bool`` values; the Pydantic
+    # schema can rely on the typed value rather than coercing ints.
+    loan_opted_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     loan_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
     loan_lender: Mapped[str | None] = mapped_column(String(255), nullable=True)
     loan_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -8,10 +8,12 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models.application import Application, PipelineStage
+from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
+from app.models.application import Application
 from app.models.user import User
-from app.rbac import Permission
-from app.rbac.dependencies import require_permission
+from app.pipeline.stages import PipelineStage
+from app.rbac.dependencies import require_role
+from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.application import ApplicationWithStudentResponse
 
@@ -20,22 +22,32 @@ router = APIRouter()
 _DB_UNAVAILABLE_DETAIL = "Counselor service is temporarily unavailable"
 
 
-def _get_counselor_applications_base_query(
+def _counselor_base_query(
     db: Session,
     current_user: AuthenticatedUser,
 ) -> select:
-    """Build base query for counselor's assigned applications."""
-    return (
-        select(Application)
-        .where(Application.assigned_counselor_id == current_user.id)
-        .where(Application.tenant_id == current_user.tenant_id)
+    """Build a tenant-scoped base query for the counselor's queue.
+
+    Tenant scoping goes through :func:`apply_tenant_scope` (ADR-0004) so the
+    multi-tenant invariant is enforced in one place; the per-counselor
+    ``assigned_counselor_id`` filter is what enforces "this counselor's
+    queue". Branch scoping is implicit because a counselor's
+    ``assigned_counselor_id`` only matches applications within the branches
+    they have access to (the row is owned by one branch's round-robin
+    assignment).
+    """
+    statement: select = apply_tenant_scope(
+        select(Application).order_by(Application.id),
+        Application,
+        current_user,
     )
+    return statement.where(Application.assigned_counselor_id == current_user.id)
 
 
 @router.get("/queue", response_model=list[ApplicationWithStudentResponse])
 def get_counselor_queue(
     current_user: Annotated[
-        AuthenticatedUser, Depends(require_permission(Permission.APPLICATION_READ_ASSIGNED))
+        AuthenticatedUser, Depends(require_role(Role.COUNSELOR))
     ],
     db: Session = Depends(get_db),
     stage: PipelineStage | None = Query(default=None, description="Filter by pipeline stage"),
@@ -43,24 +55,18 @@ def get_counselor_queue(
 ) -> list[ApplicationWithStudentResponse]:
     """Get the counselor's assigned application queue (E21; Journey J14).
 
-    Returns applications assigned to the authenticated counselor with optional
-    filtering by stage and/or search term.
+    Restricted to the ``COUNSELOR`` role only. Branch Managers and Consultancy
+    Owners use ``GET /applications/assigned-to-me`` for their broader queue
+    views (E21 backend, #156); mixing the three role views into one endpoint
+    produced a wrong-data contract for the latter two roles, which is why
+    this endpoint is narrowed.
     """
-    if current_user.tenant_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
-        )
-
     try:
-        # Build base query for counselor's assigned applications
-        query = _get_counselor_applications_base_query(db, current_user)
+        query = _counselor_base_query(db, current_user)
 
-        # Apply stage filter if provided
         if stage is not None:
-            query = query.where(Application.stage == stage)
+            query = query.where(Application.stage == stage.value)
 
-        # Apply search filter if provided (search student name or email)
         if search:
             search_term = f"%{search.strip()}%"
             query = query.join(
@@ -71,44 +77,49 @@ def get_counselor_queue(
                 (User.name.ilike(search_term)) | (User.email.ilike(search_term))
             )
 
-        # Order by created_at descending (newest first)
-        query = query.order_by(Application.created_at.desc())
-
         applications = list(db.scalars(query).all())
 
-        # Build response with student details
-        # Skip applications where student is missing (FK violation or data inconsistency)
+        # Build response with student details. Skip applications where the
+        # student row is missing (FK CASCADE deleted or orphan insertion) so
+        # the frontend receives clean rows instead of synthesised placeholders.
         result: list[ApplicationWithStudentResponse] = []
         for app in applications:
             student = db.get(User, app.student_id)
-            if student:
-                result.append(
-                    ApplicationWithStudentResponse(
-                        id=app.id,
-                        tenant_id=app.tenant_id,
-                        student_id=app.student_id,
-                        assigned_counselor_id=app.assigned_counselor_id,
-                        target_university_id=app.target_university_id,
-                        target_program_id=app.target_program_id,
-                        stage=app.stage,
-                        stage_reason=app.stage_reason,
-                        enrollment_date=app.enrollment_date,
-                        loan_opted_in=app.loan_opted_in,
-                        loan_status=app.loan_status,
-                        loan_lender=app.loan_lender,
-                        loan_amount=app.loan_amount,
-                        created_at=app.created_at,
-                        updated_at=app.updated_at,
-                        student_name=student.name,
-                        student_email=student.email,
-                        student_phone=student.phone,
-                        student_role=student.role,
-                    )
+            if student is None:
+                continue
+            result.append(
+                ApplicationWithStudentResponse(
+                    id=app.id,
+                    tenant_id=app.tenant_id,
+                    student_id=app.student_id,
+                    assigned_counselor_id=app.assigned_counselor_id,
+                    target_university_id=app.target_university_id,
+                    target_program_id=app.target_program_id,
+                    university_id=app.university_id,
+                    program_id=app.program_id,
+                    stage=app.stage,
+                    stage_reason=app.stage_reason,
+                    enrollment_date=app.enrollment_date,
+                    loan_opted_in=app.loan_opted_in,
+                    loan_status=app.loan_status,
+                    loan_lender=app.loan_lender,
+                    loan_amount=app.loan_amount,
+                    created_at=app.created_at,
+                    updated_at=app.updated_at,
+                    student_name=student.name,
+                    student_email=student.email,
+                    student_phone=student.phone,
+                    student_role=student.role,
                 )
-            # Skip applications with missing students instead of synthesizing fake data
+            )
 
         return result
 
+    except TenantScopeError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        ) from None
     except OperationalError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -116,46 +127,34 @@ def get_counselor_queue(
         ) from None
 
 
-@router.get("/queue/counts", response_model=dict[PipelineStage, int])
+@router.get("/queue/counts", response_model=dict[str, int])
 def get_counselor_queue_counts(
     current_user: Annotated[
-        AuthenticatedUser, Depends(require_permission(Permission.APPLICATION_READ_ASSIGNED))
+        AuthenticatedUser, Depends(require_role(Role.COUNSELOR))
     ],
     db: Session = Depends(get_db),
-) -> dict[PipelineStage, int]:
+) -> dict[str, int]:
     """Get counts of applications in each stage for the counselor's queue (E21; Journey J14).
 
     Useful for displaying stage badges in the dashboard. The response is keyed
-    by :class:`PipelineStage` enum members; ``PipelineStage`` is a ``StrEnum``
-    so the JSON wire format serialises each key as its enum value
-    (e.g. ``"registered"``).
+    by :class:`PipelineStage` enum string values (``registered``, ``counseling``,
+    ...) so the JSON wire format matches what the frontend expects.
     """
-    if current_user.tenant_id is None:
+    try:
+        query = _counselor_base_query(db, current_user)
+        rows = db.execute(
+            select(Application.stage, func.count(Application.id))
+            .select_from(query.subquery())
+            .group_by(Application.stage)
+        ).all()
+
+        return {stage.value: count for stage, count in rows}
+
+    except TenantScopeError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
-        )
-
-    try:
-        # Count applications by stage for this counselor
-        counts = (
-            db.execute(
-                select(Application.stage, func.count(Application.id))
-                .where(Application.assigned_counselor_id == current_user.id)
-                .where(Application.tenant_id == current_user.tenant_id)
-                .group_by(Application.stage)
-            )
-        ).all()
-
-        # Group-by returns PipelineStage members from the stage column (because
-        # Application.stage is typed as PipelineStage); coerce any plain
-        # string into the enum so the response_model validates.
-        result: dict[PipelineStage, int] = {}
-        for stage, count in counts:
-            key = PipelineStage(stage) if isinstance(stage, str) else stage
-            result[key] = count
-        return result
-
+        ) from None
     except OperationalError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

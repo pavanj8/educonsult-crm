@@ -14,16 +14,14 @@ def seed_application(
     stage: PipelineStage = PipelineStage.REGISTERED,
     target_university_id: int | None = None,
     target_program_id: int | None = None,
-    university_id: int | None = None,
-    program_id: int | None = None,
+    university_id: int = 1,
+    program_id: int = 1,
 ) -> Application:
-    """Seed an application record for counselor queue tests.
+    """Seed an application row for counselor queue tests.
 
-    ``university_id`` / ``program_id`` are required by the E18 model so the
-    Test Agent's black-box fixtures can create applications; the counselor
-    queue endpoint does not read them. They default to ``None`` here so
-    that callers who don't care about the E18 surface (e.g. the E21 unit
-    tests) do not have to invent placeholder master-data IDs.
+    ``university_id`` and ``program_id`` are required by the E18 model
+    (NOT NULL), so the helper takes explicit defaults that satisfy the
+    schema even when the E21 queue endpoint never reads them.
     """
     now = datetime.now(timezone.utc)
     application = Application(

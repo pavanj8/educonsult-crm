@@ -1,21 +1,16 @@
 """Pydantic schemas for application endpoints (E18/E21; Journey J11/J14).
 
-This module serves three different surfaces that all model an Application row:
-
-* :class:`CreateApplicationRequest` / :class:`ApplicationResponse` — used by
-  E18 (``POST /applications``, ``GET /applications``) so students can create
-  an application and list their own.
-* :class:`ApplicationWithStudentResponse` — used by E21
-  (``GET /counselor/queue``) so the counselor dashboard can show a denormalized
-  row that includes the student's name/email/phone/role.
-* :class:`StageCount` — used by E21 (``GET /counselor/queue/counts``).
+This module serves the E18 ``/applications`` endpoints (student-facing
+``CreateApplicationRequest`` and ``ApplicationResponse``) plus the E21
+counselor dashboard response shape ``ApplicationWithStudentResponse``
+which extends the response with denormalised student fields.
 """
 
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.application import PipelineStage
+from app.pipeline.stages import PipelineStage
 from app.rbac.roles import Role
 
 
@@ -39,11 +34,10 @@ class ApplicationResponse(BaseModel):
     id: int
     tenant_id: int
     student_id: int
-    # E18 fields (nullable so counselor-queue fixtures that bypass the
-    # /applications router can share this schema)
-    university_id: int | None
-    program_id: int | None
-    # E21 fields
+    # E18 fields (NOT NULL; required by POST /applications)
+    university_id: int
+    program_id: int
+    # E21 fields (nullable where the lifecycle has not yet reached them)
     assigned_counselor_id: int | None
     target_university_id: int | None
     target_program_id: int | None
