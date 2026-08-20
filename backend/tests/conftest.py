@@ -45,15 +45,19 @@ def db_session(db_engine: Engine) -> Generator[Session, None, None]:
 
 
 @pytest.fixture()
-def client(db_engine: Engine) -> Generator[TestClient, None, None]:
-    testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+def client(db_engine: Engine, db_session: Session) -> Generator[TestClient, None, None]:
+    """Test client that shares the SAME session as the test's db_session fixture.
+
+    This ensures that data seeded by tests is visible to the app's request handlers.
+    """
 
     def override_get_db() -> Generator[Session, None, None]:
-        db = testing_session_local()
+        # Yield the SAME session instance that tests use so flushed/committed
+        # data is immediately visible.
         try:
-            yield db
+            yield db_session
         finally:
-            db.close()
+            pass
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
@@ -75,3 +79,12 @@ def override_authenticated_user() -> Generator[Callable[[AuthenticatedUser], Non
 
     yield _override
     app.dependency_overrides.pop(get_current_user, None)
+
+
+# Ensure the test counseling applications table is created alongside app models.
+# Import it here so Base.metadata.create_all() (called in the db_engine fixture)
+
+# Ensure the test counseling applications table is created alongside app models.
+# Import it here so Base.metadata.create_all() (called in the db_engine fixture)
+# creates the table in the SQLite in-memory DB.
+from tests.counseling.helpers import _TestApplication  # noqa: F401
