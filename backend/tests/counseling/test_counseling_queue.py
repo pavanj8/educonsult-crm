@@ -554,6 +554,32 @@ def test_queue_rejects_non_counselor_role(client, db_session, override_authentic
         assert response.status_code == 403, f"Expected 403 for role {role.value}, got {response.status_code}"
 
 
+def test_queue_rejects_counselor_missing_tenant_scope(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """A counselor whose token carries no tenant_id must be rejected (defence-in-depth).
+
+    The require_permission check passes COUNSELOR (the only role that holds
+    APPLICATION_READ_ASSIGNED), but the explicit `tenant_id is None` guard in the
+    route body must block the request before any query can run.  In practice this
+    cannot occur with a valid JWT — COUNCILLOR role is always tenant-scoped — but
+    the guard is kept as belt-and-suspenders defence against token tampering.
+    """
+    counselor_no_tenant = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=56,
+        tenant_id=None,  # explicitly missing tenant scope
+        branch_id=1,
+    )
+    override_authenticated_user(counselor_no_tenant)
+
+    response = client.get(counseling_queue_url())
+
+    assert response.status_code == 403
+
+
 def test_queue_rejects_super_admin_without_branch_scope(
     client,
     db_session,
