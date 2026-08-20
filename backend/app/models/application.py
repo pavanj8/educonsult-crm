@@ -1,7 +1,22 @@
 """Application model (E18; E21; Requirements §5).
 
-The E21 queue fields are nullable for compatibility with applications created
-by E18, before branch assignment and automatic counselor assignment were added.
+The E21 queue fields are nullable for backwards compatibility with rows
+created by E18, which pre-dates the branch and counselor-assignment
+columns. Follow-ups tracked for the tightening of these columns to NOT NULL:
+
+- **E19 — Counselor Auto-Assignment** (Journey J12): populates
+  ``assigned_counselor_id`` automatically on new applications.
+- **E20 — Manual Counselor Reassignment** (Journey J13): allows manual
+  updates of ``assigned_counselor_id`` (and ``branch_id``) via the staff
+  reassignment API.
+- **E21 — Counselor Dashboard & Queue** (this issue; Journey J14): the
+  ``GET /applications/assigned-to-me`` endpoint reads
+  ``branch_id`` / ``assigned_counselor_id`` for the role-scoped queue.
+
+Until those follow-ups land, an ``Application`` may be persisted with
+``branch_id IS NULL`` and/or ``assigned_counselor_id IS NULL``. The
+constraints can be tightened in the respective follow-up issues when the
+columns are reliably populated for new rows.
 """
 
 from sqlalchemy import Enum, ForeignKey, Integer
