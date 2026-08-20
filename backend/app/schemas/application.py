@@ -1,38 +1,15 @@
-<<<<<<< HEAD
-"""Pydantic schemas for application endpoints (E21; Journey J14).
+"""Pydantic schemas for application endpoints (E18; E21; Journey J11; J14).
 
-``ApplicationStageEnum`` is re-exported from the model so both ORM and schema
-layers share a single enum definition (avoids duplication / drift).
+``ApplicationStageEnum`` is a re-export of :class:`app.models.application.ApplicationStage`
+so Pydantic, ORM, and FastAPI route handlers share one enum definition
+(avoids duplication / drift).
 """
-
-from datetime import datetime
-
-from pydantic import BaseModel, ConfigDict
-
-# Re-export so FastAPI route handlers and schema consumers import from one place.
-from app.models.application import ApplicationStage as ApplicationStageEnum
-
-
-class ApplicationResponse(BaseModel):
-    """Single application record in list/detail responses (E21)."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    branch_id: int
-    student_id: int
-    assigned_counselor_id: int | None
-    university: str
-    program: str
-    stage: ApplicationStageEnum
-=======
-"""Pydantic schemas for application endpoints (E18; Journey J11)."""
 
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.pipeline.stages import PipelineStage
+from app.models.application import ApplicationStage as ApplicationStageEnum
 
 
 class CreateApplicationRequest(BaseModel):
@@ -41,14 +18,22 @@ class CreateApplicationRequest(BaseModel):
 
 
 class ApplicationResponse(BaseModel):
+    """Single application record in list/detail responses (E18; E21).
+
+    ``tenant_id`` is intentionally omitted: every response served by the API
+    is already tenant-scoped via the caller's session, so echoing the value
+    back provides no extra information and widens the surface for accidental
+    client misuse.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    tenant_id: int
+    branch_id: int
     student_id: int
+    assigned_counselor_id: int | None
     university_id: int
     program_id: int
-    stage: PipelineStage
->>>>>>> origin/main
+    stage: ApplicationStageEnum
     created_at: datetime
     updated_at: datetime
