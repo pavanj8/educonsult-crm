@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.orm import Session
 
 
 # revision identifiers, used by Alembic.
@@ -97,48 +98,20 @@ def upgrade() -> None:
         unique=False,
     )
 
-    # Seed platform-wide default transition rules (no tenant_id).
-    # Forward pipeline progression: REGISTERED → ... → VISA_PROCESSING → ENROLLED
-    # LOAN_PROCESSING can be entered from VISA_PROCESSING and returns to it.
-    default_transitions = [
-        # Normal forward progression
-        ("registered", "counseling"),
-        ("counseling", "university_shortlisting"),
-        ("university_shortlisting", "application_submitted"),
-        ("application_submitted", "document_verification"),
-        ("document_verification", "offer_letter"),
-        ("offer_letter", "visa_processing"),
-        ("visa_processing", "enrolled"),
-        # Loan processing loop (optional, entered from visa_processing, returns to it)
-        ("visa_processing", "loan_processing"),
-        ("loan_processing", "visa_processing"),
-        # Terminal states can be reached from most non-terminal stages
-        ("registered", "rejected"),
-        ("registered", "withdrawn"),
-        ("counseling", "rejected"),
-        ("counseling", "withdrawn"),
-        ("university_shortlisting", "rejected"),
-        ("university_shortlisting", "withdrawn"),
-        ("application_submitted", "rejected"),
-        ("application_submitted", "withdrawn"),
-        ("document_verification", "rejected"),
-        ("document_verification", "withdrawn"),
-        ("offer_letter", "rejected"),
-        ("offer_letter", "withdrawn"),
-        ("visa_processing", "rejected"),
-        ("visa_processing", "withdrawn"),
-        ("loan_processing", "rejected"),
-        ("loan_processing", "withdrawn"),
-    ]
+    # Seed platform-wide default transition rules via the canonical application
+    # seeder. This keeps the migration and the runtime boot path in sync
+    # (both rely on ``app.pipeline.default_transitions.seed_default_stage_transitions``)
+    # and avoids dialect-specific raw SQL (e.g. ``datetime('now')`` is SQLite-only).
+    # The seeder uses Python-side ``datetime.now(timezone.utc)`` so it works
+    # identically on PostgreSQL and SQLite.
+    from app.pipeline.default_transitions import seed_default_stage_transitions
 
-    op.execute(
-        "INSERT INTO stage_transitions "
-        "(from_stage, to_stage, tenant_id, is_active, created_at, updated_at) "
-        "VALUES " + ", ".join(
-            f"('{frm}', '{to}', NULL, true, datetime('now'), datetime('now'))"
-            for frm, to in default_transitions
-        )
-    )
+    bind = op.get_bind()
+    session = Session(bind=bind)
+    try:
+        seed_default_stage_transitions(session)
+    finally:
+        session.close()
 
 
 def downgrade() -> None:

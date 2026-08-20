@@ -4,14 +4,14 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, UniqueConst
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
-from app.pipeline.stages import Stage
+from app.pipeline.stages import PipelineStage
 
 
 class StageTransition(Base):
     """Valid stage transition rules table (E25; Journey J18).
 
     Each row declares that ``from_stage`` may advance to ``to_stage`` within
-    a given tenant.  Tenants inherit a platform-wide default when no
+    a given tenant. Tenants inherit a platform-wide default when no
     tenant-specific override exists (tenant_id IS NULL rows).
 
     For v1 the default rule set encodes the forward-progression pipeline:
@@ -22,6 +22,12 @@ class StageTransition(Base):
     and transitions back to VISA_PROCESSING once the loan is resolved.
 
     Terminal stages (ENROLLED, REJECTED, WITHDRAWN) have no outgoing transitions.
+
+    Design note (ADR-0001 / v1 multi-tenant scope): this is intentionally a
+    single table with NULL-as-default rather than a separate "global rules"
+    table joined to per-tenant overrides. The unique constraint is
+    ``(from_stage, to_stage, tenant_id)`` so each tenant can have at most one
+    active row per (from, to) pair, and the NULL row is the shared default.
     """
 
     __tablename__ = "stage_transitions"
@@ -30,18 +36,18 @@ class StageTransition(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    from_stage: Mapped[Stage] = mapped_column(
+    from_stage: Mapped[PipelineStage] = mapped_column(
         Enum(
-            Stage,
+            PipelineStage,
             native_enum=False,
             length=50,
             values_callable=lambda obj: [e.value for e in obj],
         ),
         nullable=False,
     )
-    to_stage: Mapped[Stage] = mapped_column(
+    to_stage: Mapped[PipelineStage] = mapped_column(
         Enum(
-            Stage,
+            PipelineStage,
             native_enum=False,
             length=50,
             values_callable=lambda obj: [e.value for e in obj],

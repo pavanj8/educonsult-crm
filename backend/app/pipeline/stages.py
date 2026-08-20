@@ -1,3 +1,14 @@
+"""Application pipeline stage definitions (E25; J18).
+
+The canonical :class:`PipelineStage` enum (Requirements §5; Stages of an
+application's lifecycle) and small helpers for the terminal/non-terminal
+partition. Default transitions live in :mod:`app.pipeline.default_transitions`
+so that the ORM model and the runtime seeder can both import this enum
+without a circular import.
+"""
+
+from __future__ import annotations
+
 from enum import StrEnum
 
 
@@ -42,7 +53,3 @@ class PipelineStage(StrEnum):
     def is_terminal(self) -> bool:
         """Return True if this stage is terminal."""
         return self in self.terminal_stages()
-
-
-# Re-export as Stage for backward compatibility with code that imports from app.rbac.stage
-Stage = PipelineStage
