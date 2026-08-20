@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Application model (E18/E21; Journey J11/J14)."""
 
 from datetime import datetime
@@ -45,12 +46,26 @@ class Application(TenantScopedBase):
 
     Each student can have multiple applications in parallel, each with its own
     independent pipeline stage.
+=======
+from sqlalchemy import Enum, ForeignKey, Integer
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import TenantScopedBase
+from app.pipeline.stages import PipelineStage
+
+
+class Application(TenantScopedBase):
+    """Student university/program application (E18; Journey J11).
+
+    ``university_id`` and ``program_id`` reference master data tables added in E14.
+>>>>>>> origin/main
     """
 
     __tablename__ = "applications"
 
     student_id: Mapped[int] = mapped_column(
         Integer,
+<<<<<<< HEAD
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -84,3 +99,21 @@ class Application(TenantScopedBase):
     loan_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
     loan_lender: Mapped[str | None] = mapped_column(String(255), nullable=True)
     loan_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+=======
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    university_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    stage: Mapped[PipelineStage] = mapped_column(
+        Enum(
+            PipelineStage,
+            native_enum=False,
+            length=50,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
+        nullable=False,
+        default=PipelineStage.REGISTERED,
+    )
+>>>>>>> origin/main

@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Run oxlint
-        run: npm run lint
+        run: bash "$GITHUB_WORKSPACE/scripts/check.sh" frontend-lint
 
   build:
     name: Build
@@ -53,4 +53,4 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: bash "$GITHUB_WORKSPACE/scripts/check.sh" frontend-build
