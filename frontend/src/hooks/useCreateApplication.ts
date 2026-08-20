@@ -2,20 +2,17 @@ import { useCallback, useState } from 'react'
 
 import { isApiError } from '../api/client'
 import { createApplication as createApplicationApi } from '../api/applications'
-import type { Application, CreateApplicationRequest } from '../types/application'
+import type { CreateApplicationRequest } from '../types/application'
 
 export function useCreateApplication() {
   const [submitting, setSubmitting] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  const [lastCreated, setLastCreated] = useState<Application | null>(null)
 
   const createApplication = useCallback(async (payload: CreateApplicationRequest) => {
     setSubmitting(true)
     setCreateError(null)
     try {
-      const created = await createApplicationApi(payload)
-      setLastCreated(created)
-      return created
+      return await createApplicationApi(payload)
     } catch (err) {
       if (isApiError(err)) {
         setCreateError(err.message)
@@ -28,15 +25,9 @@ export function useCreateApplication() {
     }
   }, [])
 
-  const clearLastCreated = useCallback(() => {
-    setLastCreated(null)
-  }, [])
-
   return {
     submitting,
     createError,
-    lastCreated,
     createApplication,
-    clearLastCreated,
   }
 }

@@ -144,4 +144,27 @@ describe('StudentDashboardPage', () => {
       'Insufficient permissions',
     )
   })
+
+  it('shows generic error when transport fails', async () => {
+    const user = userEvent.setup()
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockStudent,
+      })
+      .mockImplementationOnce(() => Promise.reject(new Error('network down'))) as typeof fetch
+
+    renderStudentDashboard()
+
+    await screen.findByTestId('application-university')
+    await user.selectOptions(screen.getByTestId('application-university'), '1')
+    await user.selectOptions(screen.getByTestId('application-program'), '10')
+    await user.click(screen.getByTestId('application-submit'))
+
+    expect(await screen.findByTestId('application-error')).toHaveTextContent(
+      'Failed to create application',
+    )
+  })
 })

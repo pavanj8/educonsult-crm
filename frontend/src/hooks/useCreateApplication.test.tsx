@@ -37,13 +37,9 @@ describe('useCreateApplication', () => {
 
     expect(created).toEqual(mockApplication)
     expect(result.current.createError).toBeNull()
-
-    await waitFor(() => {
-      expect(result.current.lastCreated).toEqual(mockApplication)
-    })
   })
 
-  it('sets createError when creation fails', async () => {
+  it('sets createError from API error detail when creation fails', async () => {
     localStorage.setItem('access_token', 'test-token')
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -62,6 +58,55 @@ describe('useCreateApplication', () => {
 
     await waitFor(() => {
       expect(result.current.createError).toBe('Invalid program')
+    })
+  })
+
+  it('sets generic createError when transport fails', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down')) as typeof fetch
+
+    const { result } = renderHook(() => useCreateApplication())
+
+    await expect(
+      result.current.createApplication({
+        university_id: 1,
+        program_id: 10,
+      }),
+    ).rejects.toThrow('network down')
+
+    await waitFor(() => {
+      expect(result.current.createError).toBe('Failed to create application')
+    })
+  })
+
+  it('clears createError between attempts', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({ detail: 'Invalid university' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => mockApplication,
+      }) as typeof fetch
+
+    const { result } = renderHook(() => useCreateApplication())
+
+    await expect(
+      result.current.createApplication({ university_id: 1, program_id: 10 }),
+    ).rejects.toMatchObject({ status: 422 })
+    await waitFor(() => {
+      expect(result.current.createError).toBe('Invalid university')
+    })
+
+    await result.current.createApplication({ university_id: 1, program_id: 10 })
+
+    await waitFor(() => {
+      expect(result.current.createError).toBeNull()
     })
   })
 })

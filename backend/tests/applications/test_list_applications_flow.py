@@ -4,6 +4,7 @@ from app.models.tenant import Tenant
 from app.pipeline.stages import PipelineStage
 from tests.auth.test_register_student import VALID_PASSWORD, make_register_student_payload
 from tests.branches.helpers import seed_branch
+from tests.master_data.helpers import seed_master_data_chain
 
 
 def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "apex") -> Tenant:
@@ -18,6 +19,8 @@ def test_student_create_then_list_applications_flow(client, db_session):
     """Student creates multiple applications and lists them with independent stages."""
     tenant = _create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
+    chain_one = seed_master_data_chain(db_session, tenant_id=tenant.id)
+    chain_two = seed_master_data_chain(db_session, tenant_id=tenant.id)
 
     register_response = client.post(
         "/auth/register-student",
@@ -39,7 +42,7 @@ def test_student_create_then_list_applications_flow(client, db_session):
 
     first = client.post(
         "/applications",
-        json={"university_id": 101, "program_id": 201},
+        json={"university_id": chain_one[1].id, "program_id": chain_one[2].id},
         headers=headers,
     )
     assert first.status_code == 201
@@ -47,7 +50,7 @@ def test_student_create_then_list_applications_flow(client, db_session):
 
     second = client.post(
         "/applications",
-        json={"university_id": 102, "program_id": 202},
+        json={"university_id": chain_two[1].id, "program_id": chain_two[2].id},
         headers=headers,
     )
     assert second.status_code == 201
@@ -61,7 +64,7 @@ def test_student_create_then_list_applications_flow(client, db_session):
     assert len(body) == 2
     assert body[0]["id"] == first_body["id"]
     assert body[1]["id"] == second_body["id"]
-    assert body[0]["university_id"] == 101
-    assert body[1]["university_id"] == 102
+    assert body[0]["university_id"] == chain_one[1].id
+    assert body[1]["university_id"] == chain_two[1].id
     assert body[0]["stage"] == PipelineStage.REGISTERED.value
     assert body[1]["stage"] == PipelineStage.REGISTERED.value

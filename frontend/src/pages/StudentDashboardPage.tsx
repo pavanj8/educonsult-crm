@@ -1,7 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 
-import { isApiError } from '../api/client'
 import { DEMO_UNIVERSITIES, programsForUniversity } from '../data/demoMasterData'
 import { useCreateApplication } from '../hooks/useCreateApplication'
 
@@ -13,8 +12,7 @@ function formatStageLabel(stage: string): string {
 }
 
 export default function StudentDashboardPage() {
-  const { submitting, createError, lastCreated, createApplication, clearLastCreated } =
-    useCreateApplication()
+  const { submitting, createError, createApplication } = useCreateApplication()
   const [selectedUniversityId, setSelectedUniversityId] = useState<number | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -32,7 +30,6 @@ export default function StudentDashboardPage() {
     event.preventDefault()
     setSuccessMessage(null)
     setValidationError(null)
-    clearLastCreated()
 
     const formData = new FormData(event.currentTarget)
     const universityIdValue = Number(formData.get('university_id'))
@@ -64,10 +61,8 @@ export default function StudentDashboardPage() {
       )
       event.currentTarget.reset()
       setSelectedUniversityId(null)
-    } catch (err) {
-      if (!isApiError(err)) {
-        // createError is set by the hook
-      }
+    } catch {
+      // createError is set by the hook
     }
   }
 
@@ -78,12 +73,8 @@ export default function StudentDashboardPage() {
     setValidationError(null)
   }
 
-  const describedBy =
-    validationError || createError
-      ? errorId
-      : successMessage || lastCreated
-        ? successId
-        : undefined
+  const errorMessage = validationError ?? createError
+  const statusMessage = errorMessage ? errorId : successMessage ? successId : undefined
 
   return (
     <div className="student-dashboard" data-testid="student-dashboard-page">
@@ -103,7 +94,12 @@ export default function StudentDashboardPage() {
           Choose the university and program you want to apply for. You can create multiple
           applications in parallel.
         </p>
-        <form className="application-form" method="post" onSubmit={handleSubmit}>
+        <form
+          className="application-form"
+          method="post"
+          onSubmit={handleSubmit}
+          aria-describedby={statusMessage}
+        >
           <label className="application-form__field">
             University
             <select
@@ -112,7 +108,6 @@ export default function StudentDashboardPage() {
               required
               defaultValue=""
               onChange={handleUniversityChange}
-              aria-describedby={describedBy}
             >
               <option value="" disabled>
                 Select a university
@@ -133,7 +128,6 @@ export default function StudentDashboardPage() {
               required
               defaultValue=""
               disabled={selectedUniversityId == null || availablePrograms.length === 0}
-              aria-describedby={describedBy}
             >
               <option value="" disabled>
                 {selectedUniversityId == null
