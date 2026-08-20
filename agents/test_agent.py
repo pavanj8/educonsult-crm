@@ -166,18 +166,31 @@ STRICT RULES:
 {epics}
 
 ## Your process
-1. From the issue's acceptance criteria, enumerate concrete test cases,
-   including boundary values and negative cases it implies even if not
-   spelled out explicitly.
-2. Write a black-box test script under `qa/` using the `requests` library
+1. FIRST, load the API contract in ONE step instead of exploring: fetch
+   `{base_url}/openapi.json` (this FastAPI app serves the full OpenAPI schema
+   — every path, method, request/response shape). This is a black-box artifact
+   (the public API surface), so it keeps you independent while saving you from
+   discovering endpoints by trial and error. Do NOT read `backend/app/` to find
+   endpoints.
+2. From the issue's acceptance criteria + the OpenAPI contract, enumerate
+   concrete test cases, including boundary values and negative cases it implies
+   even if not spelled out explicitly.
+3. Write a black-box test script under `qa/` using the `requests` library
    against base URL `{base_url}`. Each test should be a separate
    function/case so failures are individually attributable.
-3. Execute it and capture actual results.
-4. For every failing case, determine root cause (you may now read
+4. Execute it ONCE and capture actual results. While diagnosing, re-run only
+   the specific failing case, not the whole script repeatedly.
+5. For every failing case, determine root cause (you may now read
    `backend/app/` to investigate) and assign a severity: HIGH (violates a
    stated acceptance criterion / security or data-integrity risk), MEDIUM
    (edge case not handled cleanly), or LOW (cosmetic/wording).
-5. This is iteration {iteration} of testing this issue.
+6. This is iteration {iteration} of testing this issue.
+
+## Working efficiently (do this to avoid wasting time)
+- Use the `/openapi.json` contract above instead of grepping the codebase to
+  learn the endpoints. Write the qa script in as few `write_file` calls as you
+  can (prefer `write_file` over shell heredocs). Run it once, then submit as
+  soon as you can judge every acceptance criterion.
 
 ## Finishing — deliver your report via the tool
 When (and only when) you have finished testing, call the `submit_report` tool

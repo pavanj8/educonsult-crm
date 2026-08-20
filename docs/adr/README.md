@@ -48,3 +48,4 @@ receive new entries.
 | [0018](0018-revert-minimax-sdk-model-ids.md) | Revert MiniMax model IDs — not valid on Cursor SDK local runtime | Superseded by ADR-0019 | 2026-08-20 |
 | [0019](0019-minimax-agent-loop-replaces-cursor-sdk.md) | Replace the Cursor SDK engine with a direct-MiniMax agent loop | Accepted — implemented | 2026-08-20 |
 | [0020](0020-unified-gate-and-ci-feedback-loop.md) | Unified check gate (`scripts/check.sh`) + CI-failure feedback loop | Accepted — implemented | 2026-08-20 |
+| [0021](0021-agent-latency-context-pack.md) | Cut agent latency with a context pack + efficiency prompts | Accepted — implemented | 2026-08-20 |
