@@ -1,0 +1,76 @@
+name: CI Feedback Loop
+
+# Closes the autonomy gap (harness ②, docs/adr/0019 follow-up): the harness's
+# own gate (Test/Review/hard-gate labels) did NOT include the merge-blocking CI
+# checks (ruff/pytest, oxlint/build). So a PR could pass every agent gate, still
+# fail CI, and sit red forever with no self-heal -- a human had to notice.
+#
+# This turns a failed CI run on an agent branch into first-class rework
+# feedback: it posts the failing logs as a "## Harness iteration" comment (which
+# the Dev Agent reads on its next run, see agents/github_ticket_utils.py
+# prior_iteration_feedback) and flags the issue agent:needs-rework. The existing
+# queue picker (agent-harness-queue-picker.yml) then re-dispatches Dev within
+# MAX_ITERATIONS -- so the cap and serialization are respected, not bypassed.
+
+on:
+  workflow_run:
+    workflows: ["CI Backend", "CI Frontend"]
+    types: [completed]
+
+permissions:
+  issues: write
+  pull-requests: read
+  actions: read
+  contents: read
+
+jobs:
+  feed-back:
+    # Only act on real failures of an agent branch. (Skips human branches and
+    # successful runs.)
+    if: >
+      github.event.workflow_run.conclusion == 'failure' &&
+      startsWith(github.event.workflow_run.head_branch, 'agent/issue-')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      WF_NAME: ${{ github.event.workflow_run.name }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Flag the issue for rework with the CI failure as feedback
+        run: |
+          set -euo pipefail
+          ISSUE="${BRANCH#agent/issue-}"
+          case "$ISSUE" in
+            ''|*[!0-9]*) echo "Branch '$BRANCH' has no numeric issue id; nothing to do."; exit 0 ;;
+          esac
+
+          # Skip if the PR for this branch is already merged/closed (nothing to fix).
+          STATE=$(gh pr list -R "$REPO" --head "$BRANCH" --state all --json state --jq '.[0].state // "NONE"')
+          if [ "$STATE" = "MERGED" ] || [ "$STATE" = "CLOSED" ]; then
+            echo "PR for $BRANCH is $STATE; not flagging."
+            exit 0
+          fi
+
+          # Grab the failing-step logs, bounded so the comment stays readable.
+          LOG=$(gh run view "$RUN_ID" -R "$REPO" --log-failed 2>/dev/null | tail -c 6000 || true)
+          [ -n "$LOG" ] || LOG="(could not fetch failing-step logs; see the $WF_NAME run: $RUN_ID)"
+
+          {
+            echo "## Harness iteration — CI failure ($WF_NAME)"
+            echo ""
+            echo "The merge-blocking CI check **$WF_NAME** failed on \`$BRANCH\`. This blocks"
+            echo "auto-merge. Fix these before finishing the next iteration — run"
+            echo "\`bash scripts/check.sh\` locally to reproduce:"
+            echo ""
+            echo '```'
+            echo "$LOG"
+            echo '```'
+          } > /tmp/ci_feedback.md
+
+          gh issue comment "$ISSUE" -R "$REPO" --body-file /tmp/ci_feedback.md
+          # ready-to-merge no longer holds; hand back to the retry loop.
+          gh issue edit "$ISSUE" -R "$REPO" --remove-label "agent:ready-to-merge" 2>/dev/null || true
+          gh issue edit "$ISSUE" -R "$REPO" --add-label "agent:needs-rework"
+          echo "Flagged issue #$ISSUE for rework from failed $WF_NAME; the queue picker will retry within MAX_ITERATIONS."

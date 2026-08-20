@@ -55,21 +55,47 @@ jobs:
             echo "retry=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Auto-merge PR (docs/adr/0011)
+      - name: Auto-merge PR once CI is green (docs/adr/0011, docs/adr/0020)
         if: steps.finalize.outputs.ready == 'true'
         run: |
           BRANCH="agent/issue-${{ github.event.inputs.issue_number }}"
           ISSUE="${{ github.event.inputs.issue_number }}"
           PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr merge "$PR_NUMBER" --merge --delete-branch
-          else
+          if [ -z "$PR_NUMBER" ]; then
             echo "No open PR found for branch $BRANCH; skipping auto-merge."
+            exit 0
           fi
-          # Closes #N in the PR body does not reliably close the issue.
-          # Close it here. No comment: an issue_comment would start
-          # agent-harness.yml, which then skips and looks "busy" to the picker.
-          gh issue close "$ISSUE" -R ${{ github.repository }} || true
+
+          # This repo is on a plan without branch protection, so GitHub cannot
+          # enforce required status checks -- `gh pr merge` would merge even
+          # with red CI (this is how main once went lint-dirty). The harness
+          # therefore enforces CI itself: wait for checks, merge only if green.
+          # `gh pr checks --watch` blocks until all checks finish, exits 0 iff
+          # all passed, non-zero on failure OR when there are no checks at all.
+          if timeout 1200 gh pr checks "$PR_NUMBER" --watch --fail-fast --interval 30; then
+            CI_OK=true
+          else
+            # Distinguish "a check failed" from "no checks exist" (infra-only
+            # PRs touch no backend/frontend paths, so CI never triggers).
+            NCHECKS=$(gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '.statusCheckRollup | length')
+            if [ "$NCHECKS" = "0" ]; then CI_OK=true; else CI_OK=false; fi
+          fi
+
+          if [ "$CI_OK" = "true" ]; then
+            if gh pr merge "$PR_NUMBER" --merge --delete-branch; then
+              # Closes #N in the PR body is unreliable; close explicitly. No
+              # comment -- an issue_comment would start agent-harness.yml, which
+              # then skips and looks "busy" to the picker.
+              gh issue close "$ISSUE" -R ${{ github.repository }} || true
+            else
+              echo "::warning::CI green but merge failed (likely not mergeable vs main); flagging for rework."
+              gh issue edit "$ISSUE" -R ${{ github.repository }} --remove-label "agent:ready-to-merge" --add-label "agent:needs-rework" || true
+            fi
+          else
+            echo "::warning::Agent gates passed but CI is red; NOT merging. Handing back to the rework loop."
+            gh issue edit "$ISSUE" -R ${{ github.repository }} --remove-label "agent:ready-to-merge" --add-label "agent:needs-rework" || true
+            gh issue comment "$ISSUE" -R ${{ github.repository }} --body "## Harness iteration — CI gate blocked merge. Agent gates (test/review/hard-gate) passed but a merge-blocking CI check is red, so auto-merge was withheld. See the PR checks; the CI Feedback Loop has the failing logs. Fix and the harness will retry (docs/adr/0020)."
+          fi
 
       - name: Start next Dev (do not wait for cron)
         if: steps.finalize.outputs.ready == 'true'

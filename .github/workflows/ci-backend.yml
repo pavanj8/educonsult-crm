@@ -30,7 +30,8 @@ jobs:
         run: pip install ruff==0.16.3
 
       - name: Run ruff
-        run: ruff check .
+        # Single source of truth shared with the Dev agent (scripts/check.sh).
+        run: bash "$GITHUB_WORKSPACE/scripts/check.sh" backend-lint
 
   test:
     name: Pytest
@@ -49,4 +50,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run pytest
-        run: python -m pytest -v
+        run: bash "$GITHUB_WORKSPACE/scripts/check.sh" backend-test

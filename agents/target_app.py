@@ -27,7 +27,7 @@ DATABASE_OVERRIDE_ENV_VAR = "DATABASE_OVERRIDE"
 
 # Paths the Dev/Review agents must never modify -- planning docs and the
 # harness's own tooling are out of scope for any ticket's implementation.
-PROTECTED_PATHS = ["docs/", "agents/", "harness-demo/", ".github/", ".cursor/"]
+PROTECTED_PATHS = ["docs/", "agents/", "harness-demo/", ".github/", ".cursor/", "scripts/"]
 
 APP_CODE_GLOBS = ["backend/app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx"]
 TEST_CODE_GLOBS = ["backend/tests/**/*.py", "frontend/**/*.test.ts", "frontend/**/*.test.tsx"]
