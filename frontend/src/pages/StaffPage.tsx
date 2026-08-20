@@ -98,9 +98,10 @@ export default function StaffPage() {
     setCreateValidationError(null)
 
     const formData = new FormData(event.currentTarget)
-    const email = typeof formData.get('email') === 'string' ? formData.get('email')!.trim() : ''
-    const password =
-      typeof formData.get('password') === 'string' ? formData.get('password')! : ''
+    const rawEmail = formData.get('email')
+    const rawPassword = formData.get('password')
+    const email = typeof rawEmail === 'string' ? rawEmail.trim() : ''
+    const password = typeof rawPassword === 'string' ? rawPassword : ''
     const role = formData.get('role')
     const branchIdValue = isBranchManager
       ? user?.branch_id

@@ -59,6 +59,36 @@ class DevAgentReport:
         }
 
 
+def build_repo_map() -> str:
+    """A flat listing of existing application/test files, injected into the
+    prompt so the agent doesn't burn model turns running find/ls/grep to
+    discover structure (docs/adr/0021). Bounded so it can't dominate context.
+    """
+    areas = {
+        "backend/app": "**/*.py",
+        "backend/tests": "**/*.py",
+        "frontend/src": "**/*.ts*",
+    }
+    skip = {"__pycache__", "node_modules", "venv", ".venv", ".pytest_cache"}
+    blocks: list[str] = []
+    for rel, pattern in areas.items():
+        base = REPO_ROOT / rel
+        if not base.exists():
+            continue
+        files = [
+            str(f.relative_to(REPO_ROOT))
+            for f in sorted(base.glob(pattern))
+            if f.is_file() and not (skip & set(f.parts))
+        ]
+        if files:
+            shown = files[:250]
+            more = f"\n… (+{len(files) - len(shown)} more)" if len(files) > len(shown) else ""
+            blocks.append(f"#### {rel}/ ({len(files)} files)\n" + "\n".join(shown) + more)
+    if not blocks:
+        return "(no application/test code exists yet — likely an early scaffolding ticket)"
+    return "\n\n".join(blocks)
+
+
 def build_prompt(
     issue: dict,
     requirements: str,
@@ -69,6 +99,7 @@ def build_prompt(
     prior_feedback: str,
 ) -> str:
     protected = ", ".join(target_app.PROTECTED_PATHS)
+    repo_map = build_repo_map()
     if prior_feedback:
         feedback_block = (
             f"## Feedback from prior iterations — you MUST address this\n"
@@ -101,8 +132,23 @@ describe -- nothing more, nothing speculative.
 ## Epics (docs/epics.md)
 {epics}
 
+## Repository map — every existing app/test file (so you do NOT need to explore)
+{repo_map}
+
 ## Definition of Done (docs/definition-of-done.md) -- you must satisfy every item before finishing
 {dod}
+
+## Working efficiently (do this to avoid wasting time)
+- The repository map above already lists every existing file. Do NOT run
+  `find`, `ls`, `tree`, or broad `grep` to discover structure — you have it.
+  Only `read_file` the specific files you will edit or directly depend on
+  (usually the router/model/schema/test for this ticket's area, plus one
+  similar existing file to copy conventions from).
+- Create/modify files with the `write_file` tool. Do NOT write files via shell
+  heredocs (`cat > file << EOF`) — that causes escaping and syntax errors.
+- Run `bash scripts/check.sh backend` (or `frontend`) ONCE when you believe
+  the work is complete; fix exactly what it reports; re-run only after a change.
+  Do not re-run the whole suite after every small edit.
 
 ## Rules
 1. Implement only what this issue's acceptance criteria describe. If you
@@ -121,8 +167,16 @@ describe -- nothing more, nothing speculative.
 5. Follow existing conventions already established in this repo (check
    `backend/` and `frontend/` for prior art before introducing new
    patterns).
-6. Run your own tests (e.g. `pytest` inside `backend/`) and iterate until
-   they pass, before finishing.
+6. Before finishing, run the project's canonical check script and iterate
+   until it passes — this is the EXACT gate CI enforces, so the PR will NOT
+   merge otherwise:
+   - `bash scripts/check.sh backend` for backend changes (runs `ruff check .`
+     + `pytest`), `bash scripts/check.sh frontend` for frontend changes
+     (`npm run lint` + `npm run build`), or `bash scripts/check.sh` for both.
+   - For ruff, run `ruff check --fix .` inside `backend/` first to auto-fix
+     import order (I) and unused imports (F401), then fix what remains (e.g.
+     F841 unused variables) by hand. Do NOT finish while check.sh reports
+     failure.
 7. This is iteration {iteration} for this issue. If the feedback section
    above is non-empty, treating it as optional is a failure.
 

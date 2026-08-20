@@ -18,7 +18,10 @@ test.describe('Protected routes', () => {
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
 
     const returnPath = await page.evaluate(() => {
-      const state = window.history.state as { usr?: { from?: { pathname?: string } } } | null
+      const state = (globalThis as unknown as { history?: { state?: unknown } }).history?.state as
+        | { usr?: { from?: { pathname?: string } } }
+        | null
+        | undefined
       return state?.usr?.from?.pathname ?? null
     })
     expect(returnPath).toBe('/students/42')
