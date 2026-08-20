@@ -45,6 +45,14 @@ via `prior_iteration_feedback`) and flag `agent:needs-rework` (dropping
   (CI calls the script), removing the duplicate-command drift risk.
 - A genuinely unfixable ticket still stops at `MAX_ITERATIONS` (fail-closed),
   which is the intended safety valve — not silent looping.
-- Future direction (not in this ADR): make CI a required check that the
-  harness's own "done" state also consults, and consider GitHub Check Runs as
-  the state store instead of the label set (docs/adr/0009 label model).
+- **Merge gate under a free plan.** This repo has no branch protection
+  available (private repo, free plan) and `allow_auto_merge=false`, so GitHub
+  cannot enforce CI as a required check — `gh pr merge` would merge even with
+  red CI. The harness therefore enforces it in `agent-finalize.yml`: the
+  auto-merge step runs `gh pr checks --watch` and merges only if CI is green
+  (or the PR has no checks at all), otherwise it withholds the merge and hands
+  the issue back to the rework loop. This is the harness standing in for the
+  branch protection GitHub can't provide here.
+- Future direction: on a plan with branch protection, make CI required checks
+  and use native `--auto` merge; consider GitHub Check Runs as the state store
+  instead of the label set (docs/adr/0009 label model).
