@@ -9,13 +9,22 @@ from app.pipeline.stages import PipelineStage
 def test_application_model_has_required_columns():
     column_names = {column.key for column in inspect(Application).columns}
     assert column_names == {
+        "assigned_counselor_id",
+        "created_at",
+        "enrollment_date",
         "id",
-        "tenant_id",
-        "student_id",
-        "university_id",
+        "loan_amount",
+        "loan_lender",
+        "loan_opted_in",
+        "loan_status",
         "program_id",
         "stage",
-        "created_at",
+        "stage_reason",
+        "student_id",
+        "target_program_id",
+        "target_university_id",
+        "tenant_id",
+        "university_id",
         "updated_at",
     }
 

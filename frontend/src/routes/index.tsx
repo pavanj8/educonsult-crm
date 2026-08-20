@@ -35,13 +35,11 @@ export function AppRoutes() {
           <Route element={<StaffManagerRoute />}>
             <Route path="staff" element={<StaffPage />} />
           </Route>
-<<<<<<< HEAD
           <Route element={<CounselorRoute />}>
             <Route path="counselor/queue" element={<CounselorDashboardPage />} />
-=======
+          </Route>
           <Route element={<StudentRoute />}>
             <Route path={STUDENT_DASHBOARD_PATH.slice(1)} element={<StudentDashboardPage />} />
->>>>>>> origin/main
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>

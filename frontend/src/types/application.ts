@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 /** Application types aligned with backend E18/E21 schemas (Journey J11/J14). */
-=======
-/** Application types aligned with backend E18 schemas (Journey J11). */
->>>>>>> origin/main
 
 export type PipelineStage =
   | 'registered'
@@ -21,8 +17,12 @@ export type Application = {
   id: number
   tenant_id: number
   student_id: number
-<<<<<<< HEAD
+  /** E18 — explicit university/program this application is for. */
+  university_id: number
+  program_id: number
+  /** E21 — counselor that owns this application in the queue. */
   assigned_counselor_id: number | null
+  /** E21 — denormalized target university/program (counselor queue uses). */
   target_university_id: number | null
   target_program_id: number | null
   stage: PipelineStage
@@ -32,21 +32,20 @@ export type Application = {
   loan_status: string | null
   loan_lender: string | null
   loan_amount: number | null
-=======
-  university_id: number
-  program_id: number
-  stage: PipelineStage
->>>>>>> origin/main
   created_at: string
   updated_at: string
 }
 
-<<<<<<< HEAD
 export type ApplicationWithStudent = Application & {
   student_name: string | null
   student_email: string
   student_phone: string | null
   student_role: 'student'
+}
+
+export type CreateApplicationRequest = {
+  university_id: number
+  program_id: number
 }
 
 export type CounselorQueueFilter = {
@@ -59,9 +58,6 @@ export type StageCount = {
 }
 
 export const STAGE_LABELS: Record<PipelineStage, string> = {
-=======
-export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
->>>>>>> origin/main
   registered: 'Registered',
   counseling: 'Counseling',
   university_shortlisting: 'University Shortlisting',
@@ -75,7 +71,6 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   withdrawn: 'Withdrawn',
 }
 
-<<<<<<< HEAD
 export const STAGE_COLORS: Record<PipelineStage, string> = {
   registered: '#6b7280',
   counseling: '#3b82f6',
@@ -88,9 +83,4 @@ export const STAGE_COLORS: Record<PipelineStage, string> = {
   enrolled: '#22c55e',
   rejected: '#ef4444',
   withdrawn: '#78716c',
-=======
-export type CreateApplicationRequest = {
-  university_id: number
-  program_id: number
->>>>>>> origin/main
 }

@@ -11,11 +11,8 @@ from app.pipeline.default_transitions import seed_default_stage_transitions
 from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.branches import router as branches_router
-<<<<<<< HEAD
 from app.routers.counselor import router as counselor_router
-=======
 from app.routers.master_data import router as master_data_router
->>>>>>> origin/main
 from app.routers.staff import router as staff_router
 from app.routers.tenants import router as tenants_router
 from app.seed.runner import seed_demo_data_if_empty

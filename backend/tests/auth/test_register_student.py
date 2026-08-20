@@ -1,9 +1,6 @@
 """POST /auth/register-student endpoint tests (E16, Journey J9, issue #136)."""
 
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main
 from app.auth import verify_access_token, verify_refresh_token
 from app.auth.password import verify_password
 from app.models.tenant import Tenant

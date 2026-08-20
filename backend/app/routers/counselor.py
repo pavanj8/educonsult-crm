@@ -116,16 +116,19 @@ def get_counselor_queue(
         ) from None
 
 
-@router.get("/queue/counts", response_model=dict[str, int])
+@router.get("/queue/counts", response_model=dict[PipelineStage, int])
 def get_counselor_queue_counts(
     current_user: Annotated[
         AuthenticatedUser, Depends(require_permission(Permission.APPLICATION_READ_ASSIGNED))
     ],
     db: Session = Depends(get_db),
-) -> dict[str, int]:
+) -> dict[PipelineStage, int]:
     """Get counts of applications in each stage for the counselor's queue (E21; Journey J14).
 
-    Useful for displaying stage badges in the dashboard.
+    Useful for displaying stage badges in the dashboard. The response is keyed
+    by :class:`PipelineStage` enum members; ``PipelineStage`` is a ``StrEnum``
+    so the JSON wire format serialises each key as its enum value
+    (e.g. ``"registered"``).
     """
     if current_user.tenant_id is None:
         raise HTTPException(
@@ -144,9 +147,14 @@ def get_counselor_queue_counts(
             )
         ).all()
 
-        # Convert to dict with stage as string key
-        # PipelineStage is a StrEnum so enum.value serializes to JSON string automatically
-        return {stage.value if isinstance(stage, PipelineStage) else stage: count for stage, count in counts}
+        # Group-by returns PipelineStage members from the stage column (because
+        # Application.stage is typed as PipelineStage); coerce any plain
+        # string into the enum so the response_model validates.
+        result: dict[PipelineStage, int] = {}
+        for stage, count in counts:
+            key = PipelineStage(stage) if isinstance(stage, str) else stage
+            result[key] = count
+        return result
 
     except OperationalError:
         raise HTTPException(
