@@ -98,6 +98,67 @@ describe('AuthProvider', () => {
     expect(result.current.error).toBeNull()
   })
 
+  it('registerStudent stores tokens and user profile', async () => {
+    const mockStudent = {
+      id: 42,
+      email: 'new.student@example.test',
+      role: 'student' as const,
+      tenant_id: 10,
+      branch_id: 1,
+    }
+    const mockRegisterResponse = {
+      ...mockStudent,
+      name: 'Rahul Kumar',
+      phone: '+91-9876543210',
+      date_of_birth: '2000-05-15',
+      target_country_id: null,
+      target_university_id: null,
+      target_program_id: null,
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+      token_type: 'bearer',
+      created_at: '2026-01-01T00:00:00Z',
+    }
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => mockRegisterResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockStudent,
+      }) as typeof fetch
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    await result.current.registerStudent({
+      tenant_slug: 'apex',
+      branch_id: 1,
+      email: 'new.student@example.test',
+      password: 'StudentPass1!',
+      name: 'Rahul Kumar',
+      phone: '+91-9876543210',
+      date_of_birth: '2000-05-15',
+    })
+
+    await waitFor(() => {
+      expect(result.current.isAuthenticated).toBe(true)
+    })
+
+    expect(localStorage.getItem('access_token')).toBe('access-token')
+    expect(localStorage.getItem('refresh_token')).toBe('refresh-token')
+    expect(result.current.user).toEqual(mockStudent)
+    expect(result.current.error).toBeNull()
+  })
+
   it('login sets error and clears tokens on failure', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,

@@ -9,7 +9,9 @@ import {
 } from 'react'
 
 import { authErrorMessage, fetchMe, login as loginApi, refresh as refreshApi } from '../api/auth'
+import { registerStudent as registerStudentApi } from '../api/students'
 import type { AuthUser } from '../types/auth'
+import type { RegisterStudentRequest } from '../types/student'
 import { clearTokens, getRefreshToken, hasAccessToken, setTokens } from './authStorage'
 
 type AuthContextValue = {
@@ -18,6 +20,7 @@ type AuthContextValue = {
   isLoading: boolean
   error: string | null
   login: (email: string, password: string) => Promise<void>
+  registerStudent: (payload: RegisterStudentRequest) => Promise<void>
   logout: () => void
   refreshSession: () => Promise<boolean>
   clearError: () => void
@@ -109,6 +112,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [logout],
   )
 
+  const registerStudent = useCallback(
+    async (payload: RegisterStudentRequest) => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const response = await registerStudentApi(payload)
+        if (typeof response.access_token !== 'string' || response.access_token.length === 0) {
+          throw new Error('Unable to create account')
+        }
+        setTokens(response.access_token, response.refresh_token)
+        const profile = await fetchMe()
+        setUser(profile)
+      } catch (err) {
+        logout()
+        const message =
+          err instanceof Error && err.message.length > 0
+            ? err.message
+            : authErrorMessage(err, 'Unable to create account')
+        setError(message)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [logout],
+  )
+
   const clearError = useCallback(() => {
     setError(null)
   }, [])
@@ -120,11 +150,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       error,
       login,
+      registerStudent,
       logout,
       refreshSession,
       clearError,
     }),
-    [user, isLoading, error, login, logout, refreshSession, clearError],
+    [user, isLoading, error, login, registerStudent, logout, refreshSession, clearError],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
