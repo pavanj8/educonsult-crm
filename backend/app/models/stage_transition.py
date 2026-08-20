@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, UniqueConst
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
-from app.rbac.stage import Stage
+from app.pipeline.stages import Stage
 
 
 class StageTransition(Base):

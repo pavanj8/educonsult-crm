@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models.stage_transition import StageTransition
-from app.rbac.stage import Stage
+from app.pipeline.stages import Stage
 from app.services.stage_progression import (
     InvalidStageTransitionError,
     is_valid_transition,
@@ -191,6 +191,22 @@ class TestIsValidTransition:
         _seed_tenant_transition(db_session, 1, Stage.REGISTERED, Stage.ENROLLED, is_active=False)
 
         assert is_valid_transition(db_session, Stage.REGISTERED, Stage.ENROLLED, tenant_id=1) is False
+
+    def test_tenant_isolation_tenant_1_does_not_see_tenant_2_rules(self, db_session: Session) -> None:
+        """Tenant 1's active rules must not leak into tenant 2's transition checks.
+
+        This test proves tenant isolation: conflicting is_active values for different
+        tenants must not affect each other's transition validation.
+        """
+        # Tenant 1 has registered → counseling ALLOWED
+        _seed_tenant_transition(db_session, 1, Stage.REGISTERED, Stage.COUNSELING, is_active=True)
+        # Tenant 2 has registered → counseling DISALLOWED
+        _seed_tenant_transition(db_session, 2, Stage.REGISTERED, Stage.COUNSELING, is_active=False)
+
+        # Tenant 1 sees ALLOWED
+        assert is_valid_transition(db_session, Stage.REGISTERED, Stage.COUNSELING, tenant_id=1) is True
+        # Tenant 2 sees DISALLOWED
+        assert is_valid_transition(db_session, Stage.REGISTERED, Stage.COUNSELING, tenant_id=2) is False
 
 
 class TestValidateTransition:

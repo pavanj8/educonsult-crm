@@ -7,11 +7,16 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.stage_transition import StageTransition
-from app.rbac.stage import Stage
+from app.pipeline.stages import Stage
 
 
 class InvalidStageTransitionError(ValueError):
-    """Raised when a stage transition is not allowed."""
+    """Raised when a stage transition is not allowed.
+
+    Attributes:
+        from_stage: The stage the application is transitioning from.
+        to_stage: The stage the application is attempting to transition to.
+    """
 
     def __init__(self, from_stage: Stage, to_stage: Stage) -> None:
         self.from_stage = from_stage
@@ -36,6 +41,11 @@ def is_valid_transition(
            - Inactive tenant rule → False (explicitly blocked)
       2. If no tenant-specific rule exists, fall back to the platform default
          (tenant_id IS NULL, is_active=True).
+
+    Note:
+        When called from within a request context, tenant_id must NOT be None.
+        Passing None in that context silently falls back to platform defaults,
+        which may grant unintended transition privileges.
     """
     if from_stage.is_terminal:
         return False
@@ -58,7 +68,7 @@ def is_valid_transition(
             StageTransition.from_stage == from_stage,
             StageTransition.to_stage == to_stage,
             StageTransition.tenant_id.is_(None),
-            StageTransition.is_active == True,  # noqa: E712
+            StageTransition.is_active.is_(True),
         )
     ).first()
     return default_rule is not None

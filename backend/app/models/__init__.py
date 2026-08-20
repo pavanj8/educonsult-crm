@@ -5,8 +5,4 @@ from app.models.stage_transition import StageTransition
 from app.models.tenant import Tenant
 from app.models.user import User
 
-<<<<<<< HEAD
-__all__ = ["Base", "TenantScopedBase", "Branch", "StageTransition", "Tenant", "User"]
-=======
-__all__ = ["Application", "Base", "TenantScopedBase", "Branch", "Tenant", "User"]
->>>>>>> origin/main
+__all__ = ["Application", "Base", "TenantScopedBase", "Branch", "StageTransition", "Tenant", "User"]

@@ -32,16 +32,27 @@ def db_engine() -> Generator[Engine, None, None]:
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
+    engine.dispose()
 
 
 @pytest.fixture()
 def db_session(db_engine: Engine) -> Generator[Session, None, None]:
-    testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+    """Provide a transactional database session that rolls back after each test.
+
+    This fixture wraps each test in a transaction that is rolled back at teardown,
+    preventing test isolation failures due to committed state leaking between tests.
+    """
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=connection)
     session = testing_session_local()
+
     try:
         yield session
     finally:
         session.close()
+        transaction.rollback()
+        connection.close()
 
 
 @pytest.fixture()

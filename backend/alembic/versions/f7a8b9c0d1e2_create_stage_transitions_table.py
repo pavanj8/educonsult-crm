@@ -1,7 +1,7 @@
 """create stage_transitions table
 
-Revision ID: f6a7b8c9d0e1
-Revises: e5f6a7b8c9d0
+Revision ID: f7a8b9c0d1e2
+Revises: f6a7b8c9d0e1
 Create Date: 2026-08-20 00:00:00.000000
 
 """
@@ -12,47 +12,63 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "f6a7b8c9d0e1"
-down_revision: Union[str, None] = "e5f6a7b8c9d0"
+revision: str = "f7a8b9c0d1e2"
+down_revision: Union[str, Sequence[str], None] = "f6a7b8c9d0e1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
     # Create the Stage enum type in the database (PostgreSQL only; SQLite ignores enums).
-    stage_enum = sa.Enum(
-        "registered",
-        "counseling",
-        "university_shortlisting",
-        "application_submitted",
-        "document_verification",
-        "offer_letter",
-        "visa_processing",
-        "loan_processing",
-        "enrolled",
-        "rejected",
-        "withdrawn",
-        name="stage",
-        native_enum=False,
-        length=50,
-    )
-    stage_enum.create(op.get_bind(), checkfirst=True)
+    # On PostgreSQL this creates a DB-level ENUM type. On SQLite it is a no-op.
+    # Dialect-specific creation is handled via checkfirst to avoid errors.
+    if op.get_bind().dialect.name == "postgresql":
+        stage_enum = sa.Enum(
+            "registered",
+            "counseling",
+            "university_shortlisting",
+            "application_submitted",
+            "document_verification",
+            "offer_letter",
+            "visa_processing",
+            "loan_processing",
+            "enrolled",
+            "rejected",
+            "withdrawn",
+            name="stage",
+        )
+        stage_enum.create(op.get_bind(), checkfirst=True)
+        # Use native_enum so PostgreSQL uses the ENUM type.
+        from_stage_type = stage_enum
+        to_stage_type = stage_enum
+    else:
+        # SQLite stores as VARCHAR(50) via native_enum=False.
+        stage_enum = sa.Enum(
+            "registered",
+            "counseling",
+            "university_shortlisting",
+            "application_submitted",
+            "document_verification",
+            "offer_letter",
+            "visa_processing",
+            "loan_processing",
+            "enrolled",
+            "rejected",
+            "withdrawn",
+            name="stage",
+            native_enum=False,
+            length=50,
+        )
+        from_stage_type = stage_enum
+        to_stage_type = stage_enum
 
     # Foreign key is declared inline so it is part of CREATE TABLE,
     # avoiding SQLite's restriction on ALTER TABLE + ADD CONSTRAINT.
     op.create_table(
         "stage_transitions",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column(
-            "from_stage",
-            stage_enum,
-            nullable=False,
-        ),
-        sa.Column(
-            "to_stage",
-            stage_enum,
-            nullable=False,
-        ),
+        sa.Column("from_stage", from_stage_type, nullable=False),
+        sa.Column("to_stage", to_stage_type, nullable=False),
         sa.Column(
             "tenant_id",
             sa.Integer(),
@@ -131,6 +147,7 @@ def downgrade() -> None:
         table_name="stage_transitions",
     )
     op.drop_table("stage_transitions")
-    # SQLite does not support DROP TYPE; on PostgreSQL the enum type is
-    # dropped automatically when the table is dropped via CASCADE.
-    # We suppress this step for SQLite compatibility.
+    # On PostgreSQL the DB-level ENUM type persists after table drop;
+    # SQLAlchemy/Alembic 2.x does not provide a portable cross-dialect
+    # DROP TYPE via op.execute() that works on both PostgreSQL and SQLite.
+    # The next upgrade's checkfirst=True is a no-op when the type already exists.
