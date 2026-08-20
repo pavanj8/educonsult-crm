@@ -8,38 +8,37 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models.application import Application
+from app.models.application import Application, ApplicationStage
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
-from app.schemas.application import (
-    ApplicationResponse,
-    ApplicationStageEnum,
-)
+from app.schemas.application import ApplicationResponse
 
-router = APIRouter()
+router = APIRouter(prefix="/applications")
 
 _DB_UNAVAILABLE_DETAIL = "Application service is temporarily unavailable"
 
 
-@router.get(
-    "/applications/assigned-to-me",
-    response_model=list[ApplicationResponse],
-)
+@router.get("/assigned-to-me", response_model=list[ApplicationResponse])
 def list_assigned_applications(
     current_user: Annotated[
         AuthenticatedUser, Depends(require_permission(Permission.APPLICATION_READ_ASSIGNED))
     ],
     db: Session = Depends(get_db),
-    stage: ApplicationStageEnum | None = Query(
+    stage: ApplicationStage | None = Query(
         default=None,
         description="Filter by pipeline stage",
     ),
     branch_id: int | None = Query(
         default=None,
         ge=1,
-        description="Filter by branch",
+        description=(
+            "Filter by branch. For Counselors this parameter is ignored (they are "
+            "pinned to their own branch). For Branch Managers and Consultancy Owners, "
+            "passing a branch_id outside the caller's accessible scope returns an "
+            "empty list — no error, no cross-tenant leakage."
+        ),
     ),
     student_id: int | None = Query(
         default=None,
@@ -58,7 +57,7 @@ def list_assigned_applications(
 
     Filters (all optional):
     - **stage**: pipeline stage filter (e.g. ``registered``, ``counseling``)
-    - **branch_id**: branch filter (owners only; counselors/managers are always scoped)
+    - **branch_id**: branch filter — see parameter description for role-specific behaviour
     - **student_id**: filter by student ID
     """
     if current_user.tenant_id is None:
@@ -109,9 +108,14 @@ def list_assigned_applications(
         if branch_id is not None:
             statement = statement.where(Application.branch_id == branch_id)
     else:
+        # All roles that reach this point have passed require_permission, which
+        # explicitly gates APPLICATION_READ_ASSIGNED for COUNSELOR, BRANCH_MANAGER,
+        # and CONSULTANCY_OWNER only. Any other role is rejected before this handler
+        # is invoked, making this branch unreachable. Raise 500 to make the invariant
+        # explicit rather than return a misleading 403.
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Role cannot use this endpoint",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected role for this endpoint",
         )
 
     # Apply optional filters

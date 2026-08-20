@@ -1,25 +1,15 @@
-"""Pydantic schemas for application endpoints (E21; Journey J14)."""
+"""Pydantic schemas for application endpoints (E21; Journey J14).
 
-from datetime import date, datetime
-from enum import Enum
+``ApplicationStageEnum`` is re-exported from the model so both ORM and schema
+layers share a single enum definition (avoids duplication / drift).
+"""
+
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-
-class ApplicationStageEnum(str, Enum):
-    """Per-application pipeline stages (Requirements §5)."""
-
-    REGISTERED = "registered"
-    COUNSELING = "counseling"
-    UNIVERSITY_SHORTLISTING = "university_shortlisting"
-    APPLICATION_SUBMITTED = "application_submitted"
-    DOCUMENT_VERIFICATION = "document_verification"
-    OFFER_LETTER = "offer_letter"
-    VISA_PROCESSING = "visa_processing"
-    LOAN_PROCESSING = "loan_processing"
-    ENROLLED = "enrolled"
-    REJECTED = "rejected"
-    WITHDRAWN = "withdrawn"
+# Re-export so FastAPI route handlers and schema consumers import from one place.
+from app.models.application import ApplicationStage as ApplicationStageEnum
 
 
 class ApplicationResponse(BaseModel):
@@ -28,15 +18,11 @@ class ApplicationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    tenant_id: int
     branch_id: int
     student_id: int
     assigned_counselor_id: int | None
     university: str
     program: str
     stage: ApplicationStageEnum
-    rejection_reason: str | None
-    withdrawal_reason: str | None
-    enrolled_at: date | None
     created_at: datetime
     updated_at: datetime

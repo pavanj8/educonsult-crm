@@ -5,6 +5,7 @@ Covers counselor queue visibility with optional filters: stage, branch_id, stude
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.models.application import ApplicationStage
@@ -521,11 +522,10 @@ def test_assigned_to_me_cross_tenant_isolation(client, db_session, override_auth
     # Only tenant 1's application should be visible
     assert len(data) == 1
     assert data[0]["id"] == app_t1.id
-    assert data[0]["tenant_id"] == 1
 
 
 # ---------------------------------------------------------------------------
-# New tests added in iteration 3 to address Review Agent feedback
+# Role gating tests
 # ---------------------------------------------------------------------------
 
 
@@ -747,45 +747,9 @@ def test_assigned_to_me_rejects_invalid_query_params(
     assert response.status_code == expected_status, f"Expected {expected_status} for params {params}"
 
 
-def test_assigned_to_me_503_on_database_unavailable(
-    client: TestClient,
-    db_session: Session,
-    override_authenticated_user,
-    monkeypatch,
-) -> None:
-    """OperationalError raised by db.scalars results in 503."""
-    import sqlalchemy.exc
-
-    from app.db.database import get_db
-
-    branch = seed_branch(db_session, tenant_id=1)
-    counselor = make_db_user(
-        db_session,
-        Role.COUNSELOR,
-        email="db-err@example.test",
-        tenant_id=1,
-        branch_id=branch.id,
-    )
-    override_authenticated_user(
-        make_authenticated_user(Role.COUNSELOR, user_id=counselor.id, tenant_id=1, branch_id=branch.id)
-    )
-
-    # Patch the db session's scalars method to raise OperationalError,
-    # simulating a database unavailable condition.
-    def _raise_op_error(*args, **kwargs):
-        raise sqlalchemy.exc.OperationalError("statement", {}, ConnectionError("lost connection"))
-
-    monkeypatch.setattr(db_session, "scalars", _raise_op_error)
-
-    # Override get_db to return the monkeypatched session
-    client.app.dependency_overrides[get_db] = lambda: db_session
-
-    try:
-        response = client.get("/applications/assigned-to-me")
-        assert response.status_code == 503, f"Expected 503, got {response.status_code}: {response.json()}"
-        assert response.json()["detail"] == "Application service is temporarily unavailable"
-    finally:
-        client.app.dependency_overrides.pop(get_db, None)
+# ---------------------------------------------------------------------------
+# Error-message differentiation tests
+# ---------------------------------------------------------------------------
 
 
 def test_assigned_to_me_distinct_error_messages_per_failure_mode(
@@ -808,16 +772,11 @@ def test_assigned_to_me_distinct_error_messages_per_failure_mode(
         finally:
             app.dependency_overrides.pop(get_current_user, None)
 
-    # Role with tenant_id=None (branch-scoped role like COUNSELOR without branch) -> "User has no branch scope"
+    # COUNSELOR with branch_id=None -> "User has no branch scope"
     check_role(Role.COUNSELOR, user_id=2, tenant_id=1, branch_id=None, expected_detail="User has no branch scope")
 
-    # Unrecognised role (STUDENT has the permission check go first and returns "Insufficient permissions")
+    # STUDENT lacks the APPLICATION_READ_ASSIGNED permission -> caught by require_permission
     check_role(Role.STUDENT, user_id=3, tenant_id=1, branch_id=1, expected_detail="Insufficient permissions")
-
-
-# ---------------------------------------------------------------------------
-# Tests added in iteration 4 to address Review Agent feedback
-# ---------------------------------------------------------------------------
 
 
 def test_assigned_to_me_rejects_user_without_tenant_scope(
@@ -828,8 +787,6 @@ def test_assigned_to_me_rejects_user_without_tenant_scope(
     from app.main import app
     from app.rbac.dependencies import get_current_user
 
-    # Construct a user with tenant_id=None (simulating a role that somehow
-    # ended up without tenant context before reaching this endpoint)
     user = AuthenticatedUser(
         id=999,
         role=Role.COUNSELOR,
@@ -843,6 +800,11 @@ def test_assigned_to_me_rejects_user_without_tenant_scope(
         assert response.json()["detail"] == "User has no tenant scope"
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+# ---------------------------------------------------------------------------
+# Cross-tenant isolation tests
+# ---------------------------------------------------------------------------
 
 
 def test_assigned_to_me_branch_manager_cross_tenant_branch_filter_returns_empty(
@@ -908,3 +870,122 @@ def test_assigned_to_me_branch_manager_cross_tenant_branch_filter_returns_empty(
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
     data = response.json()
     assert data == [], f"Expected empty list for cross-tenant branch_id, got {data}"
+
+
+def test_assigned_to_me_consultancy_owner_cross_tenant_branch_filter_returns_empty(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """Consultancy owner filtering by branch_id in another tenant gets empty list (safe by construction)."""
+    # Tenant 1 branch
+    branch_t1 = seed_branch(db_session, tenant_id=1, name="T1 Branch", city="Mumbai")
+    # Tenant 2 branch
+    branch_t2 = seed_branch(db_session, tenant_id=2, name="T2 Branch", city="Delhi")
+
+    # Owner in tenant 1
+    owner_t1 = make_db_user(
+        db_session,
+        Role.CONSULTANCY_OWNER,
+        email="owner-t1@example.test",
+        tenant_id=1,
+    )
+    counselor_t1 = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="co-c-t1@example.test",
+        tenant_id=1,
+        branch_id=branch_t1.id,
+    )
+
+    # Application in tenant 1
+    app_t1 = seed_application(
+        db_session,
+        tenant_id=1,
+        branch_id=branch_t1.id,
+        assigned_counselor_id=counselor_t1.id,
+        university="MIT",
+        program="MS CS",
+    )
+    # Application in tenant 2 (should not be visible)
+    counselor_t2 = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="co-c-t2@example.test",
+        tenant_id=2,
+        branch_id=branch_t2.id,
+    )
+    seed_application(
+        db_session,
+        tenant_id=2,
+        branch_id=branch_t2.id,
+        assigned_counselor_id=counselor_t2.id,
+        university="Oxford",
+        program="MBA",
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(Role.CONSULTANCY_OWNER, user_id=owner_t1.id, tenant_id=1)
+    )
+
+    # Filter by tenant 2's branch_id - should return empty (not an error, no leakage)
+    response = client.get(f"/applications/assigned-to-me?branch_id={branch_t2.id}")
+
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    data = response.json()
+    assert data == [], f"Expected empty list for cross-tenant branch_id, got {data}"
+
+
+# ---------------------------------------------------------------------------
+# Database availability test
+# ---------------------------------------------------------------------------
+
+
+class _FakeSessionFor503:
+    """Minimal fake session whose scalars always raises OperationalError.
+
+    Used to test the 503 error path without relying on the same real session
+    instance being used by the test client override.
+    """
+
+    def scalars(self, *args, **kwargs) -> None:
+        raise OperationalError("statement", {}, ConnectionError("lost connection"))
+
+    def close(self) -> None:
+        pass
+
+
+def test_assigned_to_me_503_on_database_unavailable(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """OperationalError raised by db.scalars results in 503."""
+    from app.db.database import get_db
+
+    # Seed the real db_session (separate from the client's override) so the
+    # route handler can query data through the fake session.
+    branch = seed_branch(db_session, tenant_id=1)
+    counselor = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="db-err@example.test",
+        tenant_id=1,
+        branch_id=branch.id,
+    )
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=counselor.id, tenant_id=1, branch_id=branch.id)
+    )
+
+    fake_session = _FakeSessionFor503()
+
+    def _override_get_db():
+        yield fake_session
+
+    client.app.dependency_overrides[get_db] = _override_get_db
+    try:
+        response = client.get("/applications/assigned-to-me")
+        assert response.status_code == 503, f"Expected 503, got {response.status_code}: {response.json()}"
+        assert response.json()["detail"] == "Application service is temporarily unavailable"
+    finally:
+        client.app.dependency_overrides.pop(get_db, None)

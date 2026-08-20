@@ -1,6 +1,6 @@
 """Application test helpers."""
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 from app.models.application import Application, ApplicationStage
 from app.rbac.roles import Role
@@ -18,9 +18,6 @@ def seed_application(
     university: str = "MIT",
     program: str = "MS Computer Science",
     stage: ApplicationStage = ApplicationStage.REGISTERED,
-    rejection_reason: str | None = None,
-    withdrawal_reason: str | None = None,
-    enrolled_at: date | None = None,
 ) -> Application:
     """Create and persist an application row."""
     # Auto-create a student user if student_id not provided
@@ -43,9 +40,6 @@ def seed_application(
         university=university,
         program=program,
         stage=stage,
-        rejection_reason=rejection_reason,
-        withdrawal_reason=withdrawal_reason,
-        enrolled_at=enrolled_at,
         created_at=now,
         updated_at=now,
     )

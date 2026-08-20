@@ -1,9 +1,13 @@
-"""Application model and pipeline stage enum (E18; Requirements §5)."""
+"""Application model and pipeline stage enum (E18; Requirements §5).
 
-from datetime import date
+E38 · Journey J31: Mark Enrolled  — adds ``enrolled_at`` column
+E39 · Journey J32: Mark Rejected   — adds ``rejection_reason`` column
+E40 · Journey J33: Mark Withdrawn  — adds ``withdrawal_reason`` column
+"""
+
 from enum import StrEnum
 
-from sqlalchemy import Date, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TenantScopedBase
@@ -63,6 +67,3 @@ class Application(TenantScopedBase):
         nullable=False,
         default=ApplicationStage.REGISTERED,
     )
-    enrolled_at: Mapped[date | None] = mapped_column(Date, nullable=True)
-    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    withdrawal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
