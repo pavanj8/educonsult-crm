@@ -1,21 +1,22 @@
-"""Application routes (E18; Journey J11)."""
+"""Application routes (E18; E21; Journey J11; J14)."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import Select, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
-from app.models.application import Application
+from app.models.application import Application, ApplicationStage
 from app.models.program import Program
 from app.models.university import University
 from app.models.user import User
 from app.pipeline.stages import PipelineStage
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
+from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.application import ApplicationResponse, CreateApplicationRequest
 
@@ -66,14 +67,7 @@ def _validate_university_and_program(
     university_id: int,
     program_id: int,
 ) -> None:
-    """Reject university_id/program_id that don't exist or belong to another tenant.
-
-    Both references must exist and belong to the caller's tenant; the program
-    must additionally belong to the university. This guards the multi-tenancy
-    boundary (Requirement §1) and the data-integrity expectation that an
-    application references valid master data (Requirement §5; J11 "university +
-    program").
-    """
+    """Reject university/program references outside the current tenant or university."""
     try:
         university = db.get(University, university_id)
         program = db.get(Program, program_id)
@@ -166,6 +160,85 @@ def list_applications(
             Application,
             current_user,
         )
+        return list(db.scalars(statement).all())
+    except TenantScopeError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        ) from None
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+
+def _assigned_query_for_role(
+    current_user: AuthenticatedUser,
+    branch_id: int | None,
+) -> Select[tuple[Application]]:
+    """Build the role-scoped assigned queue query with stable ordering."""
+    statement: Select[tuple[Application]] = apply_tenant_scope(
+        select(Application).order_by(Application.id),
+        Application,
+        current_user,
+    )
+
+    if current_user.role == Role.COUNSELOR:
+        if current_user.branch_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no branch scope",
+            )
+        return statement.where(
+            Application.assigned_counselor_id == current_user.id,
+            Application.branch_id == current_user.branch_id,
+        )
+
+    if current_user.role == Role.BRANCH_MANAGER:
+        if current_user.branch_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no branch scope",
+            )
+        statement = statement.where(Application.branch_id == current_user.branch_id)
+    elif current_user.role == Role.CONSULTANCY_OWNER:
+        pass
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected role for this endpoint",
+        )
+
+    if branch_id is not None:
+        statement = statement.where(Application.branch_id == branch_id)
+    return statement
+
+
+@router.get("/assigned-to-me", response_model=list[ApplicationResponse])
+def list_assigned_applications(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.APPLICATION_READ_ASSIGNED)),
+    ],
+    db: Session = Depends(get_db),
+    stage: ApplicationStage | None = Query(default=None),
+    branch_id: int | None = Query(default=None, ge=1),
+    student_id: int | None = Query(default=None, ge=1),
+) -> list[Application]:
+    """Return the role-scoped application queue with optional filters."""
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no tenant scope",
+        )
+
+    try:
+        statement = _assigned_query_for_role(current_user, branch_id)
+        if stage is not None:
+            statement = statement.where(Application.stage == stage.value)
+        if student_id is not None:
+            statement = statement.where(Application.student_id == student_id)
         return list(db.scalars(statement).all())
     except TenantScopeError:
         raise HTTPException(

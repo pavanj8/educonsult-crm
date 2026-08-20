@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "f8a9b0c1d2e3"
+HEAD_REVISION = "g0b1c2d3e4f5"
 
 
 def _alembic_config() -> Config:
@@ -78,7 +78,9 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert application_columns == {
             "id",
             "tenant_id",
+            "branch_id",
             "student_id",
+            "assigned_counselor_id",
             "university_id",
             "program_id",
             "stage",
