@@ -1,0 +1,31 @@
+name: MiniMax Egress Probe
+
+# One-off diagnostic (docs/adr/0019 follow-up): does this runner actually reach
+# api.minimax.io, or is LLM egress pinned to the Cursor gateway? Dispatch
+# manually; read the "Probe" step log. Delete once the routing question is
+# answered.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install anthropic
+        run: pip install "anthropic>=0.40"
+
+      - name: Probe
+        working-directory: agents
+        run: python egress_probe.py

@@ -1,7 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 
 import { expect, test } from './fixtures.js'
-import { DEMO_USER, mockAuthMe, SUPER_ADMIN_USER } from './helpers/auth.js'
+import { DEMO_USER, mockAuthMe } from './helpers/auth.js'
 import { gotoPath } from './helpers/navigation.js'
 
 const mockTenants = [

@@ -17,6 +17,7 @@ from app.seed.runner import (
     SeedValidationError,
     demo_user_to_authenticated_user,
     seed_demo_data,
+    seed_demo_data_if_empty,
     validate_demo_catalog,
 )
 
@@ -33,6 +34,7 @@ __all__ = [
     "demo_user_to_authenticated_user",
     "get_demo_catalog",
     "seed_demo_data",
+    "seed_demo_data_if_empty",
     "user_by_email",
     "users_for_role",
     "validate_demo_catalog",

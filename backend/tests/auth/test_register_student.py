@@ -1,6 +1,9 @@
 """Signup validation tests for POST /auth/register-student (E16, Journey J9, issue #140)."""
 
+<<<<<<< HEAD
 from datetime import date, timedelta
+=======
+>>>>>>> origin/main
 
 from app.auth import verify_access_token, verify_refresh_token
 from app.auth.password import verify_password
@@ -12,15 +15,66 @@ from tests.auth.register_student_helpers import (
     make_register_student_payload,
 )
 from tests.branches.helpers import seed_branch
+from tests.master_data.helpers import seed_master_data_chain
 
+<<<<<<< HEAD
+=======
+VALID_PASSWORD = "StudentPass1!"
+
+
+def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "apex") -> Tenant:
+    tenant = Tenant(name=name, slug=slug)
+    db_session.add(tenant)
+    db_session.commit()
+    db_session.refresh(tenant)
+    return tenant
+
+
+def make_register_student_payload(
+    *,
+    tenant_slug: str = "apex",
+    branch_id: int = 1,
+    email: str = "new.student@example.test",
+    password: str = VALID_PASSWORD,
+    name: str = "Rahul Kumar",
+    phone: str = "+91-9876543210",
+    date_of_birth: str = "2000-05-15",
+    target_country_id: int | None = None,
+    target_university_id: int | None = None,
+    target_program_id: int | None = None,
+) -> dict:
+    payload = {
+        "tenant_slug": tenant_slug,
+        "branch_id": branch_id,
+        "email": email,
+        "password": password,
+        "name": name,
+        "phone": phone,
+        "date_of_birth": date_of_birth,
+    }
+    if target_country_id is not None:
+        payload["target_country_id"] = target_country_id
+    if target_university_id is not None:
+        payload["target_university_id"] = target_university_id
+    if target_program_id is not None:
+        payload["target_program_id"] = target_program_id
+    return payload
+
+>>>>>>> origin/main
 
 def test_register_student_success(client, db_session):
     tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
+    country, university, program = seed_master_data_chain(db_session, tenant_id=tenant.id)
 
     response = client.post(
         "/auth/register-student",
-        json=make_register_student_payload(branch_id=branch.id),
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            target_country_id=country.id,
+            target_university_id=university.id,
+            target_program_id=program.id,
+        ),
     )
 
     assert response.status_code == 201
@@ -32,9 +86,9 @@ def test_register_student_success(client, db_session):
     assert body["name"] == "Rahul Kumar"
     assert body["phone"] == "+91-9876543210"
     assert body["date_of_birth"] == "2000-05-15"
-    assert body["target_country_id"] == 10
-    assert body["target_university_id"] == 20
-    assert body["target_program_id"] == 30
+    assert body["target_country_id"] == country.id
+    assert body["target_university_id"] == university.id
+    assert body["target_program_id"] == program.id
     assert body["token_type"] == "bearer"
     assert isinstance(body["access_token"], str)
     assert isinstance(body["refresh_token"], str)
