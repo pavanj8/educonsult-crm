@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
-"""One-off egress diagnostic (docs/adr/0019 follow-up).
+"""One-off egress/auth diagnostic (docs/adr/0019 follow-up).
 
-Determines whether this runner can actually reach MiniMax, or whether all LLM
-egress is pinned to the Cursor gateway. Two runs (before/after a key change)
-both returned Cursor's model catalog and "Use Cursor.models.list()" even with
-`base_url=https://api.minimax.io/v1`, which means either (a) the network path
-redirects/blocks api.minimax.io, or (b) the `openai` client ignores base_url.
-This script separates the two:
-
-  * a RAW urllib HTTPS POST straight to MiniMax (bypasses the openai client) --
-    if this reaches MiniMax, egress is fine and the client is the problem;
-  * the openai client call -- to compare.
-
-Prints proxy env, DNS, the effective final URL after any redirect, and the raw
-response body. No secrets are printed (the key is masked). Safe to delete once
-the routing question is answered.
+Fast pre-check for MiniMax's **Anthropic-compatible** endpoint before a full
+agent run: verifies the runner reaches api.minimax.io, that ANTHROPIC_AUTH_TOKEN
+authenticates, and that the Token Plan has balance (a 429 rate_limit_error 2056
+means out of credits). Does a raw urllib POST straight to the endpoint (bypasses
+the client) and then the same call via the `anthropic` client. No secrets are
+printed. Safe to delete once everything runs.
 """
 from __future__ import annotations
 
@@ -24,8 +16,9 @@ import socket
 import urllib.error
 import urllib.request
 
-BASE = os.environ.get("MINIMAX_BASE_URL", "https://api.minimax.io/v1").rstrip("/")
-KEY = os.environ.get("MINIMAX_API_KEY", "")
+BASE = os.environ.get("ANTHROPIC_BASE_URL", "https://api.minimax.io/anthropic").rstrip("/")
+TOKEN = os.environ.get("ANTHROPIC_AUTH_TOKEN", "") or os.environ.get("MINIMAX_API_KEY", "")
+MODEL = os.environ.get("PROBE_MODEL", "MiniMax-M3")
 
 
 def hr(title: str) -> None:
@@ -33,16 +26,10 @@ def hr(title: str) -> None:
 
 
 hr("proxy / env")
-for k in (
-    "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
-    "NO_PROXY", "no_proxy", "OPENAI_BASE_URL", "OPENAI_API_KEY",
-):
-    v = os.environ.get(k, "")
-    if k.endswith("API_KEY") and v:
-        v = f"{v[:6]}…({len(v)} chars)"
-    print(f"{k}={v}")
-print(f"MINIMAX_BASE_URL={BASE}")
-print(f"MINIMAX_API_KEY set={'yes' if KEY else 'NO'} ({len(KEY)} chars)")
+for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy"):
+    print(f"{k}={os.environ.get(k, '')}")
+print(f"ANTHROPIC_BASE_URL={BASE}")
+print(f"ANTHROPIC_AUTH_TOKEN set={'yes' if TOKEN else 'NO'} ({len(TOKEN)} chars)")
 
 hr("DNS: api.minimax.io")
 try:
@@ -50,15 +37,19 @@ try:
 except Exception as e:  # noqa: BLE001
     print("DNS error:", type(e).__name__, e)
 
-hr(f"RAW urllib POST -> {BASE}/chat/completions (model=MiniMax-M3)")
+hr(f"RAW urllib POST -> {BASE}/v1/messages (model={MODEL})")
 req = urllib.request.Request(
-    f"{BASE}/chat/completions",
+    f"{BASE}/v1/messages",
     data=json.dumps({
-        "model": "MiniMax-M3",
+        "model": MODEL,
+        "max_tokens": 16,
         "messages": [{"role": "user", "content": "ping"}],
-        "max_tokens": 8,
     }).encode(),
-    headers={"Authorization": f"Bearer {KEY}", "Content-Type": "application/json"},
+    headers={
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+    },
     method="POST",
 )
 try:
@@ -71,17 +62,18 @@ except urllib.error.HTTPError as e:
 except Exception as e:  # noqa: BLE001
     print("error:", type(e).__name__, e)
 
-hr("openai client (compare) -> chat.completions.create(model=MiniMax-M3)")
+hr(f"anthropic client (compare) -> messages.create(model={MODEL})")
 try:
-    from openai import OpenAI
+    from anthropic import Anthropic
 
-    client = OpenAI(api_key=KEY, base_url=BASE)
+    client = Anthropic(base_url=BASE, auth_token=TOKEN)
     print("client base_url:", getattr(client, "base_url", "?"))
-    resp = client.chat.completions.create(
-        model="MiniMax-M3",
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=16,
         messages=[{"role": "user", "content": "ping"}],
-        max_tokens=8,
     )
-    print("OK:", resp.choices[0].message.content)
+    text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+    print("OK stop_reason:", resp.stop_reason, "text:", text)
 except Exception as e:  # noqa: BLE001
     print("error:", type(e).__name__, str(e)[:800])

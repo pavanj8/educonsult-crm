@@ -12,8 +12,8 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     env:
-      MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-      MINIMAX_BASE_URL: https://api.minimax.io/v1
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,8 +23,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install openai
-        run: pip install "openai>=1.30"
+      - name: Install anthropic
+        run: pip install "anthropic>=0.40"
 
       - name: Probe
         working-directory: agents

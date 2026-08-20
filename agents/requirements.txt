@@ -1,10 +1,10 @@
-# MiniMax is OpenAI-compatible; the harness engine (minimax_agent.py) drives
-# the agents through this client (docs/adr/0019).
-openai>=1.30
+# MiniMax's Anthropic-compatible Messages API drives the harness engine
+# (minimax_agent.py) via ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN
+# (docs/adr/0019).
+anthropic>=0.40
 
 # NOTE: cursor-sdk is intentionally NOT installed. The egress probe
 # (docs/adr/0019 follow-up) showed that merely having cursor-sdk on the path
-# reroutes the `openai` client onto the Cursor gateway (identical openai
-# version, destination flips), which is exactly why MiniMax model IDs were
-# rejected with Cursor's catalog. The CURSOR_API_KEY env var can stay set
-# (dormant) for a possible rollback, but the package must be absent.
+# reroutes HTTP clients onto the Cursor gateway (which is why MiniMax model
+# IDs were rejected with Cursor's catalog). The CURSOR_API_KEY env var can
+# stay set (dormant) for a possible rollback, but the package must be absent.

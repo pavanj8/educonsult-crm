@@ -62,11 +62,11 @@ finds them on its own; failed tickets retry themselves.
 
 ## Required repo setup (one-time)
 
-1. ✅ **Secret**: `MINIMAX_API_KEY` — the harness's inference engine. All
-   three agents run on MiniMax via an OpenAI-compatible client
+1. ✅ **Secret**: `ANTHROPIC_AUTH_TOKEN` — the harness's inference engine. All
+   three agents run on MiniMax via its Anthropic-compatible Messages API
    (`agents/minimax_agent.py`, docs/adr/0019). Optional
-   `MINIMAX_BASE_URL` (default `https://api.minimax.io/v1`; use the `.com`
-   endpoint in China).
+   `ANTHROPIC_BASE_URL` (default `https://api.minimax.io/anthropic`; use the
+   `.com` endpoint in China).
 2. ➖ **Secret**: `CURSOR_API_KEY` — kept provisioned but **dormant**. The
    Cursor SDK engine was replaced by MiniMax (docs/adr/0019); no agent
    consumes this key. Left in place for a possible rollback. NOTE: the
@@ -92,8 +92,8 @@ finds them on its own; failed tickets retry themselves.
 cd agents
 python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-export MINIMAX_API_KEY="..."                        # harness inference engine
-# export MINIMAX_BASE_URL="https://api.minimax.io/v1"  # optional override
+export ANTHROPIC_AUTH_TOKEN="..."                            # MiniMax token
+# export ANTHROPIC_BASE_URL="https://api.minimax.io/anthropic"  # optional
 gh auth login   # gh CLI must be authenticated with repo write access
 
 python prepare_iteration.py 123        # bumps agent:iteration-N, prints new N

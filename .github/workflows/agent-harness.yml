@@ -43,10 +43,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # CURSOR_API_KEY kept provisioned but dormant -- the harness engine is
-      # now MiniMax (docs/adr/0019); no agent consumes this key.
+      # now MiniMax via its Anthropic-compatible endpoint (docs/adr/0019).
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-      MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-      MINIMAX_BASE_URL: https://api.minimax.io/v1
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Asymmetric model tiering (docs/adr/0013): cheap MiniMax model to
       # write, stronger MiniMax model to verify (docs/adr/0019).
