@@ -1,7 +1,12 @@
 """GET /applications/assigned-to-me endpoint tests (E21; Journey J14; issue #156).
 
-Covers counselor queue visibility with optional filters: stage, branch_id, student_id.
+Covers counselor queue visibility with optional filters: ``stage``,
+``branch_id``, ``student_id``. Tenant and branch isolation are exercised
+explicitly because the endpoint exposes cross-role visibility
+(Branch Manager / Consultancy Owner / Counselor see different slices).
 """
+
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,16 +46,16 @@ def test_assigned_to_me_returns_only_counselors_applications(
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=counselor_user.id,
-        university="MIT",
-        program="MS CS",
+        university_id=11,
+        program_id=21,
     )
     seed_application(
         db_session,
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=other_counselor.id,
-        university="Stanford",
-        program="MBA",
+        university_id=12,
+        program_id=22,
     )
 
     override_authenticated_user(
@@ -135,8 +140,8 @@ def test_assigned_to_me_filters_by_stage(client, db_session, override_authentica
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
-        university="MIT",
-        program="MS CS",
+        university_id=11,
+        program_id=21,
         stage=ApplicationStage.REGISTERED,
     )
     seed_application(
@@ -144,8 +149,8 @@ def test_assigned_to_me_filters_by_stage(client, db_session, override_authentica
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
-        university="Stanford",
-        program="MBA",
+        university_id=12,
+        program_id=22,
         stage=ApplicationStage.COUNSELING,
     )
     seed_application(
@@ -153,8 +158,8 @@ def test_assigned_to_me_filters_by_stage(client, db_session, override_authentica
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
-        university="Harvard",
-        program="BA",
+        university_id=13,
+        program_id=23,
         stage=ApplicationStage.APPLICATION_SUBMITTED,
     )
 
@@ -185,8 +190,8 @@ def test_assigned_to_me_filters_by_student_id(client, db_session, override_authe
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
         student_id=student_a.id,
-        university="MIT",
-        program="MS CS",
+        university_id=11,
+        program_id=21,
     )
     seed_application(
         db_session,
@@ -194,8 +199,8 @@ def test_assigned_to_me_filters_by_student_id(client, db_session, override_authe
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
         student_id=student_b.id,
-        university="Stanford",
-        program="MBA",
+        university_id=12,
+        program_id=22,
     )
 
     override_authenticated_user(
@@ -226,8 +231,8 @@ def test_assigned_to_me_combines_stage_and_student_id_filters(
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
         student_id=student_a.id,
-        university="MIT",
-        program="MS CS",
+        university_id=11,
+        program_id=21,
         stage=ApplicationStage.REGISTERED,
     )
     seed_application(
@@ -236,8 +241,8 @@ def test_assigned_to_me_combines_stage_and_student_id_filters(
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
         student_id=student_a.id,
-        university="Stanford",
-        program="MBA",
+        university_id=12,
+        program_id=22,
         stage=ApplicationStage.COUNSELING,
     )
 
@@ -274,8 +279,8 @@ def test_assigned_to_me_returns_all_stages_when_no_filter(
             tenant_id=1,
             branch_id=branch.id,
             assigned_counselor_id=counselor.id,
-            university=f"University {i}",
-            program=f"Program {i}",
+            university_id=10 + i,
+            program_id=20 + i,
             stage=stage,
         )
         app_ids.append(app.id)
@@ -307,8 +312,8 @@ def test_assigned_to_me_ordered_by_application_id(
             tenant_id=1,
             branch_id=branch.id,
             assigned_counselor_id=counselor.id,
-            university=f"U{i}",
-            program=f"P{i}",
+            university_id=10 + i,
+            program_id=20 + i,
         )
         app_ids.append(app.id)
 
@@ -369,6 +374,62 @@ def test_assigned_to_me_branch_manager_own_branch_only(
     data = response.json()
     assert len(data) == 1
     assert data[0]["id"] == app_in_a.id
+
+
+def test_assigned_to_me_branch_manager_same_tenant_different_branch_returns_empty(
+    client, db_session, override_authenticated_user
+):
+    """Branch manager filtering by a same-tenant but cross-branch id returns empty.
+
+    This is the same-tenant / different-branch case that must NOT leak an
+    applications row from a sibling branch.
+    """
+    branch_a = seed_branch(db_session, tenant_id=1, name="Branch A", city="Mumbai")
+    branch_b = seed_branch(db_session, tenant_id=1, name="Branch B", city="Delhi")
+
+    bm = make_db_user(
+        db_session,
+        Role.BRANCH_MANAGER,
+        email="bm-crossbranch@example.test",
+        tenant_id=1,
+        branch_id=branch_a.id,
+    )
+    counselor_b = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="c-b-crossbranch@example.test",
+        tenant_id=1,
+        branch_id=branch_b.id,
+    )
+
+    # Application in branch_b (the sibling branch) — must NOT be visible.
+    seed_application(
+        db_session,
+        tenant_id=1,
+        branch_id=branch_b.id,
+        assigned_counselor_id=counselor_b.id,
+    )
+    # Application in branch_a (own branch) — should be visible without filter.
+    app_in_a = seed_application(
+        db_session,
+        tenant_id=1,
+        branch_id=branch_a.id,
+        assigned_counselor_id=counselor_b.id,
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(Role.BRANCH_MANAGER, user_id=bm.id, tenant_id=1, branch_id=branch_a.id)
+    )
+
+    # Without filter: own branch only.
+    response = client.get("/applications/assigned-to-me")
+    assert response.status_code == 200
+    assert {item["id"] for item in response.json()} == {app_in_a.id}
+
+    # With branch_id pinned to the sibling branch: must return empty (no leakage).
+    sibling_filter = client.get(f"/applications/assigned-to-me?branch_id={branch_b.id}")
+    assert sibling_filter.status_code == 200
+    assert sibling_filter.json() == []
 
 
 def test_assigned_to_me_consultancy_owner_sees_all_branches(
@@ -578,8 +639,8 @@ def test_assigned_to_me_branch_manager_sees_unassigned_applications(
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=None,  # explicitly unassigned
-        university="Oxford",
-        program="MA History",
+        university_id=11,
+        program_id=21,
     )
     # Assigned application in the same branch
     counselor = make_db_user(
@@ -594,8 +655,8 @@ def test_assigned_to_me_branch_manager_sees_unassigned_applications(
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
-        university="Cambridge",
-        program="MSc Economics",
+        university_id=12,
+        program_id=22,
     )
 
     override_authenticated_user(
@@ -628,8 +689,8 @@ def test_assigned_to_me_consultancy_owner_sees_unassigned_applications(
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=None,
-        university="Yale",
-        program="JD",
+        university_id=11,
+        program_id=21,
     )
     counselor = make_db_user(
         db_session,
@@ -643,8 +704,8 @@ def test_assigned_to_me_consultancy_owner_sees_unassigned_applications(
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
-        university="Princeton",
-        program="PhD Math",
+        university_id=12,
+        program_id=22,
     )
 
     override_authenticated_user(
@@ -679,8 +740,8 @@ def test_assigned_to_me_counselor_does_not_see_unassigned_applications(
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=None,
-        university="Unseen U",
-        program="Unseen P",
+        university_id=11,
+        program_id=21,
     )
     # Assigned to this counselor
     my_app = seed_application(
@@ -688,8 +749,8 @@ def test_assigned_to_me_counselor_does_not_see_unassigned_applications(
         tenant_id=1,
         branch_id=branch.id,
         assigned_counselor_id=counselor.id,
-        university="My U",
-        program="My P",
+        university_id=12,
+        program_id=22,
     )
 
     override_authenticated_user(
@@ -709,7 +770,7 @@ def test_assigned_to_me_counselor_does_not_see_unassigned_applications(
     "params,expected_status",
     [
         # Invalid branch_id values
-        ({"branch_id": "abc"}, 422),  # type: ignore[dict-item]
+        ({"branch_id": "abc"}, 422),
         ({"branch_id": 0}, 422),
         ({"branch_id": -1}, 422),
         # Invalid stage
@@ -718,14 +779,14 @@ def test_assigned_to_me_counselor_does_not_see_unassigned_applications(
         # Invalid student_id
         ({"student_id": 0}, 422),
         ({"student_id": -5}, 422),
-        ({"student_id": "xyz"}, 422),  # type: ignore[dict-item]
+        ({"student_id": "xyz"}, 422),
     ],
 )
 def test_assigned_to_me_rejects_invalid_query_params(
     client: TestClient,
     db_session: Session,
     override_authenticated_user,
-    params: dict,
+    params: dict[str, Any],
     expected_status: int,
 ) -> None:
     """Query parameters outside valid ranges or types return 422 Unprocessable Entity."""
@@ -813,9 +874,9 @@ def test_assigned_to_me_branch_manager_cross_tenant_branch_filter_returns_empty(
     override_authenticated_user,
 ) -> None:
     """Branch manager filtering by branch_id in another tenant gets empty list (safe by construction)."""
-    # Tenant 1 branch
+    # Tenant 1 branch for the BM's own branch assignment
     branch_t1 = seed_branch(db_session, tenant_id=1, name="T1 Branch", city="Mumbai")
-    # Tenant 2 branch
+    # Tenant 2 branch — the one the BM will try (and fail) to peek into
     branch_t2 = seed_branch(db_session, tenant_id=2, name="T2 Branch", city="Delhi")
 
     # BM in tenant 1
@@ -826,23 +887,7 @@ def test_assigned_to_me_branch_manager_cross_tenant_branch_filter_returns_empty(
         tenant_id=1,
         branch_id=branch_t1.id,
     )
-    counselor_t1 = make_db_user(
-        db_session,
-        Role.COUNSELOR,
-        email="c-t1@example.test",
-        tenant_id=1,
-        branch_id=branch_t1.id,
-    )
 
-    # Application in tenant 1
-    app_t1 = seed_application(
-        db_session,
-        tenant_id=1,
-        branch_id=branch_t1.id,
-        assigned_counselor_id=counselor_t1.id,
-        university="MIT",
-        program="MS CS",
-    )
     # Application in tenant 2 (should not be visible)
     counselor_t2 = make_db_user(
         db_session,
@@ -856,8 +901,8 @@ def test_assigned_to_me_branch_manager_cross_tenant_branch_filter_returns_empty(
         tenant_id=2,
         branch_id=branch_t2.id,
         assigned_counselor_id=counselor_t2.id,
-        university="Oxford",
-        program="MBA",
+        university_id=12,
+        program_id=22,
     )
 
     override_authenticated_user(
@@ -878,9 +923,7 @@ def test_assigned_to_me_consultancy_owner_cross_tenant_branch_filter_returns_emp
     override_authenticated_user,
 ) -> None:
     """Consultancy owner filtering by branch_id in another tenant gets empty list (safe by construction)."""
-    # Tenant 1 branch
-    branch_t1 = seed_branch(db_session, tenant_id=1, name="T1 Branch", city="Mumbai")
-    # Tenant 2 branch
+    # Tenant 2 branch (only the cross-tenant branch is needed by this test)
     branch_t2 = seed_branch(db_session, tenant_id=2, name="T2 Branch", city="Delhi")
 
     # Owner in tenant 1
@@ -889,23 +932,6 @@ def test_assigned_to_me_consultancy_owner_cross_tenant_branch_filter_returns_emp
         Role.CONSULTANCY_OWNER,
         email="owner-t1@example.test",
         tenant_id=1,
-    )
-    counselor_t1 = make_db_user(
-        db_session,
-        Role.COUNSELOR,
-        email="co-c-t1@example.test",
-        tenant_id=1,
-        branch_id=branch_t1.id,
-    )
-
-    # Application in tenant 1
-    app_t1 = seed_application(
-        db_session,
-        tenant_id=1,
-        branch_id=branch_t1.id,
-        assigned_counselor_id=counselor_t1.id,
-        university="MIT",
-        program="MS CS",
     )
     # Application in tenant 2 (should not be visible)
     counselor_t2 = make_db_user(
@@ -920,8 +946,8 @@ def test_assigned_to_me_consultancy_owner_cross_tenant_branch_filter_returns_emp
         tenant_id=2,
         branch_id=branch_t2.id,
         assigned_counselor_id=counselor_t2.id,
-        university="Oxford",
-        program="MBA",
+        university_id=12,
+        program_id=22,
     )
 
     override_authenticated_user(
@@ -944,11 +970,11 @@ def test_assigned_to_me_consultancy_owner_cross_tenant_branch_filter_returns_emp
 class _FakeSessionFor503:
     """Minimal fake session whose scalars always raises OperationalError.
 
-    Used to test the 503 error path without relying on the same real session
-    instance being used by the test client override.
+    Used to test the 503 error path without touching the real session
+    the test fixture installs.
     """
 
-    def scalars(self, *args, **kwargs) -> None:
+    def scalars(self, *args: object, **kwargs: object) -> object:
         raise OperationalError("statement", {}, ConnectionError("lost connection"))
 
     def close(self) -> None:
@@ -963,8 +989,6 @@ def test_assigned_to_me_503_on_database_unavailable(
     """OperationalError raised by db.scalars results in 503."""
     from app.db.database import get_db
 
-    # Seed the real db_session (separate from the client's override) so the
-    # route handler can query data through the fake session.
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_db_user(
         db_session,

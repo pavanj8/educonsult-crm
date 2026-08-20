@@ -20,16 +20,23 @@ class CreateApplicationRequest(BaseModel):
 class ApplicationResponse(BaseModel):
     """Single application record in list/detail responses (E18; E21).
 
-    ``tenant_id`` is intentionally omitted: every response served by the API
-    is already tenant-scoped via the caller's session, so echoing the value
-    back provides no extra information and widens the surface for accidental
-    client misuse.
+    Field notes:
+    - ``tenant_id`` is included so existing E18 list/detail callers that echo
+      it back keep working (tenant scoping is already enforced by the route;
+      echoing the value is a convenience for clients).
+    - ``branch_id`` and ``assigned_counselor_id`` are nullable. They are
+      back-filled by the E19 (auto-assignment) and E20 (manual reassignment)
+      tasks; rows created by E18 ``POST /applications`` do not yet carry a
+      branch, and they remain ``NULL`` until those epics land. The schema
+      matches the ORM (where both columns are ``nullable=True``) so existing
+      rows do not raise 500s.
     """
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    branch_id: int
+    tenant_id: int
+    branch_id: int | None
     student_id: int
     assigned_counselor_id: int | None
     university_id: int

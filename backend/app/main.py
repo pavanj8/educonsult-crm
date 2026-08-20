@@ -7,10 +7,7 @@ from sqlalchemy.orm import Session
 import app.models  # noqa: F401 — register ORM models with Base.metadata
 from app.db.database import SQLALCHEMY_DATABASE_URL, SessionLocal, engine
 from app.models.base import Base
-<<<<<<< HEAD
-=======
 from app.pipeline.default_transitions import seed_default_stage_transitions
->>>>>>> origin/main
 from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.branches import router as branches_router
@@ -85,11 +82,7 @@ app.include_router(applications_router, prefix="/applications", tags=["applicati
 app.include_router(branches_router, prefix="/branches", tags=["branches"])
 app.include_router(staff_router, prefix="/staff", tags=["staff"])
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
-<<<<<<< HEAD
-app.include_router(applications_router, tags=["applications"])
-=======
 app.include_router(master_data_router, prefix="/tenants", tags=["master-data"])
->>>>>>> origin/main
 
 
 @app.get("/health")
