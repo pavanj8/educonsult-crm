@@ -45,6 +45,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Refresh harness tooling from main (protected paths)
+        # Always run the latest agents/ + DoD even on an older issue branch
+        # (docs/adr/0019 follow-up).
+        run: |
+          git fetch origin main --depth=1
+          git checkout origin/main -- agents/ docs/definition-of-done.md
+
       - name: Install agent dependencies
         working-directory: agents
         run: pip install -r requirements.txt

@@ -95,6 +95,15 @@ jobs:
           git config user.email "agent-harness-bot@users.noreply.github.com"
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
 
+      - name: Refresh harness tooling from main (protected paths)
+        # agents/ and the DoD are protected paths, never part of a ticket's
+        # diff, so always run the LATEST copies even on a resumed older branch
+        # -- otherwise prompt/tooling fixes never reach in-flight branches
+        # (docs/adr/0019 follow-up).
+        run: |
+          git fetch origin main --depth=1
+          git checkout origin/main -- agents/ docs/definition-of-done.md
+
       - name: Prepare iteration
         id: iteration
         working-directory: agents
