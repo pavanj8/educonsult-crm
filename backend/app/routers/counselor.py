@@ -12,9 +12,8 @@ from app.models.application import Application, PipelineStage
 from app.models.user import User
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
-from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
-from app.schemas.application import ApplicationWithStudentResponse, CounselorQueueFilter
+from app.schemas.application import ApplicationWithStudentResponse
 
 router = APIRouter()
 
@@ -31,15 +30,6 @@ def _get_counselor_applications_base_query(
         .where(Application.assigned_counselor_id == current_user.id)
         .where(Application.tenant_id == current_user.tenant_id)
     )
-
-
-def _build_student_join(query, db: Session, current_user: AuthenticatedUser):
-    """Add LEFT JOIN with students table."""
-    return query.join(
-        User,
-        User.id == Application.student_id,
-        isouter=True,
-    ).where(User.tenant_id == current_user.tenant_id)
 
 
 @router.get("/queue", response_model=list[ApplicationWithStudentResponse])
@@ -87,6 +77,7 @@ def get_counselor_queue(
         applications = list(db.scalars(query).all())
 
         # Build response with student details
+        # Skip applications where student is missing (FK violation or data inconsistency)
         result: list[ApplicationWithStudentResponse] = []
         for app in applications:
             student = db.get(User, app.student_id)
@@ -114,31 +105,7 @@ def get_counselor_queue(
                         student_role=student.role,
                     )
                 )
-            else:
-                # Edge case: student not found
-                result.append(
-                    ApplicationWithStudentResponse(
-                        id=app.id,
-                        tenant_id=app.tenant_id,
-                        student_id=app.student_id,
-                        assigned_counselor_id=app.assigned_counselor_id,
-                        target_university_id=app.target_university_id,
-                        target_program_id=app.target_program_id,
-                        stage=app.stage,
-                        stage_reason=app.stage_reason,
-                        enrollment_date=app.enrollment_date,
-                        loan_opted_in=app.loan_opted_in,
-                        loan_status=app.loan_status,
-                        loan_lender=app.loan_lender,
-                        loan_amount=app.loan_amount,
-                        created_at=app.created_at,
-                        updated_at=app.updated_at,
-                        student_name=None,
-                        student_email="unknown@example.com",
-                        student_phone=None,
-                        student_role=Role.STUDENT,
-                    )
-                )
+            # Skip applications with missing students instead of synthesizing fake data
 
         return result
 
@@ -147,13 +114,6 @@ def get_counselor_queue(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=_DB_UNAVAILABLE_DETAIL,
         ) from None
-
-
-def _stage_to_str(stage: PipelineStage | str) -> str:
-    """Convert stage to string, handling both enum and plain string from SQLite."""
-    if isinstance(stage, str):
-        return stage
-    return stage.value
 
 
 @router.get("/queue/counts", response_model=dict[str, int])
@@ -184,9 +144,9 @@ def get_counselor_queue_counts(
             )
         ).all()
 
-        # Convert to dict with stage as key
-        # Handle both enum values and plain strings (SQLite returns strings)
-        return {_stage_to_str(stage): count for stage, count in counts}
+        # Convert to dict with stage as string key
+        # PipelineStage is a StrEnum so enum.value serializes to JSON string automatically
+        return {stage.value if isinstance(stage, PipelineStage) else stage: count for stage, count in counts}
 
     except OperationalError:
         raise HTTPException(

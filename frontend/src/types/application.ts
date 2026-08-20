@@ -13,13 +13,6 @@ export type PipelineStage =
   | 'rejected'
   | 'withdrawn'
 
-// Terminal stages - applications cannot progress further
-export const TERMINAL_STAGES: readonly PipelineStage[] = ['enrolled', 'rejected', 'withdrawn'] as const
-
-export function isTerminalStage(stage: PipelineStage): boolean {
-  return TERMINAL_STAGES.includes(stage)
-}
-
 export type Application = {
   id: number
   tenant_id: number
@@ -53,20 +46,6 @@ export type CounselorQueueFilter = {
 export type StageCount = {
   [stage: string]: number
 }
-
-export const PIPELINE_STAGES: readonly PipelineStage[] = [
-  'registered',
-  'counseling',
-  'university_shortlisting',
-  'application_submitted',
-  'document_verification',
-  'offer_letter',
-  'visa_processing',
-  'loan_processing',
-  'enrolled',
-  'rejected',
-  'withdrawn',
-] as const
 
 export const STAGE_LABELS: Record<PipelineStage, string> = {
   registered: 'Registered',

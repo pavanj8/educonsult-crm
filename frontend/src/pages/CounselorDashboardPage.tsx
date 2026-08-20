@@ -16,9 +16,9 @@ const PIPELINE_STAGE_ORDER: PipelineStage[] = [
 
 const ACTIVE_STAGES = PIPELINE_STAGE_ORDER
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string, locale?: string): string {
   const date = new Date(dateString)
-  return date.toLocaleDateString('en-IN', {
+  return date.toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -174,6 +174,7 @@ export default function CounselorDashboardPage() {
       {!loading && !error && applications.length > 0 && (
         <section className="counselor-dashboard__queue" aria-label="Application queue">
           <table className="counselor-dashboard__table" data-testid="queue-table">
+            <caption className="visually-hidden">Applications assigned to you</caption>
             <thead>
               <tr>
                 <th scope="col">Student</th>

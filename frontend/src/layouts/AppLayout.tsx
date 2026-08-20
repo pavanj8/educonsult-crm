@@ -33,6 +33,16 @@ export default function AppLayout() {
               <Link to="/staff" data-testid="nav-staff">
                 Staff
               </Link>
+              <Link to="/counselor/queue" data-testid="nav-counselor-queue">
+                My Queue
+              </Link>
+            </nav>
+          ) : null}
+          {user?.role === 'counselor' ? (
+            <nav className="app-header__nav" aria-label="Main">
+              <Link to="/counselor/queue" data-testid="nav-counselor-queue">
+                My Queue
+              </Link>
             </nav>
           ) : null}
         </div>

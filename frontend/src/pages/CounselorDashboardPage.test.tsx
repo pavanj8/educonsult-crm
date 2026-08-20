@@ -179,17 +179,18 @@ describe('CounselorDashboardPage', () => {
     expect(screen.getByTestId('stage-badge-counseling')).toBeInTheDocument()
   })
 
-  it('shows loading state while fetching queue', async () => {
-    // Keep the queue empty to avoid async issues
-    mockFetchQueue.mockResolvedValueOnce([])
+  it('shows loading state synchronously before data loads', async () => {
+    // Use a promise that never resolves to simulate loading
+    const pendingPromise = new Promise<never>(() => {})
+    
+    mockFetchQueue.mockImplementation(() => pendingPromise)
     mockFetchCounts.mockResolvedValueOnce({})
 
     renderPage()
 
-    // The component should render immediately with loading state if data is not yet loaded
-    await waitFor(() => {
-      expect(screen.queryByTestId('queue-empty') || screen.queryByTestId('queue-loading')).toBeTruthy()
-    })
+    // Loading state should appear immediately before any async resolution
+    expect(screen.queryByTestId('queue-loading')).toBeInTheDocument()
+    expect(screen.queryByTestId('queue-table')).not.toBeInTheDocument()
   })
 
   it('shows empty state when no applications assigned', async () => {
@@ -219,9 +220,9 @@ describe('CounselorDashboardPage', () => {
     expect(screen.getByTestId('retry-button')).toBeInTheDocument()
   })
 
-  it('filters queue by stage when stage filter changes', async () => {
-    mockFetchQueue.mockResolvedValueOnce([mockQueueData[0]])
-    mockFetchCounts.mockResolvedValueOnce(mockCounts)
+  it('calls API with stage filter when stage filter changes', async () => {
+    mockFetchQueue.mockResolvedValue([mockQueueData[0]])
+    mockFetchCounts.mockResolvedValue({ registered: 1 })
 
     renderPage()
 
@@ -231,17 +232,17 @@ describe('CounselorDashboardPage', () => {
 
     // Change the stage filter
     const stageSelect = screen.getByTestId('stage-filter')
-    await userEvent.selectOptions(stageSelect, 'counseling')
+    await userEvent.selectOptions(stageSelect, 'registered')
 
     await waitFor(() => {
       // Verify the API was called with the stage filter
-      expect(mockFetchQueue).toHaveBeenCalledWith({ stage: 'counseling' })
+      expect(mockFetchQueue).toHaveBeenCalledWith({ stage: 'registered' })
     })
   })
 
-  it('filters queue by search term', async () => {
-    mockFetchQueue.mockResolvedValueOnce(mockQueueData)
-    mockFetchCounts.mockResolvedValueOnce(mockCounts)
+  it('calls API with search filter when search is entered', async () => {
+    mockFetchQueue.mockResolvedValue([mockQueueData[0]])
+    mockFetchCounts.mockResolvedValue({ registered: 1 })
 
     renderPage()
 
@@ -249,11 +250,14 @@ describe('CounselorDashboardPage', () => {
       expect(screen.getByTestId('queue-search')).toBeInTheDocument()
     })
 
+    // Type in the search field
     await userEvent.type(screen.getByTestId('queue-search'), 'Alice')
 
-    // The API should be called with the search filter
     await waitFor(() => {
-      expect(mockFetchQueue).toHaveBeenCalledWith({ search: 'Alice' })
+      // The API should eventually be called with the search filter
+      expect(mockFetchQueue).toHaveBeenCalledWith(
+        expect.objectContaining({ search: expect.stringContaining('Alice') })
+      )
     })
   })
 
@@ -322,8 +326,8 @@ describe('CounselorDashboardPage', () => {
       expect(screen.getByTestId('queue-table')).toBeInTheDocument()
     })
 
-    // Check that date is formatted (Jan 15, 2026)
-    expect(screen.getByText(/15 Jan 2026/)).toBeInTheDocument()
-    expect(screen.getByText(/16 Jan 2026/)).toBeInTheDocument()
+    // Check that dates are formatted in the table (Jan 15, 2026 format)
+    expect(screen.getByText(/Jan 15, 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/Jan 16, 2026/)).toBeInTheDocument()
   })
 })

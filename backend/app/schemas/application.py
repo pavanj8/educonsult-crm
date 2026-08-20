@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.models.application import PipelineStage
 from app.rbac.roles import Role
@@ -40,10 +40,3 @@ class ApplicationWithStudentResponse(ApplicationResponse):
     student_email: str
     student_phone: str | None
     student_role: Role
-
-
-class CounselorQueueFilter(BaseModel):
-    """Query filters for counselor queue (E21; Journey J14)."""
-
-    stage: PipelineStage | None = Field(default=None)
-    search: str | None = Field(default=None, max_length=100)
