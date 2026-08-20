@@ -69,7 +69,10 @@ finds them on its own; failed tickets retry themselves.
    endpoint in China).
 2. ➖ **Secret**: `CURSOR_API_KEY` — kept provisioned but **dormant**. The
    Cursor SDK engine was replaced by MiniMax (docs/adr/0019); no agent
-   consumes this key. Left in place for a possible rollback.
+   consumes this key. Left in place for a possible rollback. NOTE: the
+   `cursor-sdk` *package* is deliberately uninstalled — its presence
+   hijacks the `openai` client onto the Cursor gateway (docs/adr/0019). The
+   env var is harmless; the package is not.
 3. ⬜ **Secret**: `GH_PAT` — a token that can push `.github/workflows/*`
    (`workflow` scope). `GITHUB_TOKEN` cannot; issue #61 failed on that.
    Needed for any ticket that adds or edits GitHub Actions workflows.
