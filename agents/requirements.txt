@@ -1,1 +1,6 @@
+# MiniMax is OpenAI-compatible; the harness engine (minimax_agent.py) drives
+# the agents through this client (docs/adr/0019).
+openai>=1.30
+# Kept installed but no longer imported: the Cursor SDK engine was replaced by
+# MiniMax (docs/adr/0019). Left in place alongside a dormant CURSOR_API_KEY.
 cursor-sdk==1.0.28

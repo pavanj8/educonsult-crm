@@ -62,12 +62,14 @@ finds them on its own; failed tickets retry themselves.
 
 ## Required repo setup (one-time)
 
-1. ✅ **Secret**: `CURSOR_API_KEY` set in repo Settings -> Secrets and
-   variables -> Actions (done 2026-08-19). Still required for Cursor SDK
-   agent orchestration even when using MiniMax for model inference.
-2. ✅ **Secret**: `MINIMAX_API_KEY` — MiniMax Token Plan key for LLM
-   calls (Dev/Test/Review model inference). Mapped to OpenAI-compatible
-   env vars at agent startup (`agents/llm_env.py`, docs/adr/0017).
+1. ✅ **Secret**: `MINIMAX_API_KEY` — the harness's inference engine. All
+   three agents run on MiniMax via an OpenAI-compatible client
+   (`agents/minimax_agent.py`, docs/adr/0019). Optional
+   `MINIMAX_BASE_URL` (default `https://api.minimax.io/v1`; use the `.com`
+   endpoint in China).
+2. ➖ **Secret**: `CURSOR_API_KEY` — kept provisioned but **dormant**. The
+   Cursor SDK engine was replaced by MiniMax (docs/adr/0019); no agent
+   consumes this key. Left in place for a possible rollback.
 3. ⬜ **Secret**: `GH_PAT` — a token that can push `.github/workflows/*`
    (`workflow` scope). `GITHUB_TOKEN` cannot; issue #61 failed on that.
    Needed for any ticket that adds or edits GitHub Actions workflows.
@@ -87,9 +89,8 @@ finds them on its own; failed tickets retry themselves.
 cd agents
 python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-export CURSOR_API_KEY="cursor_..."
-export MINIMAX_API_KEY="sk-cp-..."   # optional locally; workflows always set it
-export MINIMAX_BASE_URL="https://api.minimax.io/v1"
+export MINIMAX_API_KEY="..."                        # harness inference engine
+# export MINIMAX_BASE_URL="https://api.minimax.io/v1"  # optional override
 gh auth login   # gh CLI must be authenticated with repo write access
 
 python prepare_iteration.py 123        # bumps agent:iteration-N, prints new N
@@ -109,8 +110,10 @@ python try_finalize.py 123 1           # no-ops until gate+test+review labels ex
   issue on every merge done via `gh pr merge` in practice; worth
   double-checking, or closing the issue explicitly as a fallback in the
   auto-merge workflow step.
-- MiniMax model IDs must be locally executable on the GitHub Actions
-  runner the same way ADR-0014 required for Cursor-native IDs. Current
-  defaults: Dev `MiniMax-M2.5-highspeed`, Test/Review `MiniMax-M3`
-  (docs/adr/0017). Silent local rejections still fail closed with the
-  ADR-0014 diagnostic in agent comments.
+- MiniMax model IDs (`MiniMax-M2.5-highspeed` Dev, `MiniMax-M3`
+  Test/Review) are not yet verified against the live MiniMax catalog for
+  this account (docs/adr/0019). The first real Dev run confirms them; a
+  bad ID fails closed (`agent:needs-rework`) with a diagnostic from
+  `minimax_agent.py`. Override via the `*_AGENT_MODEL` workflow env.
+- `agents/sdk_run.py` (Cursor-specific run diagnostics) is now unused;
+  left in place pending a cleanup ADR.

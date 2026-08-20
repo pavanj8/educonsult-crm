@@ -27,6 +27,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     env:
+      # CURSOR_API_KEY kept provisioned but dormant (docs/adr/0019).
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
       MINIMAX_BASE_URL: https://api.minimax.io/v1
