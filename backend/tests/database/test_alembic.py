@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "e5f6a7b8c9d0"
+HEAD_REVISION = "f6a7b8c9d0e1"
 
 
 def _alembic_config() -> Config:
@@ -52,6 +52,7 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "users" in table_names
         assert "tenants" in table_names
         assert "branches" in table_names
+        assert "stage_transitions" in table_names
         user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
         assert "is_active" in user_columns
         assert "name" in user_columns
@@ -60,6 +61,13 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "target_country_id" in user_columns
         assert "target_university_id" in user_columns
         assert "target_program_id" in user_columns
+        stage_columns = {column["name"] for column in inspect(connection).get_columns("stage_transitions")}
+        assert "from_stage" in stage_columns
+        assert "to_stage" in stage_columns
+        assert "tenant_id" in stage_columns
+        assert "is_active" in stage_columns
+        assert "created_at" in stage_columns
+        assert "updated_at" in stage_columns
 
 
 def test_alembic_downgrade_base_clears_revision(tmp_path, monkeypatch):
