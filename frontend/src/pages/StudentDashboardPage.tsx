@@ -1,8 +1,27 @@
 import { useId, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 
-import { DEMO_UNIVERSITIES, programsForUniversity } from '../data/demoMasterData'
+import {
+  DEMO_UNIVERSITIES,
+  programName,
+  programsForUniversity,
+  universityName,
+} from '../data/demoMasterData'
+import { useApplications } from '../hooks/useApplications'
 import { useCreateApplication } from '../hooks/useCreateApplication'
+import { PIPELINE_STAGE_LABELS } from '../types/application'
+
+function formatDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return iso
+  }
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
 
 function formatStageLabel(stage: string): string {
   return stage
@@ -12,6 +31,7 @@ function formatStageLabel(stage: string): string {
 }
 
 export default function StudentDashboardPage() {
+  const { applications, loading, error, reload } = useApplications()
   const { submitting, createError, createApplication } = useCreateApplication()
   const [selectedUniversityId, setSelectedUniversityId] = useState<number | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -50,17 +70,16 @@ export default function StudentDashboardPage() {
         university_id: universityIdValue,
         program_id: programIdValue,
       })
-      const university = DEMO_UNIVERSITIES.find((item) => item.id === created.university_id)
-      const program = programsForUniversity(created.university_id).find(
-        (item) => item.id === created.program_id,
-      )
-      const universityLabel = university?.name ?? `University #${created.university_id}`
-      const programLabel = program?.name ?? `Program #${created.program_id}`
+      const universityLabel = universityName(created.university_id)
+      const programLabel =
+        programName(created.university_id, created.program_id) ??
+        `Program #${created.program_id}`
       setSuccessMessage(
         `Application created for ${programLabel} at ${universityLabel}. Current stage: ${formatStageLabel(created.stage)}.`,
       )
       event.currentTarget.reset()
       setSelectedUniversityId(null)
+      await reload()
     } catch {
       // createError is set by the hook
     }
@@ -84,6 +103,56 @@ export default function StudentDashboardPage() {
           Start a new university application or track your study abroad journey.
         </p>
       </header>
+
+      <section
+        className="student-dashboard__section"
+        aria-labelledby="applications-list-heading"
+      >
+        <h3 id="applications-list-heading">My applications</h3>
+        {loading && <p className="student-dashboard__status">Loading applications…</p>}
+        {error && (
+          <p
+            className="student-dashboard__status student-dashboard__status--error"
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
+        {!loading && !error && applications.length === 0 && (
+          <p className="student-dashboard__status">No applications yet.</p>
+        )}
+        {!loading && !error && applications.length > 0 && (
+          <div className="application-table-wrapper">
+            <table className="application-table" data-testid="application-table">
+              <thead>
+                <tr>
+                  <th scope="col">University</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Stage</th>
+                  <th scope="col">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {applications.map((application) => (
+                  <tr key={application.id} data-testid={`application-row-${application.id}`}>
+                    <td>{universityName(application.university_id)}</td>
+                    <td>{programName(application.university_id, application.program_id)}</td>
+                    <td>
+                      <span
+                        className="application-table__stage"
+                        data-testid={`application-stage-${application.id}`}
+                      >
+                        {PIPELINE_STAGE_LABELS[application.stage]}
+                      </span>
+                    </td>
+                    <td>{formatDate(application.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section
         className="student-dashboard__section"

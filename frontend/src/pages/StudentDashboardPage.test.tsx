@@ -6,7 +6,7 @@ import { AuthProvider } from '../store/authStore'
 import StudentDashboardPage from './StudentDashboardPage'
 
 const mockStudent = {
-  id: 8,
+  id: 42,
   email: 'student@demo.test',
   role: 'student' as const,
   tenant_id: 10,
@@ -16,13 +16,36 @@ const mockStudent = {
 const mockApplication = {
   id: 1,
   tenant_id: 10,
-  student_id: 8,
+  student_id: 42,
   university_id: 1,
   program_id: 10,
   stage: 'registered' as const,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 }
+
+const mockApplications = [
+  {
+    id: 1,
+    tenant_id: 10,
+    student_id: 42,
+    university_id: 1,
+    program_id: 10,
+    stage: 'registered' as const,
+    created_at: '2026-01-15T10:00:00Z',
+    updated_at: '2026-01-15T10:00:00Z',
+  },
+  {
+    id: 2,
+    tenant_id: 10,
+    student_id: 42,
+    university_id: 2,
+    program_id: 20,
+    stage: 'document_verification' as const,
+    created_at: '2026-02-01T10:00:00Z',
+    updated_at: '2026-02-02T10:00:00Z',
+  },
+]
 
 function renderStudentDashboard() {
   return render(
@@ -37,10 +60,27 @@ describe('StudentDashboardPage', () => {
     vi.restoreAllMocks()
     localStorage.clear()
     localStorage.setItem('access_token', 'test-token')
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockStudent,
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString()
+      if (url.endsWith('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockStudent,
+        } as Response
+      }
+      if (url.endsWith('/applications')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockApplications,
+        } as Response
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Not found' }),
+      } as Response
     }) as typeof fetch
   })
 
@@ -82,18 +122,36 @@ describe('StudentDashboardPage', () => {
 
   it('creates an application and shows success message', async () => {
     const user = userEvent.setup()
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockStudent,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 201,
-        json: async () => mockApplication,
-      }) as typeof fetch
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString()
+      if (url.endsWith('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockStudent,
+        } as Response
+      }
+      if (url.endsWith('/applications') && init?.method === 'POST') {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => mockApplication,
+        } as Response
+      }
+      if (url.endsWith('/applications')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [mockApplication],
+        } as Response
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Not found' }),
+      } as Response
+    })
+    globalThis.fetch = fetchMock as typeof fetch
 
     renderStudentDashboard()
 
@@ -108,7 +166,7 @@ describe('StudentDashboardPage', () => {
       )
     })
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/applications', {
+    expect(fetchMock).toHaveBeenCalledWith('/applications', {
       method: 'POST',
       body: JSON.stringify({ university_id: 1, program_id: 10 }),
       headers: {
@@ -120,18 +178,35 @@ describe('StudentDashboardPage', () => {
 
   it('shows API error when creation fails', async () => {
     const user = userEvent.setup()
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockStudent,
-      })
-      .mockResolvedValueOnce({
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString()
+      if (url.endsWith('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockStudent,
+        } as Response
+      }
+      if (url.endsWith('/applications') && init?.method === 'POST') {
+        return {
+          ok: false,
+          status: 403,
+          json: async () => ({ detail: 'Insufficient permissions' }),
+        } as Response
+      }
+      if (url.endsWith('/applications')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockApplications,
+        } as Response
+      }
+      return {
         ok: false,
-        status: 403,
-        json: async () => ({ detail: 'Insufficient permissions' }),
-      }) as typeof fetch
+        status: 404,
+        json: async () => ({ detail: 'Not found' }),
+      } as Response
+    }) as typeof fetch
 
     renderStudentDashboard()
 
@@ -147,14 +222,31 @@ describe('StudentDashboardPage', () => {
 
   it('shows generic error when transport fails', async () => {
     const user = userEvent.setup()
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockStudent,
-      })
-      .mockImplementationOnce(() => Promise.reject(new Error('network down'))) as typeof fetch
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString()
+      if (url.endsWith('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockStudent,
+        } as Response
+      }
+      if (url.endsWith('/applications') && init?.method === 'POST') {
+        return Promise.reject(new Error('network down'))
+      }
+      if (url.endsWith('/applications')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockApplications,
+        } as Response
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Not found' }),
+      } as Response
+    }) as typeof fetch
 
     renderStudentDashboard()
 
@@ -166,5 +258,97 @@ describe('StudentDashboardPage', () => {
     expect(await screen.findByTestId('application-error')).toHaveTextContent(
       'Failed to create application',
     )
+  })
+
+  it('renders application list after loading', async () => {
+    renderStudentDashboard()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('application-table')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('University of Toronto')).toBeInTheDocument()
+    expect(screen.getByText('MSc Computer Science')).toBeInTheDocument()
+    expect(screen.getByText('University of Melbourne')).toBeInTheDocument()
+    expect(screen.getByText('Master of Engineering')).toBeInTheDocument()
+    expect(screen.getByTestId('application-stage-1')).toHaveTextContent('Registered')
+    expect(screen.getByTestId('application-stage-2')).toHaveTextContent('Document Verification')
+  })
+
+  it('shows empty state when no applications exist', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString()
+      if (url.endsWith('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockStudent,
+        } as Response
+      }
+      if (url.endsWith('/applications')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [],
+        } as Response
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Not found' }),
+      } as Response
+    }) as typeof fetch
+
+    renderStudentDashboard()
+
+    await waitFor(() => {
+      expect(screen.getByText('No applications yet.')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('application-table')).not.toBeInTheDocument()
+  })
+
+  it('shows error state when list fetch fails', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString()
+      if (url.endsWith('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockStudent,
+        } as Response
+      }
+      if (url.endsWith('/applications')) {
+        return {
+          ok: false,
+          status: 403,
+          json: async () => ({ detail: 'Insufficient permissions' }),
+        } as Response
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Not found' }),
+      } as Response
+    }) as typeof fetch
+
+    renderStudentDashboard()
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('You do not have permission to view applications'),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('shows independent stage per application row', async () => {
+    renderStudentDashboard()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('application-row-1')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('application-stage-1')).toHaveTextContent('Registered')
+    expect(screen.getByTestId('application-stage-2')).toHaveTextContent('Document Verification')
   })
 })

@@ -988,6 +988,53 @@ body {
   color: #6b7280;
 }
 
+.student-dashboard__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.student-dashboard__status--error {
+  color: #dc2626;
+}
+
+.application-table-wrapper {
+  overflow-x: auto;
+}
+
+.application-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.application-table th,
+.application-table td {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.application-table th {
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+}
+
+.application-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.application-table__stage {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .application-form {
   display: flex;
   flex-direction: column;
