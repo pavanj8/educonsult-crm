@@ -220,45 +220,81 @@ describe('CounselorDashboardPage', () => {
     expect(screen.getByTestId('retry-button')).toBeInTheDocument()
   })
 
-  it('calls API with stage filter when stage filter changes', async () => {
-    mockFetchQueue.mockResolvedValue([mockQueueData[0]])
-    mockFetchCounts.mockResolvedValue({ registered: 1 })
+  it('filters queue by stage when stage filter changes and renders filtered results', async () => {
+    // First call returns all data, second call returns filtered data
+    mockFetchQueue
+      .mockResolvedValueOnce(mockQueueData) // Initial load with all data
+      .mockResolvedValueOnce([mockQueueData[0]]) // Filtered to 'registered' stage only
+    mockFetchCounts.mockResolvedValue({ registered: 1, counseling: 1 })
 
     renderPage()
 
+    // Wait for initial data to load
     await waitFor(() => {
       expect(screen.getByTestId('stage-filter')).toBeInTheDocument()
     })
 
-    // Change the stage filter
+    // Both students should be visible initially
+    expect(screen.getByText('Alice Johnson')).toBeInTheDocument()
+    expect(screen.getByText('Bob Smith')).toBeInTheDocument()
+
+    // Change the stage filter to 'registered'
     const stageSelect = screen.getByTestId('stage-filter')
     await userEvent.selectOptions(stageSelect, 'registered')
 
+    // Verify the API was called with the stage filter
     await waitFor(() => {
-      // Verify the API was called with the stage filter
       expect(mockFetchQueue).toHaveBeenCalledWith({ stage: 'registered' })
     })
+
+    // Verify the rendered output reflects the filter:
+    // Alice (registered stage) should be visible
+    expect(screen.getByText('Alice Johnson')).toBeInTheDocument()
+    // Bob (counseling stage) should NOT be visible after filtering
+    expect(screen.queryByText('Bob Smith')).not.toBeInTheDocument()
   })
 
-  it('calls API with search filter when search is entered', async () => {
-    mockFetchQueue.mockResolvedValue([mockQueueData[0]])
-    mockFetchCounts.mockResolvedValue({ registered: 1 })
+  it('filters queue by search when search is entered and renders filtered results', async () => {
+    // Use mockImplementation to return filtered results for any search containing 'alice'
+    // This handles multiple onChange events from userEvent.type
+    mockFetchQueue.mockImplementation((filter?: { stage?: string; search?: string }) => {
+      if (filter?.search && filter.search.toLowerCase().includes('alice')) {
+        return Promise.resolve([mockQueueData[0]])
+      }
+      if (filter?.search && filter.search.toLowerCase().includes('bob')) {
+        return Promise.resolve([mockQueueData[1]])
+      }
+      return Promise.resolve(mockQueueData)
+    })
+    mockFetchCounts.mockResolvedValue({ registered: 1, counseling: 1 })
 
     renderPage()
 
+    // Wait for initial data to load
     await waitFor(() => {
       expect(screen.getByTestId('queue-search')).toBeInTheDocument()
     })
 
-    // Type in the search field
+    // Both students should be visible initially
+    expect(screen.getByText('Alice Johnson')).toBeInTheDocument()
+    expect(screen.getByText('Bob Smith')).toBeInTheDocument()
+
+    // Type in the search field to filter for 'Alice'
     await userEvent.type(screen.getByTestId('queue-search'), 'Alice')
 
+    // Wait for the filter to be applied and UI to update
     await waitFor(() => {
-      // The API should eventually be called with the search filter
+      // Verify the API was eventually called with the search filter
       expect(mockFetchQueue).toHaveBeenCalledWith(
         expect.objectContaining({ search: expect.stringContaining('Alice') })
       )
     })
+
+    // Verify the rendered output reflects the filter:
+    // Alice should be visible
+    expect(screen.getByText('Alice Johnson')).toBeInTheDocument()
+    // Bob should NOT be visible after filtering
+    expect(screen.queryByText('Bob Smith')).not.toBeInTheDocument()
   })
 
   it('shows empty state when filters return no results', async () => {
@@ -329,5 +365,82 @@ describe('CounselorDashboardPage', () => {
     // Check that dates are formatted in the table (Jan 15, 2026 format)
     expect(screen.getByText(/Jan 15, 2026/)).toBeInTheDocument()
     expect(screen.getByText(/Jan 16, 2026/)).toBeInTheDocument()
+  })
+
+  it('clears search filter when clear filters button is clicked', async () => {
+    // Return mockQueueData for both initial load and after clearing filters
+    mockFetchQueue
+      .mockResolvedValueOnce(mockQueueData) // Initial load
+      .mockResolvedValueOnce(mockQueueData) // After clearing filters
+    mockFetchCounts.mockResolvedValue(mockCounts)
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-search')).toBeInTheDocument()
+    })
+
+    // Apply search filter - use clear + paste for predictable behavior
+    await userEvent.clear(screen.getByTestId('queue-search'))
+    await userEvent.paste('Alice')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('clear-filters')).toBeInTheDocument()
+    })
+
+    // Clear filters
+    await userEvent.click(screen.getByTestId('clear-filters'))
+
+    // Verify search input is cleared
+    expect((screen.getByTestId('queue-search') as HTMLInputElement).value).toBe('')
+  })
+
+  it('renders stage tags with correct badge colors', async () => {
+    mockFetchQueue.mockResolvedValueOnce(mockQueueData)
+    mockFetchCounts.mockResolvedValueOnce(mockCounts)
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-table')).toBeInTheDocument()
+    })
+
+    // Check stage tags have the expected styling via CSS custom properties
+    const registeredTag = screen.getByTestId('stage-tag-1')
+    expect(registeredTag).toHaveStyle({ '--badge-color': '#6b7280' })
+
+    const counselingTag = screen.getByTestId('stage-tag-2')
+    expect(counselingTag).toHaveStyle({ '--badge-color': '#3b82f6' })
+  })
+
+  it('updates queue when stage badge is clicked', async () => {
+    mockFetchQueue
+      .mockResolvedValueOnce(mockQueueData) // Initial load with all data
+      .mockResolvedValueOnce([mockQueueData[1]]) // Filtered to 'counseling' stage
+    mockFetchCounts.mockResolvedValue({ registered: 1, counseling: 1 })
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stage-badge-counseling')).toBeInTheDocument()
+    })
+
+    // Both students should be visible initially
+    expect(screen.getByText('Alice Johnson')).toBeInTheDocument()
+    expect(screen.getByText('Bob Smith')).toBeInTheDocument()
+
+    // Click on the counseling stage badge
+    await userEvent.click(screen.getByTestId('stage-badge-counseling'))
+
+    // Verify the API was called with the stage filter
+    await waitFor(() => {
+      expect(mockFetchQueue).toHaveBeenCalledWith({ stage: 'counseling' })
+    })
+
+    // Verify the rendered output reflects the filter:
+    // Bob (counseling stage) should be visible
+    expect(screen.getByText('Bob Smith')).toBeInTheDocument()
+    // Alice (registered stage) should NOT be visible after filtering
+    expect(screen.queryByText('Alice Johnson')).not.toBeInTheDocument()
   })
 })
