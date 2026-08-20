@@ -1,6 +1,6 @@
 # ADR-0014: Local SDK runtime only executes a subset of listed models
 
-**Status**: Accepted — implemented
+**Status**: Accepted — model IDs superseded by [ADR-0017](0017-minimax-api-key-for-agent-models.md)
 **Date**: 2026-08-19
 
 ## Context

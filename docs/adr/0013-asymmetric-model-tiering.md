@@ -1,6 +1,6 @@
 # ADR-0013: Asymmetric model tiering — cheap model to write, high-end model to verify
 
-**Status**: Accepted — model IDs superseded by [ADR-0014](0014-local-sdk-runtime-model-subset.md)
+**Status**: Accepted — model IDs superseded by [ADR-0014](0014-local-sdk-runtime-model-subset.md), then [ADR-0017](0017-minimax-api-key-for-agent-models.md)
 **Date**: 2026-08-19
 
 ## Context

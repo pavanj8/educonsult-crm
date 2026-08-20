@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -21,15 +22,16 @@ from pathlib import Path
 from cursor_sdk import Agent, CursorAgentError, LocalAgentOptions
 
 import github_ticket_utils as ticket_utils
+import llm_env
 import sdk_run
 import target_app
 
+llm_env.configure_minimax_env()
+
 REPO_ROOT = target_app.REPO_ROOT
-# Fast/cheap tier: Dev Agent writes a lot of code across many tickets, and
-# composer-2.5 is purpose-built for agentic coding loops (edit -> run ->
-# fix). Test/Review intentionally use a stronger model instead -- see
-# docs/adr/0013.
-DEFAULT_MODEL = "composer-2.5"
+# Fast/cheap tier for Dev. With MINIMAX_API_KEY set, defaults to
+# MiniMax-M2.5-highspeed; otherwise composer-2.5 (docs/adr/0017).
+DEFAULT_MODEL = os.environ.get("DEV_AGENT_MODEL", "composer-2.5")
 
 
 def read_text(path: Path) -> str:
@@ -151,6 +153,7 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
     try:
         with Agent.create(
             model=model,
+            api_key=llm_env.cursor_api_key(),
             local=LocalAgentOptions(cwd=str(REPO_ROOT), auto_review=False),
         ) as agent:
             run = agent.send(prompt)

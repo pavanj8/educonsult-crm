@@ -63,8 +63,12 @@ finds them on its own; failed tickets retry themselves.
 ## Required repo setup (one-time)
 
 1. ✅ **Secret**: `CURSOR_API_KEY` set in repo Settings -> Secrets and
-   variables -> Actions (done 2026-08-19).
-2. ⬜ **Secret**: `GH_PAT` — a token that can push `.github/workflows/*`
+   variables -> Actions (done 2026-08-19). Still required for Cursor SDK
+   agent orchestration even when using MiniMax for model inference.
+2. ✅ **Secret**: `MINIMAX_API_KEY` — MiniMax Token Plan key for LLM
+   calls (Dev/Test/Review model inference). Mapped to OpenAI-compatible
+   env vars at agent startup (`agents/llm_env.py`, docs/adr/0017).
+3. ⬜ **Secret**: `GH_PAT` — a token that can push `.github/workflows/*`
    (`workflow` scope). `GITHUB_TOKEN` cannot; issue #61 failed on that.
    Needed for any ticket that adds or edits GitHub Actions workflows.
 2. ✅ **Labels**: `agent:ready-for-dev`, `agent:iteration-1` through
@@ -84,6 +88,8 @@ cd agents
 python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 export CURSOR_API_KEY="cursor_..."
+export MINIMAX_API_KEY="sk-cp-..."   # optional locally; workflows always set it
+export MINIMAX_BASE_URL="https://api.minimax.io/v1"
 gh auth login   # gh CLI must be authenticated with repo write access
 
 python prepare_iteration.py 123        # bumps agent:iteration-N, prints new N
@@ -103,8 +109,8 @@ python try_finalize.py 123 1           # no-ops until gate+test+review labels ex
   issue on every merge done via `gh pr merge` in practice; worth
   double-checking, or closing the issue explicitly as a fallback in the
   auto-merge workflow step.
-- `Cursor.models.list()` IDs are not all executable on the local SDK
-  runtime the harness uses. Test/Review currently run `grok-4.6`, not
-  `claude-opus-5` — see `docs/adr/0014`. Changing those IDs in
-  `.github/workflows/agent-harness.yml` without a local probe will
-  silently fail-closed (`agent:needs-rework`) again.
+- MiniMax model IDs must be locally executable on the GitHub Actions
+  runner the same way ADR-0014 required for Cursor-native IDs. Current
+  defaults: Dev `MiniMax-M2.5-highspeed`, Test/Review `MiniMax-M3`
+  (docs/adr/0017). Silent local rejections still fail closed with the
+  ADR-0014 diagnostic in agent comments.

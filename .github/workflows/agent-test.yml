@@ -28,8 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+      MINIMAX_BASE_URL: https://api.minimax.io/v1
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TEST_AGENT_MODEL: grok-4.6
+      TEST_AGENT_MODEL: MiniMax-M3
     steps:
       - name: Checkout issue branch
         uses: actions/checkout@v4

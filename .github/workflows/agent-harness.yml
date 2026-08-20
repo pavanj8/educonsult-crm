@@ -43,12 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+      MINIMAX_BASE_URL: https://api.minimax.io/v1
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Asymmetric model tiering (docs/adr/0013, docs/adr/0014): cheap
-      # model to write, strongest *locally executable* model to verify.
-      # Do not pick IDs from Cursor.models.list() alone -- many listed
-      # IDs fail immediately on the local runtime.
-      DEV_AGENT_MODEL: composer-2.5
+      # Asymmetric model tiering (docs/adr/0013, docs/adr/0017): cheap
+      # MiniMax model to write, stronger MiniMax model to verify. LLM calls
+      # route through MINIMAX_API_KEY -> OPENAI_* env (see agents/llm_env.py).
+      DEV_AGENT_MODEL: MiniMax-M2.5-highspeed
 
     steps:
       - name: Determine issue number

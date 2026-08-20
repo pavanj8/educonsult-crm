@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -30,14 +31,16 @@ from pathlib import Path
 from cursor_sdk import Agent, CursorAgentError, LocalAgentOptions
 
 import github_ticket_utils as ticket_utils
+import llm_env
 import sdk_run
 import target_app
 
+llm_env.configure_minimax_env()
+
 REPO_ROOT = target_app.REPO_ROOT
-# Strongest model empirically executable on the local SDK runtime, not
-# the account's listed high-end IDs (claude-opus-5 / gpt-5.x fail
-# immediately locally). See docs/adr/0013 and docs/adr/0014.
-DEFAULT_MODEL = "grok-4.6"
+# Stronger verify tier. With MINIMAX_API_KEY set, defaults to MiniMax-M3;
+# otherwise grok-4.6 (docs/adr/0014, docs/adr/0017).
+DEFAULT_MODEL = os.environ.get("TEST_AGENT_MODEL", "grok-4.6")
 
 
 def read_text(path: Path) -> str:
@@ -179,6 +182,7 @@ def run_test_agent(issue: dict, model: str, base_url: str, iteration: int) -> tu
     try:
         with Agent.create(
             model=model,
+            api_key=llm_env.cursor_api_key(),
             local=LocalAgentOptions(cwd=str(REPO_ROOT), auto_review=False),
         ) as agent:
             run = agent.send(prompt)

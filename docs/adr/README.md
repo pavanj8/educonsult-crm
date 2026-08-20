@@ -44,3 +44,4 @@ receive new entries.
 | [0014](0014-local-sdk-runtime-model-subset.md) | Local SDK runtime only executes a subset of listed models | Accepted — implemented | 2026-08-19 |
 | [0015](0015-auto-retry-needs-rework.md) | Auto-retry `agent:needs-rework` with Test/Review feedback | Accepted — implemented | 2026-08-19 |
 | [0016](0016-pipeline-parallelism.md) | Pipeline parallelism: Dev, Test, and Review on different tickets | Accepted — implemented | 2026-08-19 |
+| [0017](0017-minimax-api-key-for-agent-models.md) | MiniMax API key for agent harness model inference | Accepted — implemented | 2026-08-20 |
