@@ -1,5 +1,10 @@
 import { AppRouter } from './routes'
+import { AuthProvider } from './store/authStore'
 
 export default function App() {
-  return <AppRouter />
+  return (
+    <AuthProvider>
+      <AppRouter />
+    </AuthProvider>
+  )
 }

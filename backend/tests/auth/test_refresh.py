@@ -1,7 +1,15 @@
+<<<<<<< HEAD
 import pytest
 
 from app.auth import (
     create_access_token,
+=======
+"""Token refresh endpoint tests (E5, Journey J44, issue #88)."""
+
+import pytest
+
+from app.auth import (
+>>>>>>> origin/main
     create_refresh_token,
     verify_access_token,
     verify_refresh_token,
@@ -129,6 +137,41 @@ def test_refresh_rejects_token_for_deleted_user(client):
     assert response.json() == {"detail": "Invalid refresh token"}
 
 
+<<<<<<< HEAD
+=======
+def test_refresh_returns_503_when_database_unavailable(client):
+    from unittest.mock import MagicMock
+
+    from sqlalchemy.exc import OperationalError
+
+    user = make_authenticated_user(Role.COUNSELOR)
+    refresh_token = create_refresh_token(user)
+
+    mock_session = MagicMock()
+    mock_session.get.side_effect = OperationalError("stmt", {}, Exception("no such table"))
+
+    def override_get_db():
+        yield mock_session
+
+    from app.db.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = client.post(
+            "/auth/refresh",
+            json={"refresh_token": refresh_token},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Authentication service is temporarily unavailable",
+    }
+
+
+>>>>>>> origin/main
 def test_refresh_uses_current_user_record(client, db_session):
     password = "current-user-password"
     user = make_db_user(

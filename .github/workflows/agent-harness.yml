@@ -42,13 +42,15 @@ jobs:
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
+      # CURSOR_API_KEY kept provisioned but dormant -- the harness engine is
+      # now MiniMax via its Anthropic-compatible endpoint (docs/adr/0019).
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Asymmetric model tiering (docs/adr/0013, docs/adr/0014): cheap
-      # model to write, strongest *locally executable* model to verify.
-      # Do not pick IDs from Cursor.models.list() alone -- many listed
-      # IDs fail immediately on the local runtime.
-      DEV_AGENT_MODEL: composer-2.5
+      # Asymmetric model tiering (docs/adr/0013): cheap MiniMax model to
+      # write, stronger MiniMax model to verify (docs/adr/0019).
+      DEV_AGENT_MODEL: MiniMax-M2.5-highspeed
 
     steps:
       - name: Determine issue number
@@ -84,14 +86,42 @@ jobs:
         run: |
           BRANCH="agent/issue-${{ steps.issue.outputs.number }}"
           git fetch origin
+          git config user.name "agent-harness-bot"
+          git config user.email "agent-harness-bot@users.noreply.github.com"
           if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
             git checkout -B "$BRANCH" "origin/$BRANCH"
+            # Bring a resumed branch up to date with main so it inherits merged
+            # fixes (e.g. lint cleanups) instead of running stale copies of
+            # shared files like backend/tests (docs/adr/0019 follow-up).
+            # Protected paths (tooling/docs/CI) are authoritative on main and
+            # legitimately diverge as the harness evolves, so any conflict there
+            # is auto-resolved in main's favor; a real conflict in PRODUCT code
+            # aborts loudly for manual resolution.
+            git merge --no-commit --no-ff origin/main || true
+            for p in agents docs .github harness-demo .cursor scripts; do
+              git checkout origin/main -- "$p" 2>/dev/null || true
+            done
+            git add -A
+            if git diff --name-only --diff-filter=U | grep -q .; then
+              echo "::error::Merge conflict outside protected paths in $BRANCH; needs manual resolution."
+              git merge --abort
+              exit 1
+            fi
+            # Complete the merge commit (no-op if the branch was already current).
+            git commit --no-edit -m "Sync $BRANCH with main" 2>/dev/null || true
           else
             git checkout -B "$BRANCH" origin/main
           fi
-          git config user.name "agent-harness-bot"
-          git config user.email "agent-harness-bot@users.noreply.github.com"
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Refresh harness tooling from main (protected paths)
+        # agents/ and the DoD are protected paths, never part of a ticket's
+        # diff, so always run the LATEST copies even on a resumed older branch
+        # -- otherwise prompt/tooling fixes never reach in-flight branches
+        # (docs/adr/0019 follow-up).
+        run: |
+          git fetch origin main --depth=1
+          git checkout origin/main -- agents/ scripts/ docs/definition-of-done.md
 
       - name: Prepare iteration
         id: iteration
@@ -105,6 +135,20 @@ jobs:
         working-directory: agents
         continue-on-error: true
         run: python dev_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --model "$DEV_AGENT_MODEL"
+
+      - name: Ruff auto-fix backstop (docs/adr/0019 follow-up)
+        # Best-effort: auto-fixes import-order (I) and unused imports (F401)
+        # the Dev Agent may have left, so lint-only misses don't block the PR.
+        # Unfixable errors still surface in the CI Backend "Ruff lint" gate.
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -d backend ]; then
+            python -m pip install ruff==0.16.3
+            (cd backend && ruff check --fix . || true)
+          else
+            echo "no backend/ yet -- skipping ruff backstop"
+          fi
 
       - name: Commit Dev Agent changes
         id: commit

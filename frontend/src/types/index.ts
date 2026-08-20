@@ -1,1 +1,3 @@
-/** Shared frontend types are added in later tickets. */
+export type { AuthUser, LoginCredentials, TokenResponse, UserRole } from './auth'
+export type { RegisterStudentRequest, RegisterStudentResponse } from './student'
+export type { Tenant, TenantCreateRequest } from './tenant'

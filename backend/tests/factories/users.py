@@ -66,6 +66,7 @@ def make_db_user(
     password: str = "test-password",
     tenant_id: int | None | Any = _AUTO,
     branch_id: int | None | Any = _AUTO,
+    is_active: bool = True,
 ) -> User:
     """Persist a ``User`` row with a bcrypt password hash for integration tests."""
     auth_user = make_authenticated_user(
@@ -80,6 +81,7 @@ def make_db_user(
         role=auth_user.role,
         tenant_id=auth_user.tenant_id,
         branch_id=auth_user.branch_id,
+        is_active=is_active,
         created_at=now,
         updated_at=now,
     )

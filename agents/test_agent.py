@@ -13,13 +13,14 @@ failing, deferring entirely to the Review Agent and the hard test gate for
 that kind of ticket.
 
 Usage:
-    export CURSOR_API_KEY=cursor_...
+    export MINIMAX_API_KEY=...
     python agents/test_agent.py <issue_number> --iteration 1
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -27,17 +28,54 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-from cursor_sdk import Agent, CursorAgentError, LocalAgentOptions
-
 import github_ticket_utils as ticket_utils
-import sdk_run
+import llm_env
+import minimax_agent
 import target_app
 
+llm_env.configure_minimax_env()
+
 REPO_ROOT = target_app.REPO_ROOT
-# Strongest model empirically executable on the local SDK runtime, not
-# the account's listed high-end IDs (claude-opus-5 / gpt-5.x fail
-# immediately locally). See docs/adr/0013 and docs/adr/0014.
-DEFAULT_MODEL = "grok-4.6"
+# Stronger MiniMax verify tier (docs/adr/0019). Overridable via env.
+DEFAULT_MODEL = os.environ.get("TEST_AGENT_MODEL", llm_env.DEFAULT_VERIFY_MODEL)
+
+# Structured final-report tool (docs/adr/0019 follow-up). The agent calls this
+# to deliver its verdict instead of emitting a ```json block in free text,
+# which silently produced UNKNOWN when the model ran long or formatted loosely.
+REPORT_TOOL = {
+    "name": "submit_report",
+    "description": (
+        "Submit your FINAL structured test report. Call this exactly once, when "
+        "you have finished testing. Calling it ends the session, so do all your "
+        "testing first."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "enum": ["PASS", "FAIL"]},
+            "issue_number": {"type": "integer"},
+            "iteration": {"type": "integer"},
+            "failures": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "test": {"type": "string"},
+                        "expected": {"type": "string"},
+                        "actual": {"type": "string"},
+                        "root_cause": {"type": "string"},
+                        "severity": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]},
+                        "evidence": {"type": "string"},
+                        "recommendation": {"type": "string"},
+                    },
+                    "required": ["test", "expected", "actual", "severity"],
+                },
+            },
+            "summary": {"type": "string"},
+        },
+        "required": ["status", "failures", "summary"],
+    },
+}
 
 
 def read_text(path: Path) -> str:
@@ -141,26 +179,14 @@ STRICT RULES:
    (edge case not handled cleanly), or LOW (cosmetic/wording).
 5. This is iteration {iteration} of testing this issue.
 
-## Final report format
-End your response with a fenced ```json block with EXACTLY this shape
-(use an empty list for "failures" if status is PASS):
-{{
-  "status": "PASS" or "FAIL",
-  "issue_number": {issue['number']},
-  "iteration": {iteration},
-  "failures": [
-    {{
-      "test": "short_test_name",
-      "expected": "what should have happened",
-      "actual": "what actually happened",
-      "root_cause": "your diagnosis",
-      "severity": "HIGH" or "MEDIUM" or "LOW",
-      "evidence": "concrete evidence, e.g. request/response",
-      "recommendation": "what the Dev Agent should do to fix it"
-    }}
-  ],
-  "summary": "one paragraph overview of what you tested and found"
-}}
+## Finishing — deliver your report via the tool
+When (and only when) you have finished testing, call the `submit_report` tool
+with your verdict. Do NOT print the report as text; the tool is the report.
+Use an empty "failures" list if status is PASS. Each failure needs: test,
+expected, actual, root_cause, severity (HIGH/MEDIUM/LOW), evidence,
+recommendation. Set issue_number={issue['number']} and iteration={iteration}.
+Be efficient — gather what you need, then submit; do not keep exploring after
+you can already judge the acceptance criteria.
 """
 
 
@@ -175,27 +201,7 @@ def run_test_agent(issue: dict, model: str, base_url: str, iteration: int) -> tu
     )
 
     print(f"--- Test Agent starting for issue #{issue['number']} against {base_url} (model={model}) ---\n")
-
-    try:
-        with Agent.create(
-            model=model,
-            local=LocalAgentOptions(cwd=str(REPO_ROOT), auto_review=False),
-        ) as agent:
-            run = agent.send(prompt)
-            print(f"[test-agent] agent_id={agent.agent_id} run_id={run.id}")
-            final_text_parts: list[str] = []
-            for message in run.messages():
-                if message.type == "assistant":
-                    for block in message.message.content:
-                        if getattr(block, "type", None) == "text":
-                            sys.stdout.write(block.text)
-                            sys.stdout.flush()
-                            final_text_parts.append(block.text)
-            result = run.wait()
-            return sdk_run.finish_run("test-agent", result, "".join(final_text_parts))
-    except CursorAgentError as err:
-        print(f"[test-agent] STARTUP FAILURE: {err}", file=sys.stderr)
-        return "startup_error", str(err)
+    return minimax_agent.run_agent("test-agent", prompt, model, REPO_ROOT, report_tool=REPORT_TOOL)
 
 
 def extract_json_report(final_text: str) -> dict | None:
@@ -244,7 +250,7 @@ def format_failures_markdown(failures: list[dict]) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Test Agent: independently verify a GitHub Issue via Cursor SDK")
+    parser = argparse.ArgumentParser(description="Test Agent: independently verify a GitHub Issue via MiniMax")
     parser.add_argument("issue_number", type=int)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--iteration", type=int, default=1)

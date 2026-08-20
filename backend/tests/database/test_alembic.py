@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "30da6e4e72f6"
+HEAD_REVISION = "f6a7b8c9d0e1"
 
 
 def _alembic_config() -> Config:
@@ -48,7 +48,32 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "alembic_version" in inspect(connection).get_table_names()
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
         assert version == HEAD_REVISION
-        assert "users" in inspect(connection).get_table_names()
+        table_names = inspect(connection).get_table_names()
+        assert "users" in table_names
+        assert "tenants" in table_names
+        assert "branches" in table_names
+        user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
+        assert "is_active" in user_columns
+        assert "name" in user_columns
+        assert "phone" in user_columns
+        assert "date_of_birth" in user_columns
+        assert "target_country_id" in user_columns
+        assert "target_university_id" in user_columns
+        assert "target_program_id" in user_columns
+        assert "applications" in table_names
+        application_columns = {
+            column["name"] for column in inspect(connection).get_columns("applications")
+        }
+        assert application_columns == {
+            "id",
+            "tenant_id",
+            "student_id",
+            "university_id",
+            "program_id",
+            "stage",
+            "created_at",
+            "updated_at",
+        }
 
 
 def test_alembic_downgrade_base_clears_revision(tmp_path, monkeypatch):

@@ -33,6 +33,38 @@ export const DEMO_LOGIN: LoginCredentials = {
   password: 'demo-password',
 }
 
+export const DEMO_USER = {
+  id: 1,
+  email: 'counselor@demo.test',
+  role: 'counselor' as UserRole,
+  tenant_id: 10,
+  branch_id: 1,
+}
+
+export const SUPER_ADMIN_USER = {
+  id: 99,
+  email: 'super_admin@demo.test',
+  role: 'super_admin' as UserRole,
+  tenant_id: null,
+  branch_id: null,
+}
+
+export const CONSULTANCY_OWNER_USER = {
+  id: 50,
+  email: 'owner@demo.test',
+  role: 'consultancy_owner' as UserRole,
+  tenant_id: 10,
+  branch_id: null,
+}
+
+export const BRANCH_MANAGER_USER = {
+  id: 20,
+  email: 'manager@demo.test',
+  role: 'branch_manager' as UserRole,
+  tenant_id: 10,
+  branch_id: 1,
+}
+
 const ROLE_TOKENS: Record<UserRole, string> = {
   super_admin: 'test-token-super-admin',
   consultancy_owner: 'test-token-consultancy-owner',
@@ -54,6 +86,34 @@ export function loginTokensForRole(role: UserRole): LoginTokens {
     refresh_token: `refresh-${role}`,
     token_type: 'bearer',
   }
+}
+
+export async function mockAuthMe(
+  page: Page,
+  user: typeof DEMO_USER = DEMO_USER,
+): Promise<void> {
+  await page.route('**/auth/me', async (route: Route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue()
+      return
+    }
+
+    const authHeader = route.request().headers()['authorization']
+    if (!authHeader?.startsWith('Bearer ')) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Not authenticated' }),
+      })
+      return
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(user),
+    })
+  })
 }
 
 export async function setAuthSession(page: Page, accessToken: string, refreshToken?: string): Promise<void> {

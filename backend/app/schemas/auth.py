@@ -20,7 +20,11 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+<<<<<<< HEAD
 class UserMeResponse(BaseModel):
+=======
+class MeResponse(BaseModel):
+>>>>>>> origin/main
     id: int
     email: str
     role: Role
