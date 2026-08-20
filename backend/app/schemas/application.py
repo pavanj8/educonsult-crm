@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class ApplicationStageEnum(str, Enum):
@@ -40,15 +40,3 @@ class ApplicationResponse(BaseModel):
     enrolled_at: date | None
     created_at: datetime
     updated_at: datetime
-
-
-class AssignedToMeFilters(BaseModel):
-    """Optional filters for GET /applications/assigned-to-me (E21).
-
-    All filter fields are optional. When a field is absent, no filtering
-    is applied on that dimension.
-    """
-
-    stage: ApplicationStageEnum | None = Field(default=None, description="Filter by pipeline stage")
-    branch_id: int | None = Field(default=None, ge=1, description="Filter by branch")
-    student_id: int | None = Field(default=None, ge=1, description="Filter by student ID")

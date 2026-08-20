@@ -3,6 +3,8 @@
 from datetime import date, datetime, timezone
 
 from app.models.application import Application, ApplicationStage
+from app.rbac.roles import Role
+from tests.factories.ids import next_test_id
 from tests.factories.users import make_db_user
 
 
@@ -25,8 +27,8 @@ def seed_application(
     if student_id is None:
         student = make_db_user(
             db_session,
-            role="student",  # type: ignore[arg-type]
-            email=f"student-{datetime.now(timezone.utc).timestamp()}@example.test",
+            Role.STUDENT,
+            email=f"student-{next_test_id()}@example.test",
             tenant_id=tenant_id,
             branch_id=branch_id,
         )

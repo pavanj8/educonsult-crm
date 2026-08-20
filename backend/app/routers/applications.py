@@ -53,8 +53,8 @@ def list_assigned_applications(
 
     Behaviour by role:
     - **Counselor**: returns applications *assigned to them*, scoped to their branch.
-    - **Branch Manager**: returns all applications in their branch.
-    - **Consultancy Owner**: returns all applications across their tenant.
+    - **Branch Manager**: returns all applications in their branch (including unassigned).
+    - **Consultancy Owner**: returns all applications across their tenant (including unassigned).
 
     Filters (all optional):
     - **stage**: pipeline stage filter (e.g. ``registered``, ``counseling``)
@@ -64,7 +64,7 @@ def list_assigned_applications(
     if current_user.tenant_id is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
+            detail="User has no tenant scope",
         )
 
     # Build base statement based on role
@@ -73,7 +73,7 @@ def list_assigned_applications(
         if current_user.branch_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
+                detail="User has no branch scope",
             )
         statement: Select[tuple[Application]] = (
             select(Application)
@@ -87,7 +87,7 @@ def list_assigned_applications(
         if current_user.branch_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
+                detail="User has no branch scope",
             )
         statement = (
             select(Application)
@@ -111,7 +111,7 @@ def list_assigned_applications(
     else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
+            detail="Role cannot use this endpoint",
         )
 
     # Apply optional filters
