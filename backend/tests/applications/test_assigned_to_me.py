@@ -770,23 +770,15 @@ def test_assigned_to_me_503_on_database_unavailable(
         make_authenticated_user(Role.COUNSELOR, user_id=counselor.id, tenant_id=1, branch_id=branch.id)
     )
 
-    # Patch the get_db dependency so every request gets a session that raises
-    # OperationalError on scalars(), simulating a database unavailable condition.
-    def _failing_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
-
-    failing_session = db_session
-
+    # Patch the db session's scalars method to raise OperationalError,
+    # simulating a database unavailable condition.
     def _raise_op_error(*args, **kwargs):
         raise sqlalchemy.exc.OperationalError("statement", {}, ConnectionError("lost connection"))
 
-    monkeypatch.setattr(failing_session, "scalars", _raise_op_error)
+    monkeypatch.setattr(db_session, "scalars", _raise_op_error)
 
     # Override get_db to return the monkeypatched session
-    client.app.dependency_overrides[get_db] = lambda: failing_session
+    client.app.dependency_overrides[get_db] = lambda: db_session
 
     try:
         response = client.get("/applications/assigned-to-me")
@@ -821,3 +813,98 @@ def test_assigned_to_me_distinct_error_messages_per_failure_mode(
 
     # Unrecognised role (STUDENT has the permission check go first and returns "Insufficient permissions")
     check_role(Role.STUDENT, user_id=3, tenant_id=1, branch_id=1, expected_detail="Insufficient permissions")
+
+
+# ---------------------------------------------------------------------------
+# Tests added in iteration 4 to address Review Agent feedback
+# ---------------------------------------------------------------------------
+
+
+def test_assigned_to_me_rejects_user_without_tenant_scope(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """User with tenant_id=None gets 403 with 'User has no tenant scope'."""
+    from app.main import app
+    from app.rbac.dependencies import get_current_user
+
+    # Construct a user with tenant_id=None (simulating a role that somehow
+    # ended up without tenant context before reaching this endpoint)
+    user = AuthenticatedUser(
+        id=999,
+        role=Role.COUNSELOR,
+        tenant_id=None,
+        branch_id=1,
+    )
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        response = client.get("/applications/assigned-to-me")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+        assert response.json()["detail"] == "User has no tenant scope"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_assigned_to_me_branch_manager_cross_tenant_branch_filter_returns_empty(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """Branch manager filtering by branch_id in another tenant gets empty list (safe by construction)."""
+    # Tenant 1 branch
+    branch_t1 = seed_branch(db_session, tenant_id=1, name="T1 Branch", city="Mumbai")
+    # Tenant 2 branch
+    branch_t2 = seed_branch(db_session, tenant_id=2, name="T2 Branch", city="Delhi")
+
+    # BM in tenant 1
+    bm_t1 = make_db_user(
+        db_session,
+        Role.BRANCH_MANAGER,
+        email="bm-t1@example.test",
+        tenant_id=1,
+        branch_id=branch_t1.id,
+    )
+    counselor_t1 = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="c-t1@example.test",
+        tenant_id=1,
+        branch_id=branch_t1.id,
+    )
+
+    # Application in tenant 1
+    app_t1 = seed_application(
+        db_session,
+        tenant_id=1,
+        branch_id=branch_t1.id,
+        assigned_counselor_id=counselor_t1.id,
+        university="MIT",
+        program="MS CS",
+    )
+    # Application in tenant 2 (should not be visible)
+    counselor_t2 = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        email="c-t2@example.test",
+        tenant_id=2,
+        branch_id=branch_t2.id,
+    )
+    seed_application(
+        db_session,
+        tenant_id=2,
+        branch_id=branch_t2.id,
+        assigned_counselor_id=counselor_t2.id,
+        university="Oxford",
+        program="MBA",
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(Role.BRANCH_MANAGER, user_id=bm_t1.id, tenant_id=1, branch_id=branch_t1.id)
+    )
+
+    # Filter by tenant 2's branch_id - should return empty (not an error, no leakage)
+    response = client.get(f"/applications/assigned-to-me?branch_id={branch_t2.id}")
+
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    data = response.json()
+    assert data == [], f"Expected empty list for cross-tenant branch_id, got {data}"
