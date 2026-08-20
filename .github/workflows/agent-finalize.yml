@@ -97,8 +97,16 @@ jobs:
             gh issue comment "$ISSUE" -R ${{ github.repository }} --body "## Harness iteration — CI gate blocked merge. Agent gates (test/review/hard-gate) passed but a merge-blocking CI check is red, so auto-merge was withheld. See the PR checks; the CI Feedback Loop has the failing logs. Fix and the harness will retry (docs/adr/0020)."
           fi
 
-      - name: Start next Dev (do not wait for cron)
-        if: steps.finalize.outputs.ready == 'true'
+      - name: Kick the queue picker for the next ticket (event-driven drain)
+        # Always kick, not just on merge (docs/adr/0022). GitHub throttles the
+        # picker's cron badly (10-30 min gaps, observed ~30 min stall), and a
+        # workflow_run chain can't help here because GITHUB_TOKEN-dispatched Dev
+        # runs don't emit trigger events (ADR-0012). finalize runs after every
+        # ticket's Test+Review via the allowed workflow_dispatch, so kicking the
+        # picker here advances the queue to the next eligible issue regardless
+        # of this ticket's outcome. The picker's own busy/eligibility guards
+        # keep it safe and self-limiting.
+        if: always()
         run: |
           gh workflow run agent-harness-queue-picker.yml -R ${{ github.repository }} --ref main
 
