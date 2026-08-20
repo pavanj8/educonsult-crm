@@ -944,3 +944,79 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+/* Student dashboard */
+.student-dashboard {
+  max-width: 48rem;
+}
+
+.student-dashboard__header {
+  margin-bottom: 2rem;
+}
+
+.student-dashboard__header h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.student-dashboard__subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.student-dashboard__section {
+  margin-bottom: 2rem;
+}
+
+.student-dashboard__section h3 {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+}
+
+.student-dashboard__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.student-dashboard__status--error {
+  color: #dc2626;
+}
+
+.application-table-wrapper {
+  overflow-x: auto;
+}
+
+.application-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.application-table th,
+.application-table td {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.application-table th {
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+}
+
+.application-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.application-table__stage {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1d4ed8;
+}

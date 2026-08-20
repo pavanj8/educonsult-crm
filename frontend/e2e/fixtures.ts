@@ -8,6 +8,7 @@ import {
   mockAuthMe,
   mockLoginApi,
   setAuthSession,
+  STUDENT_USER,
   SUPER_ADMIN_USER,
   type UserRole,
 } from './helpers/auth.js'
@@ -21,6 +22,7 @@ type AppFixtures = {
   superAdminPage: void
   consultancyOwnerPage: void
   branchManagerPage: void
+  studentPage: void
 }
 
 export const test = base.extend<AppFixtures>({
@@ -66,6 +68,13 @@ export const test = base.extend<AppFixtures>({
   branchManagerPage: async ({ page }, use) => {
     await mockAuthMe(page, BRANCH_MANAGER_USER)
     await setAuthSession(page, accessTokenForRole('branch_manager'))
+    await gotoHome(page)
+    await use()
+  },
+
+  studentPage: async ({ page }, use) => {
+    await mockAuthMe(page, STUDENT_USER)
+    await setAuthSession(page, accessTokenForRole('student'))
     await gotoHome(page)
     await use()
   },
