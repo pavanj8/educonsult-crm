@@ -131,6 +131,43 @@ def test_queue_excludes_applications_from_other_tenant(
     assert student_names == {"Own Tenant Student"}
 
 
+def test_queue_excludes_applications_from_other_branch(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """A counselor must not see applications assigned to them that belong to a different branch."""
+    branch_a = seed_branch(db_session, tenant_id=1, name="Branch A", city="Mumbai")
+    branch_b = seed_branch(db_session, tenant_id=1, name="Branch B", city="Delhi")
+
+    # Same counselor exists in both branches (their auth user is scoped to branch_a)
+    counselor = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=13,
+        tenant_id=1,
+        branch_id=branch_a.id,
+    )
+    override_authenticated_user(counselor)
+
+    # Application assigned to the same counselor but in branch A — must appear
+    seed_application(
+        db_session, tenant_id=1, branch_id=branch_a.id,
+        student_name="Branch A Student", assigned_counselor_id=counselor.id,
+    )
+    # Application assigned to the same counselor but in branch B — must NOT appear
+    seed_application(
+        db_session, tenant_id=1, branch_id=branch_b.id,
+        student_name="Branch B Student", assigned_counselor_id=counselor.id,
+    )
+
+    response = client.get(counseling_queue_url())
+
+    assert response.status_code == 200
+    data = response.json()
+    student_names = {item["student_name"] for item in data}
+    assert student_names == {"Branch A Student"}
+
+
 # ---------------------------------------------------------------------------
 # Filtering: stage
 # ---------------------------------------------------------------------------
@@ -145,7 +182,7 @@ def test_queue_filters_by_stage(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=13,
+        user_id=14,
         tenant_id=1,
         branch_id=branch.id,
     )
@@ -185,7 +222,7 @@ def test_queue_returns_all_matching_applications_for_single_stage(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=14,
+        user_id=15,
         tenant_id=1,
         branch_id=branch.id,
     )
@@ -221,7 +258,7 @@ def test_queue_stage_filter_case_insensitive(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=15,
+        user_id=16,
         tenant_id=1,
         branch_id=branch.id,
     )
@@ -265,6 +302,33 @@ def test_queue_rejects_invalid_stage(
     assert len(data["detail"]["allowed_values"]) > 0
 
 
+def test_queue_invalid_stage_error_shows_pipeline_order(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """Invalid-stage error returns allowed_values in natural pipeline order, not alphabetical."""
+    branch = seed_branch(db_session, tenant_id=1)
+    counselor = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=54,
+        tenant_id=1,
+        branch_id=branch.id,
+    )
+    override_authenticated_user(counselor)
+
+    response = client.get(f"{counseling_queue_url()}?stage=not_a_stage")
+
+    assert response.status_code == 422
+    data = response.json()
+    allowed = data["detail"]["allowed_values"]
+    # Pipeline order: registered → counseling → ... → withdrawn
+    assert allowed[0] == "registered"
+    assert allowed[-1] == "withdrawn"
+    # Not alphabetical: "application_submitted" must come before "counseling"
+    assert allowed.index("counseling") < allowed.index("application_submitted")
+
+
 # ---------------------------------------------------------------------------
 # Filtering: student_name (partial match)
 # ---------------------------------------------------------------------------
@@ -279,7 +343,7 @@ def test_queue_filters_by_student_name_partial_match(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=16,
+        user_id=17,
         tenant_id=1,
         branch_id=branch.id,
     )
@@ -315,7 +379,7 @@ def test_queue_filters_by_student_name_case_insensitive(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=17,
+        user_id=18,
         tenant_id=1,
         branch_id=branch.id,
     )
@@ -343,7 +407,7 @@ def test_queue_combines_stage_and_student_name_filters(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=18,
+        user_id=19,
         tenant_id=1,
         branch_id=branch.id,
     )
@@ -372,6 +436,45 @@ def test_queue_combines_stage_and_student_name_filters(
     assert len(data) == 1
     assert data[0]["student_name"] == "Ravi Kumar"
     assert data[0]["stage"] == "counseling"
+
+
+def test_queue_student_name_escapes_like_wildcards(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """LIKE wildcards (% and _) in student_name are escaped so they match literally."""
+    branch = seed_branch(db_session, tenant_id=1)
+    counselor = make_authenticated_user(
+        Role.COUNSELOR,
+        user_id=55,
+        tenant_id=1,
+        branch_id=branch.id,
+    )
+    override_authenticated_user(counselor)
+
+    seed_application(
+        db_session, tenant_id=1, branch_id=branch.id,
+        student_name="Student % Name", assigned_counselor_id=counselor.id,
+    )
+    seed_application(
+        db_session, tenant_id=1, branch_id=branch.id,
+        student_name="Test_Student", assigned_counselor_id=counselor.id,
+    )
+
+    # Searching for "%" returns only the student whose name literally contains %
+    response = client.get(f"{counseling_queue_url()}?student_name=%")
+    assert response.status_code == 200
+    data = response.json()
+    student_names = {item["student_name"] for item in data}
+    assert student_names == {"Student % Name"}
+
+    # Searching for "_" returns only the student whose name literally contains _
+    response = client.get(f"{counseling_queue_url()}?student_name=_")
+    assert response.status_code == 200
+    data = response.json()
+    student_names = {item["student_name"] for item in data}
+    assert student_names == {"Test_Student"}
 
 
 # ---------------------------------------------------------------------------
@@ -439,6 +542,7 @@ def test_queue_rejects_non_counselor_role(client, db_session, override_authentic
     branch = seed_branch(db_session, tenant_id=1)
 
     for role in [
+        Role.CONSULTANCY_OWNER,
         Role.BRANCH_MANAGER,
         Role.DOCUMENT_VERIFIER,
         Role.VISA_PROCESSOR,
@@ -479,20 +583,20 @@ def test_queue_returns_expected_fields(
     db_session,
     override_authenticated_user,
 ):
-    """Each queue item exposes the five ApplicationQueueItem schema fields.
+    """Each queue item exposes the six ApplicationQueueItem schema fields.
 
-    Fields: id, student_name, stage, branch_id, assigned_counselor_id.
+    Fields: id, student_id, student_name, stage, branch_id, assigned_counselor_id.
     """
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=19,
+        user_id=20,
         tenant_id=1,
         branch_id=branch.id,
     )
     override_authenticated_user(counselor)
 
-    seed_application(
+    app = seed_application(
         db_session, tenant_id=1, branch_id=branch.id,
         student_name="Test Student", stage="counseling",
         assigned_counselor_id=counselor.id,
@@ -504,12 +608,15 @@ def test_queue_returns_expected_fields(
     data = response.json()
     assert len(data) == 1
     item = data[0]
-    # Verify all five schema fields are present and hold the expected values
+    # Verify all six schema fields are present and hold the expected values
     assert "id" in item
+    assert "student_id" in item
     assert "student_name" in item
     assert "stage" in item
     assert "branch_id" in item
     assert "assigned_counselor_id" in item
+    assert item["id"] == app.id
+    assert item["student_id"] == app.student_id
     assert item["student_name"] == "Test Student"
     assert item["stage"] == "counseling"
     assert item["branch_id"] == branch.id
@@ -530,7 +637,7 @@ def test_queue_returns_empty_list_when_no_applications(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=20,
+        user_id=21,
         tenant_id=1,
         branch_id=branch.id,
     )
@@ -551,7 +658,7 @@ def test_queue_returns_empty_when_all_applications_unassigned(
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
-        user_id=21,
+        user_id=22,
         tenant_id=1,
         branch_id=branch.id,
     )

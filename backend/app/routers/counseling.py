@@ -3,14 +3,18 @@
 GET /counseling/queue — returns applications assigned to the logged-in counselor.
 """
 
-from typing import Annotated, Sequence
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models.application import VALID_APPLICATION_STAGES, Application
+from app.models.application import (
+    APPLICATION_STAGES,
+    VALID_APPLICATION_STAGES,
+    Application,
+)
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.user import AuthenticatedUser
@@ -37,7 +41,7 @@ def get_counseling_queue(
         min_length=1,
         max_length=255,
     ),
-) -> Sequence[ApplicationQueueItem]:
+) -> list[ApplicationQueueItem]:
     """Return applications assigned to the current counselor.
 
     The result is scoped to:
@@ -77,14 +81,18 @@ def get_counseling_queue(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
                     "error": "invalid_stage",
-                    "allowed_values": sorted(VALID_APPLICATION_STAGES),
+                    "allowed_values": list(APPLICATION_STAGES),
                 },
             )
         statement = statement.where(func.lower(Application.stage) == stage_normalized)
 
     if student_name is not None:
+        # Use autoescape=True so that user-supplied '%' and '_' characters
+        # are treated as literals rather than LIKE wildcards.  Without this,
+        # a '%' in the search string would match any substring, potentially
+        # returning more results than expected and enabling slow broad scans.
         statement = statement.where(
-            func.lower(Application.student_name).contains(student_name.lower())
+            func.lower(Application.student_name).contains(student_name.lower(), autoescape=True)
         )
 
     return list(db.scalars(statement).all())

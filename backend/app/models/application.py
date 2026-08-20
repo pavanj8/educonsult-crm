@@ -1,12 +1,13 @@
 """Application model (E18, E21; Requirements §5 Student Journey)."""
 
-from sqlalchemy import Enum, ForeignKey, Integer, String
+from sqlalchemy import Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TenantScopedBase
 
 # All valid pipeline stage values — single source of truth used both by the
 # SQLAlchemy enum column and by the counseling queue's input validator.
+# Order reflects the natural pipeline progression: registered → counseling → ... → enrolled/rejected/withdrawn.
 APPLICATION_STAGES = (
     "registered",
     "counseling",
@@ -25,11 +26,15 @@ APPLICATION_STAGES = (
 # (e.g. the counseling router's input validator) without re-declaring the list.
 VALID_APPLICATION_STAGES = frozenset(APPLICATION_STAGES)
 
+# Aligned with migration: VARCHAR(50) on Postgres via native_enum=False.
+# Keep native_enum=False so the ORM emits VARCHAR and never creates a Postgres
+# ENUM type (which would diverge from the existing migration history).
 APPLICATION_STAGE_ENUM = Enum(
     *APPLICATION_STAGES,
     name="application_stage",
-    native_enum=True,
+    native_enum=False,
     create_constraint=False,
+    length=50,
 )
 
 
@@ -44,7 +49,6 @@ class Application(TenantScopedBase):
 
     student_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
