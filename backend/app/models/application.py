@@ -1,13 +1,13 @@
 """Application model (E18, E21; Requirements §5 Student Journey)."""
 
-
 from sqlalchemy import Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TenantScopedBase
 
-# String-based enum matching the pattern used in app.rbac.roles.Role
-_application_stage_values = [
+# All valid pipeline stage values — single source of truth used both by the
+# SQLAlchemy enum column and by the counseling queue's input validator.
+APPLICATION_STAGES = (
     "registered",
     "counseling",
     "university_shortlisting",
@@ -19,17 +19,14 @@ _application_stage_values = [
     "enrolled",
     "rejected",
     "withdrawn",
-]
-
-ApplicationStage = type(
-    "ApplicationStage",
-    (str,),
-    {name.upper(): name for name in _application_stage_values},
 )
 
+# Frozenset derived from the tuple so O(1) lookup is available to callers
+# (e.g. the counseling router's input validator) without re-declaring the list.
+VALID_APPLICATION_STAGES = frozenset(APPLICATION_STAGES)
 
 APPLICATION_STAGE_ENUM = Enum(
-    *_application_stage_values,
+    *APPLICATION_STAGES,
     name="application_stage",
     native_enum=True,
     create_constraint=False,

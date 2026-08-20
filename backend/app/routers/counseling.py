@@ -3,35 +3,20 @@
 GET /counseling/queue — returns applications assigned to the logged-in counselor.
 """
 
-from typing import Annotated
+from typing import Annotated, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models.application import Application
+from app.models.application import VALID_APPLICATION_STAGES, Application
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.user import AuthenticatedUser
 from app.schemas.application import ApplicationQueueItem
 
 router = APIRouter()
-
-# Valid pipeline stages for input validation (case-insensitive matching)
-VALID_STAGES = frozenset({
-    "registered",
-    "counseling",
-    "university_shortlisting",
-    "application_submitted",
-    "document_verification",
-    "offer_letter",
-    "visa_processing",
-    "loan_processing",
-    "enrolled",
-    "rejected",
-    "withdrawn",
-})
 
 
 @router.get("/queue", response_model=list[ApplicationQueueItem])
@@ -52,7 +37,7 @@ def get_counseling_queue(
         min_length=1,
         max_length=255,
     ),
-) -> list[Application]:
+) -> Sequence[ApplicationQueueItem]:
     """Return applications assigned to the current counselor.
 
     The result is scoped to:
@@ -87,10 +72,13 @@ def get_counseling_queue(
 
     if stage is not None:
         stage_normalized = stage.lower()
-        if stage_normalized not in VALID_STAGES:
+        if stage_normalized not in VALID_APPLICATION_STAGES:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid stage. Allowed values: {', '.join(sorted(VALID_STAGES))}",
+                detail={
+                    "error": "invalid_stage",
+                    "allowed_values": sorted(VALID_APPLICATION_STAGES),
+                },
             )
         statement = statement.where(func.lower(Application.stage) == stage_normalized)
 

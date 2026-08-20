@@ -176,12 +176,12 @@ def test_queue_filters_by_stage(
     assert data[0]["stage"] == "counseling"
 
 
-def test_queue_filters_by_multiple_stages(
+def test_queue_returns_all_matching_applications_for_single_stage(
     client,
     db_session,
     override_authenticated_user,
 ):
-    """When multiple matching stages exist, all are returned."""
+    """When multiple applications match a single stage filter, all are returned."""
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
@@ -191,12 +191,13 @@ def test_queue_filters_by_multiple_stages(
     )
     override_authenticated_user(counselor)
 
-    for stage in ("counseling", "counseling"):
+    for i in range(3):
         seed_application(
             db_session, tenant_id=1, branch_id=branch.id,
-            student_name=f"Student in {stage}", stage=stage,
+            student_name=f"Student in counseling #{i}", stage="counseling",
             assigned_counselor_id=counselor.id,
         )
+    # Application in a different stage must not be returned
     seed_application(
         db_session, tenant_id=1, branch_id=branch.id,
         student_name="Other Stage Student", stage="registered",
@@ -207,7 +208,7 @@ def test_queue_filters_by_multiple_stages(
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
+    assert len(data) == 3
     assert all(item["stage"] == "counseling" for item in data)
 
 
@@ -244,7 +245,7 @@ def test_queue_rejects_invalid_stage(
     db_session,
     override_authenticated_user,
 ):
-    """Invalid stage values return 422 with allowed values in error detail."""
+    """Invalid stage values return 422 with a structured error detail."""
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
@@ -258,8 +259,10 @@ def test_queue_rejects_invalid_stage(
 
     assert response.status_code == 422
     data = response.json()
-    assert "Invalid stage" in data["detail"]
-    assert "Allowed values" in data["detail"]
+    # Structured error: consumers can parse allowed_values programmatically
+    assert data["detail"]["error"] == "invalid_stage"
+    assert isinstance(data["detail"]["allowed_values"], list)
+    assert len(data["detail"]["allowed_values"]) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +479,10 @@ def test_queue_returns_expected_fields(
     db_session,
     override_authenticated_user,
 ):
-    """Each queue item must include id, student_name, stage, and application_id."""
+    """Each queue item exposes the five ApplicationQueueItem schema fields.
+
+    Fields: id, student_name, stage, branch_id, assigned_counselor_id.
+    """
     branch = seed_branch(db_session, tenant_id=1)
     counselor = make_authenticated_user(
         Role.COUNSELOR,
@@ -498,11 +504,16 @@ def test_queue_returns_expected_fields(
     data = response.json()
     assert len(data) == 1
     item = data[0]
+    # Verify all five schema fields are present and hold the expected values
     assert "id" in item
     assert "student_name" in item
     assert "stage" in item
+    assert "branch_id" in item
+    assert "assigned_counselor_id" in item
     assert item["student_name"] == "Test Student"
     assert item["stage"] == "counseling"
+    assert item["branch_id"] == branch.id
+    assert item["assigned_counselor_id"] == counselor.id
 
 
 # ---------------------------------------------------------------------------
