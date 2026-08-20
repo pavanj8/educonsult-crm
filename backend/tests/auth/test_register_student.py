@@ -1,6 +1,5 @@
 """POST /auth/register-student endpoint tests (E16, Journey J9, issue #136)."""
 
-from datetime import date
 
 from app.auth import verify_access_token, verify_refresh_token
 from app.auth.password import verify_password
