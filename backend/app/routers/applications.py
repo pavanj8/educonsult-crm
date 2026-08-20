@@ -3,10 +3,12 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
 from app.models.application import Application
 from app.models.user import User
 from app.pipeline.stages import PipelineStage
@@ -91,3 +93,35 @@ def create_application(
 
     db.refresh(application)
     return application
+
+
+@router.get("", response_model=list[ApplicationResponse])
+def list_applications(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.APPLICATION_READ_OWN)),
+    ],
+    db: Session = Depends(get_db),
+) -> list[Application]:
+    """List applications belonging to the authenticated student."""
+    student = _get_active_student(current_user, db)
+
+    try:
+        statement = apply_tenant_scope(
+            select(Application)
+            .where(Application.student_id == student.id)
+            .order_by(Application.id),
+            Application,
+            current_user,
+        )
+        return list(db.scalars(statement).all())
+    except TenantScopeError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        ) from None
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
