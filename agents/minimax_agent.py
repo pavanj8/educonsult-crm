@@ -28,8 +28,11 @@ import llm_env
 
 # Safety rails. A run that needs more than this many model turns is almost
 # certainly stuck; failing closed here surfaces as agent:needs-rework rather
-# than burning the token budget indefinitely.
-MAX_TURNS = 80
+# than burning the token budget indefinitely. Test/Review agents are
+# legitimately tool-heavy (write tests, run the full suite, verify), so this
+# is generous; a `report_tool` caller also gets a forced final report on the
+# last turn instead of dying as max_turns (see run_agent).
+MAX_TURNS = int(os.environ.get("AGENT_MAX_TURNS", "140"))
 # Anthropic Messages API requires an explicit output cap per call.
 MAX_TOKENS = int(os.environ.get("AGENT_MAX_TOKENS", "16384"))
 COMMAND_TIMEOUT_SEC = 600
@@ -168,14 +171,23 @@ def run_agent(
     cwd: str | os.PathLike[str],
     *,
     max_turns: int = MAX_TURNS,
+    report_tool: dict | None = None,
 ) -> tuple[str, str]:
     """Drive a MiniMax (Anthropic Messages API) tool-calling agent to completion.
 
     Returns ``(status, text)`` where ``status`` is one of ``completed``,
     ``error``, or ``max_turns`` and ``text`` is the concatenated assistant
-    prose (the callers parse a trailing ```json block out of it). On a hard
-    failure ``text`` is a diagnostic string so the GitHub issue comment is
-    never a bare "UNKNOWN".
+    prose. On a hard failure ``text`` is a diagnostic string so the GitHub
+    issue comment is never a bare "UNKNOWN".
+
+    ``report_tool`` (Test/Review agents): an Anthropic tool schema the model
+    MUST call to deliver its final structured report. When it does, the tool's
+    input is captured and appended to the returned text as a ```json block (so
+    the callers' existing parsers work unchanged), and the run ends. This
+    replaces the fragile "emit a ```json block in free text" contract, which
+    silently produced ``UNKNOWN`` when the model ran out of turns or formatted
+    loosely. On the last allowed turn the report tool is *forced* (tool_choice)
+    so the run yields a real report instead of dying as ``max_turns``.
     """
     cwd = Path(cwd).resolve()
     try:
@@ -184,22 +196,48 @@ def run_agent(
         print(f"[{prefix}] STARTUP FAILURE: {err}", file=sys.stderr)
         return "error", str(err)
 
+    report_name = report_tool["name"] if report_tool else None
+    all_tools = TOOLS + ([report_tool] if report_tool else [])
+
     messages: list[dict] = [{"role": "user", "content": prompt}]
     final_text_parts: list[str] = []
 
+    def _emit_report(payload: dict) -> tuple[str, str]:
+        """Append the captured report as a ```json block and finish."""
+        final_text_parts.append("\n\n```json\n" + json.dumps(payload, indent=2) + "\n```\n")
+        print(f"\n\n--- {prefix} finished: submitted structured report ---")
+        return "completed", "".join(final_text_parts)
+
     for turn in range(1, max_turns + 1):
+        # On the final allowed turn, force the report tool so we get a real
+        # report rather than dying as max_turns (report-tool callers only).
+        force_report = report_tool is not None and turn == max_turns
+        create_kwargs: dict = {
+            "model": model, "max_tokens": MAX_TOKENS, "messages": messages,
+            "tools": [report_tool] if force_report else all_tools,
+        }
+        if force_report:
+            create_kwargs["tool_choice"] = {"type": "tool", "name": report_name}
         try:
-            resp = client.messages.create(
-                model=model, max_tokens=MAX_TOKENS, tools=TOOLS, messages=messages,
-            )
+            resp = client.messages.create(**create_kwargs)
         except Exception as err:  # noqa: BLE001 -- auth/model/rate-limit failures
-            hint = (
-                f"MiniMax (Anthropic API) call failed on turn {turn} (model={model!r}): "
-                f"{err}. If this is an invalid-model or auth/quota error, verify the "
-                f"model ID, ANTHROPIC_AUTH_TOKEN, and Token Plan balance (docs/adr/0019)."
-            )
-            print(f"[{prefix}] {hint}", file=sys.stderr)
-            return "error", hint
+            if force_report and "tool_choice" in create_kwargs:
+                # Some backends may reject forced tool_choice; retry once softly.
+                create_kwargs.pop("tool_choice", None)
+                try:
+                    resp = client.messages.create(**create_kwargs)
+                except Exception as err2:  # noqa: BLE001
+                    err = err2
+                else:
+                    err = None
+            if err is not None:
+                hint = (
+                    f"MiniMax (Anthropic API) call failed on turn {turn} (model={model!r}): "
+                    f"{err}. If this is an invalid-model or auth/quota error, verify the "
+                    f"model ID, ANTHROPIC_AUTH_TOKEN, and Token Plan balance (docs/adr/0019)."
+                )
+                print(f"[{prefix}] {hint}", file=sys.stderr)
+                return "error", hint
 
         assistant_blocks: list[dict] = []
         tool_uses: list = []
@@ -215,6 +253,11 @@ def run_agent(
                 )
                 tool_uses.append(block)
         messages.append({"role": "assistant", "content": assistant_blocks})
+
+        # The model delivered its final report -> capture and finish.
+        for tu in tool_uses:
+            if tu.name == report_name:
+                return _emit_report(tu.input if isinstance(tu.input, dict) else {})
 
         if resp.stop_reason != "tool_use":
             print(f"\n\n--- {prefix} finished: stop_reason={resp.stop_reason} turns={turn} ---")

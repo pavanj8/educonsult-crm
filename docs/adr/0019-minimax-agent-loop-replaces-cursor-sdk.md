@@ -78,6 +78,13 @@ ADR builds that different architecture.
   tools, revisit the loop (system prompt, temperature, or a stronger tier).
 - China-region deployments set `ANTHROPIC_BASE_URL` to the `.com` endpoint
   (`https://api.minimaxi.com/anthropic`).
+- **Structured reports.** Test/Review agents deliver their verdict via a
+  `submit_report` tool (Anthropic tool-use) rather than emitting a ```json
+  block in free text, which silently produced `UNKNOWN` when the model ran out
+  of turns or formatted loosely. On the last allowed turn the report tool is
+  forced (`tool_choice`) so a run yields a real report instead of dying as
+  `max_turns`; `MAX_TURNS` was also raised (env `AGENT_MAX_TURNS`, default 140)
+  for the legitimately tool-heavy Test/Review passes.
 - **Protocol note.** The engine initially used MiniMax's OpenAI-compatible
   `/v1` endpoint via the `openai` client; it was switched to MiniMax's
   Anthropic-compatible `/anthropic` Messages API via the `anthropic` client

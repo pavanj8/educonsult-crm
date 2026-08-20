@@ -121,14 +121,16 @@ describe -- nothing more, nothing speculative.
 5. Follow existing conventions already established in this repo (check
    `backend/` and `frontend/` for prior art before introducing new
    patterns).
-6. Before finishing, run BOTH of these inside `backend/` and iterate until
-   each is clean — the PR will NOT merge otherwise:
-   - `python -m pytest` — all tests pass.
-   - `ruff check .` — ZERO lint errors. CI runs exactly this (`ruff==0.16.3`;
-     config in `backend/pyproject.toml`: rules E/F/I, line-length 88). Run
-     `ruff check --fix .` first to auto-fix import ordering (I) and unused
-     imports (F401), then fix anything it reports by hand. Do not leave unused
-     imports/variables or out-of-order imports.
+6. Before finishing, run the project's canonical check script and iterate
+   until it passes — this is the EXACT gate CI enforces, so the PR will NOT
+   merge otherwise:
+   - `bash scripts/check.sh backend` for backend changes (runs `ruff check .`
+     + `pytest`), `bash scripts/check.sh frontend` for frontend changes
+     (`npm run lint` + `npm run build`), or `bash scripts/check.sh` for both.
+   - For ruff, run `ruff check --fix .` inside `backend/` first to auto-fix
+     import order (I) and unused imports (F401), then fix what remains (e.g.
+     F841 unused variables) by hand. Do NOT finish while check.sh reports
+     failure.
 7. This is iteration {iteration} for this issue. If the feedback section
    above is non-empty, treating it as optional is a failure.
 

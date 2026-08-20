@@ -61,6 +61,7 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "target_country_id" in user_columns
         assert "target_university_id" in user_columns
         assert "target_program_id" in user_columns
+<<<<<<< HEAD
         stage_columns = {column["name"] for column in inspect(connection).get_columns("stage_transitions")}
         assert "from_stage" in stage_columns
         assert "to_stage" in stage_columns
@@ -68,6 +69,22 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "is_active" in stage_columns
         assert "created_at" in stage_columns
         assert "updated_at" in stage_columns
+=======
+        assert "applications" in table_names
+        application_columns = {
+            column["name"] for column in inspect(connection).get_columns("applications")
+        }
+        assert application_columns == {
+            "id",
+            "tenant_id",
+            "student_id",
+            "university_id",
+            "program_id",
+            "stage",
+            "created_at",
+            "updated_at",
+        }
+>>>>>>> origin/main
 
 
 def test_alembic_downgrade_base_clears_revision(tmp_path, monkeypatch):
