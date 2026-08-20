@@ -10,6 +10,8 @@ from app.rbac.roles import Role
 from tests.branches.helpers import seed_branch
 from tests.factories.users import make_db_user
 
+VALID_PASSWORD = "StudentPass1!"
+
 
 def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "apex") -> Tenant:
     tenant = Tenant(name=name, slug=slug)
@@ -24,7 +26,7 @@ def make_register_student_payload(
     tenant_slug: str = "apex",
     branch_id: int = 1,
     email: str = "new.student@example.test",
-    password: str = "student-password",
+    password: str = VALID_PASSWORD,
     name: str = "Rahul Kumar",
     phone: str = "+91-9876543210",
     date_of_birth: str = "2000-05-15",
@@ -91,7 +93,7 @@ def test_register_student_success(client, db_session):
 def test_register_student_persists_hashed_password(client, db_session):
     tenant = _create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
-    plain_password = "plain-student-password"
+    plain_password = VALID_PASSWORD
 
     response = client.post(
         "/auth/register-student",
@@ -151,7 +153,7 @@ def test_register_student_allows_optional_target_fields(client, db_session):
             "tenant_slug": tenant.slug,
             "branch_id": branch.id,
             "email": "minimal.student@example.test",
-            "password": "student-password",
+            "password": VALID_PASSWORD,
             "name": "Minimal Student",
             "phone": "+91-9000000000",
             "date_of_birth": "1999-01-01",
@@ -168,7 +170,7 @@ def test_register_student_allows_optional_target_fields(client, db_session):
 def test_register_student_can_login_after_registration(client, db_session):
     tenant = _create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
-    password = "post-register-password"
+    password = VALID_PASSWORD
 
     register_response = client.post(
         "/auth/register-student",
@@ -320,8 +322,88 @@ def test_register_student_rejects_missing_required_fields(client, db_session):
             "tenant_slug": tenant.slug,
             "branch_id": branch.id,
             "email": "incomplete@example.test",
-            "password": "student-password",
+            "password": VALID_PASSWORD,
         },
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_weak_password(client, db_session):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="weak.password@example.test",
+            password="password",
+        ),
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_short_password(client, db_session):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="short.password@example.test",
+            password="Ab1!",
+        ),
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_whitespace_only_password(client, db_session):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="blank.password@example.test",
+            password="   ",
+        ),
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_future_date_of_birth(client, db_session):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="future.dob@example.test",
+            date_of_birth="2099-01-01",
+        ),
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_student_rejects_implausible_date_of_birth(client, db_session):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="old.dob@example.test",
+            date_of_birth="1860-01-01",
+        ),
     )
 
     assert response.status_code == 422
