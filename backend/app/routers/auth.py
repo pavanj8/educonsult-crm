@@ -12,31 +12,20 @@ from app.auth import (
     TokenExpiredError,
     create_access_token,
     create_refresh_token,
-<<<<<<< HEAD
-    verify_password,
-    verify_refresh_token,
-)
-=======
     hash_password,
     verify_password,
     verify_refresh_token,
 )
 from app.auth.email_uniqueness import DUPLICATE_EMAIL_DETAIL, ensure_email_available
->>>>>>> origin/main
 from app.db.database import get_db
 from app.models.branch import Branch
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.rbac.dependencies import get_current_user
-<<<<<<< HEAD
-from app.rbac.user import AuthenticatedUser
-from app.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserMeResponse
-=======
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.auth import LoginRequest, MeResponse, RefreshRequest, TokenResponse
 from app.schemas.student import RegisterStudentRequest, RegisterStudentResponse
->>>>>>> origin/main
 
 router = APIRouter()
 
@@ -103,9 +92,6 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
             detail="Invalid refresh token",
         ) from None
 
-<<<<<<< HEAD
-    user = db.get(User, token_user.id)
-=======
     try:
         user = db.get(User, token_user.id)
     except OperationalError:
@@ -114,22 +100,18 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
             detail=_DB_UNAVAILABLE_DETAIL,
         ) from None
 
->>>>>>> origin/main
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
         )
 
-<<<<<<< HEAD
-=======
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated",
         )
 
->>>>>>> origin/main
     authenticated_user = _user_to_authenticated_user(user)
     return TokenResponse(
         access_token=create_access_token(authenticated_user),
@@ -137,14 +119,6 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     )
 
 
-<<<<<<< HEAD
-@router.get("/me", response_model=UserMeResponse)
-def me(
-    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
-    db: Session = Depends(get_db),
-) -> UserMeResponse:
-    """Return the authenticated user's profile from a valid access token."""
-=======
 @router.post(
     "/register-student",
     response_model=RegisterStudentResponse,
@@ -245,23 +219,15 @@ def me(
     db: Session = Depends(get_db),
 ) -> MeResponse:
     """Return the authenticated user's profile for session hydration."""
->>>>>>> origin/main
     user = db.get(User, current_user.id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-<<<<<<< HEAD
-            detail="Invalid access token",
-        )
-
-    return UserMeResponse(
-=======
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     return MeResponse(
->>>>>>> origin/main
         id=user.id,
         email=user.email,
         role=user.role,

@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.auth import InvalidTokenError, TokenExpiredError, verify_access_token
 from app.rbac.permissions import Permission, role_has_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
@@ -14,7 +13,6 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 def get_current_user(
     credentials: Annotated[
-<<<<<<< HEAD
         HTTPAuthorizationCredentials | None,
         Depends(_bearer_scheme),
     ],
@@ -23,12 +21,6 @@ def get_current_user(
     # Lazy import avoids app.auth <-> app.rbac circular import at startup.
     from app.auth.jwt import InvalidTokenError, TokenExpiredError, verify_access_token
 
-=======
-        HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)
-    ] = None,
-) -> AuthenticatedUser:
-    """Return the authenticated user from a valid Bearer access token."""
->>>>>>> origin/main
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
