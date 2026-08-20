@@ -163,7 +163,7 @@ function createFetchMock(handlers: {
     }
 
     throw new Error(`Unhandled fetch: ${path} ${init?.method ?? 'GET'}`)
-  }) as typeof fetch
+  }) as unknown as typeof fetch
 }
 
 function renderStaffPage() {

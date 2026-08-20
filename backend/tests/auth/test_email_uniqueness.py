@@ -8,7 +8,6 @@ from app.auth.email_uniqueness import (
     ensure_email_available,
     find_user_by_email,
 )
-from app.models.user import User
 from app.rbac.roles import Role
 from tests.factories.users import make_db_user
 

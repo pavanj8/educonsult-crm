@@ -1,8 +1,15 @@
 from datetime import datetime, timezone
 
+<<<<<<< HEAD
 from sqlalchemy import inspect, select
 
 from app.models.application import Application, ApplicationStage
+=======
+from sqlalchemy import inspect
+
+from app.models.application import Application
+from app.pipeline.stages import PipelineStage
+>>>>>>> origin/main
 
 
 def test_application_model_has_required_columns():
@@ -24,9 +31,15 @@ def test_application_persists_row(db_session):
     application = Application(
         tenant_id=1,
         student_id=10,
+<<<<<<< HEAD
         university_id=20,
         program_id=30,
         stage=ApplicationStage.REGISTERED,
+=======
+        university_id=100,
+        program_id=200,
+        stage=PipelineStage.REGISTERED,
+>>>>>>> origin/main
         created_at=now,
         updated_at=now,
     )
@@ -35,6 +48,7 @@ def test_application_persists_row(db_session):
     db_session.refresh(application)
 
     assert application.id is not None
+<<<<<<< HEAD
     assert application.tenant_id == 1
     assert application.student_id == 10
     assert application.university_id == 20
@@ -109,3 +123,6 @@ def test_student_can_have_multiple_applications_with_independent_stages(db_sessi
     assert first.id != second.id
     assert first.stage == ApplicationStage.COUNSELING
     assert second.stage == ApplicationStage.APPLICATION_SUBMITTED
+=======
+    assert application.stage == PipelineStage.REGISTERED
+>>>>>>> origin/main

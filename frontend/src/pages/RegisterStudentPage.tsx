@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { isApiError } from '../api/client'
+import StudyPreferencesFieldset from '../components/master-data/StudyPreferencesFieldset'
+import { useDebouncedTenantSlug } from '../hooks/useMasterData'
 import { LOGIN_PATH } from '../routes/ProtectedRoute'
 import { useAuth } from '../store/authStore'
 import { REGISTER_PATH } from '../routes/paths'
@@ -30,6 +32,11 @@ export default function RegisterStudentPage() {
   const { registerStudent, clearError, isAuthenticated, isLoading } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [tenantSlugInput, setTenantSlugInput] = useState('')
+  const tenantSlug = useDebouncedTenantSlug(tenantSlugInput)
+  const [countryId, setCountryId] = useState<number | ''>('')
+  const [universityId, setUniversityId] = useState<number | ''>('')
+  const [programId, setProgramId] = useState<number | ''>('')
   const errorId = useId()
 
   useEffect(() => {
@@ -76,6 +83,9 @@ export default function RegisterStudentPage() {
         password: passwordValue,
         phone: trimmedPhone,
         date_of_birth: dateOfBirthValue,
+        ...(typeof countryId === 'number' ? { target_country_id: countryId } : {}),
+        ...(typeof universityId === 'number' ? { target_university_id: universityId } : {}),
+        ...(typeof programId === 'number' ? { target_program_id: programId } : {}),
       })
       navigate(postRegisterPath(location), { replace: true })
     } catch (err) {
@@ -117,6 +127,12 @@ export default function RegisterStudentPage() {
                 required
                 placeholder="e.g. apex"
                 aria-describedby={error ? errorId : undefined}
+                onChange={(event) => {
+                  setTenantSlugInput(event.target.value)
+                  setCountryId('')
+                  setUniversityId('')
+                  setProgramId('')
+                }}
               />
             </label>
             <label className="login-form__field">
@@ -132,6 +148,23 @@ export default function RegisterStudentPage() {
               />
             </label>
           </fieldset>
+          <StudyPreferencesFieldset
+            tenantSlug={tenantSlug}
+            countryId={countryId}
+            universityId={universityId}
+            programId={programId}
+            onCountryChange={(value) => {
+              setCountryId(value)
+              setUniversityId('')
+              setProgramId('')
+            }}
+            onUniversityChange={(value) => {
+              setUniversityId(value)
+              setProgramId('')
+            }}
+            onProgramChange={setProgramId}
+            describedBy={error ? errorId : undefined}
+          />
           <fieldset className="login-form__section">
             <legend>Profile</legend>
             <label className="login-form__field">

@@ -1,9 +1,8 @@
-"""Token refresh endpoint tests (E5, Journey J44, issue #88)."""
+"""Token refresh endpoint tests (E5, Journey J44, issue #84)."""
 
 import pytest
 
 from app.auth import (
-    create_access_token,
     create_refresh_token,
     verify_access_token,
     verify_refresh_token,
@@ -19,6 +18,7 @@ def _login(client, email: str, password: str) -> dict:
 
 
 def test_refresh_success_returns_new_bearer_tokens(client, db_session):
+    """Valid refresh token exchanges for new access + refresh tokens."""
     password = "refresh-password"
     user = make_db_user(
         db_session,
@@ -52,6 +52,7 @@ def test_refresh_success_returns_new_bearer_tokens(client, db_session):
 
 @pytest.mark.parametrize("role", list(Role))
 def test_refresh_success_for_all_roles(client, db_session, role: Role):
+    """All eight product roles can refresh their session."""
     password = "role-refresh-password"
     email = f"{role.value}@refresh.test"
     user = make_db_user(db_session, role, email=email, password=password)
@@ -70,6 +71,7 @@ def test_refresh_success_for_all_roles(client, db_session, role: Role):
 
 
 def test_refresh_rejects_expired_token(client, monkeypatch):
+    """Expired refresh token returns 401 with Refresh token has expired."""
     monkeypatch.setenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "0")
     user = make_authenticated_user(Role.COUNSELOR)
     expired_refresh = create_refresh_token(user)
@@ -84,6 +86,7 @@ def test_refresh_rejects_expired_token(client, monkeypatch):
 
 
 def test_refresh_rejects_invalid_token(client):
+    """Garbage refresh token returns 401 with Invalid refresh token."""
     response = client.post(
         "/auth/refresh",
         json={"refresh_token": "not-a-valid-jwt"},
@@ -94,6 +97,7 @@ def test_refresh_rejects_invalid_token(client):
 
 
 def test_refresh_rejects_access_token(client, db_session):
+    """Access token used as refresh credential returns 401 (wrong token type)."""
     password = "access-token-password"
     make_db_user(
         db_session,
@@ -113,12 +117,14 @@ def test_refresh_rejects_access_token(client, db_session):
 
 
 def test_refresh_rejects_missing_refresh_token(client):
+    """Empty body returns 422 validation error."""
     response = client.post("/auth/refresh", json={})
 
     assert response.status_code == 422
 
 
 def test_refresh_rejects_token_for_deleted_user(client):
+    """Refresh token for deleted user returns 401 with Invalid refresh token."""
     user = make_authenticated_user(Role.COUNSELOR, user_id=999_999)
     refresh_token = create_refresh_token(user)
 
@@ -132,6 +138,7 @@ def test_refresh_rejects_token_for_deleted_user(client):
 
 
 def test_refresh_returns_503_when_database_unavailable(client):
+    """DB unavailable returns 503 with Authentication service is temporarily unavailable."""
     from unittest.mock import MagicMock
 
     from sqlalchemy.exc import OperationalError
@@ -164,6 +171,7 @@ def test_refresh_returns_503_when_database_unavailable(client):
 
 
 def test_refresh_uses_current_user_record(client, db_session):
+    """New tokens reflect current DB state, not stale JWT claims."""
     password = "current-user-password"
     user = make_db_user(
         db_session,
