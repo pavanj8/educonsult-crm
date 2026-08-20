@@ -1,15 +1,4 @@
-"""Application routes (E18; E21; Journey J11; J14).
-
-E21 · Journey J14 (issue #156) adds ``GET /applications/assigned-to-me`` with
-``stage``, ``branch_id``, and ``student_id`` filters for Counselor / Branch
-Manager / Consultancy Owner roles. Tenant scoping goes through
-:func:`app.db.tenant_scope.apply_tenant_scope` (the same helper used by
-``list_applications``) so the multi-tenant invariant is enforced in one
-place. Branch scoping is inlined per role because COUNSELOR and
-BRANCH_MANAGER are pinned to their own branch and the shared helper would
-raise ``BranchScopeError`` when ``branch_id`` is missing; for those two
-roles the handler treats a missing ``branch_id`` as a scope error.
-"""
+"""Application routes (E18; E21; Journey J11; J14)."""
 
 from typing import Annotated
 
@@ -78,14 +67,7 @@ def _validate_university_and_program(
     university_id: int,
     program_id: int,
 ) -> None:
-    """Reject university_id/program_id that don't exist or belong to another tenant.
-
-    Both references must exist and belong to the caller's tenant; the program
-    must additionally belong to the university. This guards the multi-tenancy
-    boundary (Requirement §1) and the data-integrity expectation that an
-    application references valid master data (Requirement §5; J11 "university +
-    program").
-    """
+    """Reject university/program references outside the current tenant or university."""
     try:
         university = db.get(University, university_id)
         program = db.get(Program, program_id)
@@ -191,60 +173,11 @@ def list_applications(
         ) from None
 
 
-@router.get("/assigned-to-me", response_model=list[ApplicationResponse])
-def list_assigned_applications(
-    current_user: Annotated[
-        AuthenticatedUser,
-        Depends(require_permission(Permission.APPLICATION_READ_ASSIGNED)),
-    ],
-    db: Session = Depends(get_db),
-    stage: ApplicationStage | None = Query(
-        default=None,
-        description="Filter by pipeline stage",
-    ),
-    branch_id: int | None = Query(
-        default=None,
-        ge=1,
-        description=(
-            "Filter by branch. For Counselors this parameter is ignored (they are "
-            "pinned to their own branch). For Branch Managers and Consultancy Owners, "
-            "passing a branch_id outside the caller's accessible scope returns an "
-            "empty list — no error, no cross-tenant leakage."
-        ),
-    ),
-    student_id: int | None = Query(
-        default=None,
-        ge=1,
-        description="Filter by student ID",
-    ),
-) -> list[Application]:
-    """Return applications in the caller's scope.
-
-    E21 · Journey J14: Counselor views their assigned student/application queue.
-
-    Behaviour by role:
-    - **Counselor**: returns applications *assigned to them*, scoped to their branch.
-    - **Branch Manager**: returns all applications in their branch (including unassigned).
-    - **Consultancy Owner**: returns all applications across their tenant (including unassigned).
-
-    Filters (all optional):
-    - **stage**: pipeline stage filter (e.g. ``registered``, ``counseling``)
-    - **branch_id**: branch filter — see parameter description for role-specific behaviour
-    - **student_id**: filter by student ID
-
-    Tenant scoping is delegated to :func:`app.db.tenant_scope.apply_tenant_scope`
-    so the multi-tenant invariant is enforced in one place for every
-    ``Application`` read in the codebase.
-    """
-    if current_user.tenant_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User has no tenant scope",
-        )
-
-    # Base statement: tenant-scoped + stable id ordering. The helper does
-    # nothing for SUPER_ADMIN and raises TenantScopeError only when a
-    # non-super role is missing tenant_id (handled above).
+def _assigned_query_for_role(
+    current_user: AuthenticatedUser,
+    branch_id: int | None,
+) -> Select[tuple[Application]]:
+    """Build the role-scoped assigned queue query with stable ordering."""
     statement: Select[tuple[Application]] = apply_tenant_scope(
         select(Application).order_by(Application.id),
         Application,
@@ -257,40 +190,61 @@ def list_assigned_applications(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User has no branch scope",
             )
-        statement = statement.where(Application.assigned_counselor_id == current_user.id)
-        statement = statement.where(Application.branch_id == current_user.branch_id)
-    elif current_user.role == Role.BRANCH_MANAGER:
+        return statement.where(
+            Application.assigned_counselor_id == current_user.id,
+            Application.branch_id == current_user.branch_id,
+        )
+
+    if current_user.role == Role.BRANCH_MANAGER:
         if current_user.branch_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User has no branch scope",
             )
         statement = statement.where(Application.branch_id == current_user.branch_id)
-        if branch_id is not None:
-            statement = statement.where(Application.branch_id == branch_id)
     elif current_user.role == Role.CONSULTANCY_OWNER:
-        if branch_id is not None:
-            statement = statement.where(Application.branch_id == branch_id)
+        pass
     else:
-        # require_permission gates this endpoint to roles carrying the
-        # APPLICATION_READ_ASSIGNED permission (Counselor / Branch Manager /
-        # Consultancy Owner). Any other role is rejected with 403 before this
-        # handler is invoked — this branch is therefore unreachable; raise 500
-        # to make the invariant explicit rather than return a misleading 403.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unexpected role for this endpoint",
         )
 
-    # Apply optional filters
-    if stage is not None:
-        statement = statement.where(Application.stage == stage.value)
+    if branch_id is not None:
+        statement = statement.where(Application.branch_id == branch_id)
+    return statement
 
-    if student_id is not None:
-        statement = statement.where(Application.student_id == student_id)
+
+@router.get("/assigned-to-me", response_model=list[ApplicationResponse])
+def list_assigned_applications(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.APPLICATION_READ_ASSIGNED)),
+    ],
+    db: Session = Depends(get_db),
+    stage: ApplicationStage | None = Query(default=None),
+    branch_id: int | None = Query(default=None, ge=1),
+    student_id: int | None = Query(default=None, ge=1),
+) -> list[Application]:
+    """Return the role-scoped application queue with optional filters."""
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no tenant scope",
+        )
 
     try:
+        statement = _assigned_query_for_role(current_user, branch_id)
+        if stage is not None:
+            statement = statement.where(Application.stage == stage.value)
+        if student_id is not None:
+            statement = statement.where(Application.student_id == student_id)
         return list(db.scalars(statement).all())
+    except TenantScopeError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        ) from None
     except OperationalError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

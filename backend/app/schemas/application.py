@@ -1,9 +1,4 @@
-"""Pydantic schemas for application endpoints (E18; E21; Journey J11; J14).
-
-``ApplicationStageEnum`` is a re-export of :class:`app.models.application.ApplicationStage`
-so Pydantic, ORM, and FastAPI route handlers share one enum definition
-(avoids duplication / drift).
-"""
+"""Pydantic schemas for application endpoints (E18; E21; Journey J11; J14)."""
 
 from datetime import datetime
 
@@ -18,19 +13,7 @@ class CreateApplicationRequest(BaseModel):
 
 
 class ApplicationResponse(BaseModel):
-    """Single application record in list/detail responses (E18; E21).
-
-    Field notes:
-    - ``tenant_id`` is included so existing E18 list/detail callers that echo
-      it back keep working (tenant scoping is already enforced by the route;
-      echoing the value is a convenience for clients).
-    - ``branch_id`` and ``assigned_counselor_id`` are nullable. They are
-      back-filled by the E19 (auto-assignment) and E20 (manual reassignment)
-      tasks; rows created by E18 ``POST /applications`` do not yet carry a
-      branch, and they remain ``NULL`` until those epics land. The schema
-      matches the ORM (where both columns are ``nullable=True``) so existing
-      rows do not raise 500s.
-    """
+    """Application data returned by the E18 and E21 endpoints."""
 
     model_config = ConfigDict(from_attributes=True)
 
