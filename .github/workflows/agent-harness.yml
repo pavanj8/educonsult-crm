@@ -86,13 +86,21 @@ jobs:
         run: |
           BRANCH="agent/issue-${{ steps.issue.outputs.number }}"
           git fetch origin
+          git config user.name "agent-harness-bot"
+          git config user.email "agent-harness-bot@users.noreply.github.com"
           if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
             git checkout -B "$BRANCH" "origin/$BRANCH"
+            # Bring a resumed branch up to date with main so it inherits merged
+            # fixes (e.g. lint cleanups) instead of running stale copies of
+            # shared files like backend/tests (docs/adr/0019 follow-up).
+            if ! git merge origin/main --no-edit -m "Sync $BRANCH with main"; then
+              git merge --abort
+              echo "::error::Merge conflict syncing $BRANCH with main; needs manual resolution."
+              exit 1
+            fi
           else
             git checkout -B "$BRANCH" origin/main
           fi
-          git config user.name "agent-harness-bot"
-          git config user.email "agent-harness-bot@users.noreply.github.com"
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Refresh harness tooling from main (protected paths)
