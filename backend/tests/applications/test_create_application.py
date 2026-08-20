@@ -1,6 +1,8 @@
 """POST /applications endpoint tests (E18, Journey J11, issue #145)."""
 
 from app.auth import create_access_token
+from app.db.database import get_db
+from app.main import app
 from app.models.application import Application
 from app.models.tenant import Tenant
 from app.pipeline.stages import PipelineStage
@@ -389,3 +391,146 @@ def test_create_application_rejects_student_missing_tenant_scope(
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Student account is missing tenant scope"
+
+
+def test_create_application_returns_503_when_database_unavailable_on_user_lookup(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """OperationalError in _get_active_student → db.get() returns 503."""
+    from unittest.mock import MagicMock
+    from sqlalchemy.exc import OperationalError
+
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _seed_student(db_session, tenant.id, branch.id)
+
+    # Override auth so we reach _get_active_student without a valid JWT.
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.STUDENT,
+            user_id=student.id,
+            tenant_id=tenant.id,
+            branch_id=branch.id,
+        )
+    )
+
+    # Mock the DB session to raise OperationalError on get().
+    mock_session = MagicMock()
+    mock_session.get.side_effect = OperationalError(
+        "stmt", {}, Exception("no such table")
+    )
+
+    def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = client.post(
+            "/applications",
+            headers={"Authorization": "Bearer test-token"},
+            json={"university_id": 1, "program_id": 2},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Application service is temporarily unavailable"
+
+
+def test_create_application_returns_503_when_database_unavailable_on_commit(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """OperationalError in db.commit() returns 503."""
+    from unittest.mock import MagicMock
+    from sqlalchemy.exc import OperationalError
+
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _seed_student(db_session, tenant.id, branch.id)
+
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.STUDENT,
+            user_id=student.id,
+            tenant_id=tenant.id,
+            branch_id=branch.id,
+        )
+    )
+
+    # Mock the DB session so get() returns the real student but commit() raises.
+    mock_session = MagicMock()
+    mock_session.get.return_value = student
+    mock_session.commit.side_effect = OperationalError(
+        "stmt", {}, Exception("disk full")
+    )
+
+    def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = client.post(
+            "/applications",
+            headers={"Authorization": "Bearer test-token"},
+            json={"university_id": 1, "program_id": 2},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Application service is temporarily unavailable"
+
+
+def test_create_application_tenant_id_matches_callers_tenant(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    """The response tenant_id is always the caller's tenant, never another tenant's.
+
+    This is a structural property: tenant_id is derived from the DB row inside
+    _get_active_student, not from the request payload.  We assert it explicitly
+    here to harden the cross-tenant isolation property at the API layer.
+    """
+    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
+    branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
+
+    student_a = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant_a.id,
+        branch_id=branch_a.id,
+        email="student.tenant.a@example.test",
+    )
+    make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant_b.id,
+        branch_id=branch_b.id,
+        email="student.tenant.b@example.test",
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.STUDENT,
+            user_id=student_a.id,
+            tenant_id=tenant_a.id,
+            branch_id=branch_a.id,
+        )
+    )
+
+    response = client.post(
+        "/applications",
+        json={"university_id": 1, "program_id": 2},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["tenant_id"] == tenant_a.id
+    assert response.json()["tenant_id"] != tenant_b.id

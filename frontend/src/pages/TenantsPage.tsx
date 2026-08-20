@@ -27,12 +27,12 @@ export default function TenantsPage() {
     setSuccessMessage(null)
 
     const formData = new FormData(event.currentTarget)
-    const name = typeof formData.get('name') === 'string' ? formData.get('name')!.trim() : ''
-    const slug = typeof formData.get('slug') === 'string' ? formData.get('slug')!.trim() : ''
-    const ownerEmail =
-      typeof formData.get('owner_email') === 'string'
-        ? formData.get('owner_email')!.trim()
-        : ''
+    const rawName = formData.get('name')
+    const rawSlug = formData.get('slug')
+    const rawOwnerEmail = formData.get('owner_email')
+    const name = typeof rawName === 'string' ? rawName.trim() : ''
+    const slug = typeof rawSlug === 'string' ? rawSlug.trim() : ''
+    const ownerEmail = typeof rawOwnerEmail === 'string' ? rawOwnerEmail.trim() : ''
 
     try {
       const created = await createTenant({

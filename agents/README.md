@@ -62,9 +62,18 @@ finds them on its own; failed tickets retry themselves.
 
 ## Required repo setup (one-time)
 
-1. ✅ **Secret**: `CURSOR_API_KEY` set in repo Settings -> Secrets and
-   variables -> Actions (done 2026-08-19).
-2. ⬜ **Secret**: `GH_PAT` — a token that can push `.github/workflows/*`
+1. ✅ **Secret**: `ANTHROPIC_AUTH_TOKEN` — the harness's inference engine. All
+   three agents run on MiniMax via its Anthropic-compatible Messages API
+   (`agents/minimax_agent.py`, docs/adr/0019). Optional
+   `ANTHROPIC_BASE_URL` (default `https://api.minimax.io/anthropic`; use the
+   `.com` endpoint in China).
+2. ➖ **Secret**: `CURSOR_API_KEY` — kept provisioned but **dormant**. The
+   Cursor SDK engine was replaced by MiniMax (docs/adr/0019); no agent
+   consumes this key. Left in place for a possible rollback. NOTE: the
+   `cursor-sdk` *package* is deliberately uninstalled — its presence
+   hijacks the `openai` client onto the Cursor gateway (docs/adr/0019). The
+   env var is harmless; the package is not.
+3. ⬜ **Secret**: `GH_PAT` — a token that can push `.github/workflows/*`
    (`workflow` scope). `GITHUB_TOKEN` cannot; issue #61 failed on that.
    Needed for any ticket that adds or edits GitHub Actions workflows.
 2. ✅ **Labels**: `agent:ready-for-dev`, `agent:iteration-1` through
@@ -83,7 +92,8 @@ finds them on its own; failed tickets retry themselves.
 cd agents
 python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-export CURSOR_API_KEY="cursor_..."
+export ANTHROPIC_AUTH_TOKEN="..."                            # MiniMax token
+# export ANTHROPIC_BASE_URL="https://api.minimax.io/anthropic"  # optional
 gh auth login   # gh CLI must be authenticated with repo write access
 
 python prepare_iteration.py 123        # bumps agent:iteration-N, prints new N
@@ -103,8 +113,10 @@ python try_finalize.py 123 1           # no-ops until gate+test+review labels ex
   issue on every merge done via `gh pr merge` in practice; worth
   double-checking, or closing the issue explicitly as a fallback in the
   auto-merge workflow step.
-- `Cursor.models.list()` IDs are not all executable on the local SDK
-  runtime the harness uses. Test/Review currently run `grok-4.6`, not
-  `claude-opus-5` — see `docs/adr/0014`. Changing those IDs in
-  `.github/workflows/agent-harness.yml` without a local probe will
-  silently fail-closed (`agent:needs-rework`) again.
+- MiniMax model IDs (`MiniMax-M2.5-highspeed` Dev, `MiniMax-M3`
+  Test/Review) are not yet verified against the live MiniMax catalog for
+  this account (docs/adr/0019). The first real Dev run confirms them; a
+  bad ID fails closed (`agent:needs-rework`) with a diagnostic from
+  `minimax_agent.py`. Override via the `*_AGENT_MODEL` workflow env.
+- `agents/sdk_run.py` (Cursor-specific run diagnostics) is now unused;
+  left in place pending a cleanup ADR.

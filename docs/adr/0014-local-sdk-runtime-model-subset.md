@@ -1,6 +1,6 @@
 # ADR-0014: Local SDK runtime only executes a subset of listed models
 
-**Status**: Accepted — implemented
+**Status**: Accepted — Cursor-runtime constraint moot once the Cursor SDK engine was dropped by [ADR-0019](0019-minimax-agent-loop-replaces-cursor-sdk.md); superseded model-ID history in [ADR-0017](0017-minimax-api-key-for-agent-models.md) → [ADR-0018](0018-revert-minimax-sdk-model-ids.md) → [ADR-0019](0019-minimax-agent-loop-replaces-cursor-sdk.md)
 **Date**: 2026-08-19
 
 ## Context
