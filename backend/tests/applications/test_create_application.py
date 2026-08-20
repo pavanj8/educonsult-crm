@@ -1,10 +1,12 @@
 """POST /applications endpoint tests (E18, Journey J11, issue #145)."""
 
+from app.auth import create_access_token
 from app.models.application import Application
 from app.models.tenant import Tenant
 from app.pipeline.stages import PipelineStage
 from app.rbac.roles import Role
 from tests.branches.helpers import seed_branch
+from tests.conftest import make_auth_headers
 from tests.factories.users import make_authenticated_user, make_db_user
 
 
@@ -260,3 +262,130 @@ def test_create_application_rejects_invalid_ids(
     )
 
     assert response.status_code == 422
+
+
+def test_create_application_success_with_real_jwt(client, db_session):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    password = "student-password"
+    make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        email="student.jwt@example.test",
+        password=password,
+    )
+    login_response = client.post(
+        "/auth/login",
+        json={"email": "student.jwt@example.test", "password": password},
+    )
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/applications",
+        headers=make_auth_headers(access_token),
+        json=make_create_application_payload(university_id=55, program_id=66),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["university_id"] == 55
+    assert body["program_id"] == 66
+    assert body["stage"] == PipelineStage.REGISTERED.value
+    assert body["tenant_id"] == tenant.id
+
+
+def test_create_application_rejects_invalid_access_token(client):
+    response = client.post(
+        "/applications",
+        headers=make_auth_headers("not-a-valid-jwt"),
+        json=make_create_application_payload(),
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid access token"
+
+
+def test_create_application_rejects_non_student_jwt(client, db_session):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    counselor = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+    )
+    token = create_access_token(
+        make_authenticated_user(
+            Role.COUNSELOR,
+            user_id=counselor.id,
+            tenant_id=tenant.id,
+            branch_id=branch.id,
+        )
+    )
+
+    response = client.post(
+        "/applications",
+        headers=make_auth_headers(token),
+        json=make_create_application_payload(),
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Insufficient permissions"
+
+
+def test_create_application_rejects_missing_program_id(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _seed_student(db_session, tenant.id, branch.id)
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.STUDENT,
+            user_id=student.id,
+            tenant_id=tenant.id,
+            branch_id=branch.id,
+        )
+    )
+
+    response = client.post(
+        "/applications",
+        json={"university_id": 101},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_application_rejects_student_missing_tenant_scope(
+    client,
+    db_session,
+    override_authenticated_user,
+):
+    student = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=None,
+        branch_id=1,
+    )
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.STUDENT,
+            user_id=student.id,
+            tenant_id=None,
+            branch_id=1,
+        )
+    )
+
+    response = client.post(
+        "/applications",
+        json=make_create_application_payload(),
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Student account is missing tenant scope"
