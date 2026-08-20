@@ -121,8 +121,14 @@ describe -- nothing more, nothing speculative.
 5. Follow existing conventions already established in this repo (check
    `backend/` and `frontend/` for prior art before introducing new
    patterns).
-6. Run your own tests (e.g. `pytest` inside `backend/`) and iterate until
-   they pass, before finishing.
+6. Before finishing, run BOTH of these inside `backend/` and iterate until
+   each is clean — the PR will NOT merge otherwise:
+   - `python -m pytest` — all tests pass.
+   - `ruff check .` — ZERO lint errors. CI runs exactly this (`ruff==0.16.3`;
+     config in `backend/pyproject.toml`: rules E/F/I, line-length 88). Run
+     `ruff check --fix .` first to auto-fix import ordering (I) and unused
+     imports (F401), then fix anything it reports by hand. Do not leave unused
+     imports/variables or out-of-order imports.
 7. This is iteration {iteration} for this issue. If the feedback section
    above is non-empty, treating it as optional is a failure.
 

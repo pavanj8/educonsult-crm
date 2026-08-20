@@ -18,6 +18,7 @@ iteration:
 - [ ] Automated tests (unit, and integration/E2E where applicable) are added or updated alongside any application code change, and committed in the same PR — not left for a follow-up.
 - [ ] The number of test functions has not decreased relative to `main` (mechanically enforced by `agents/check_test_gate.py`).
 - [ ] All tests pass: `pytest` for the backend, Playwright for E2E flows where relevant.
+- [ ] Backend lint is clean: `ruff check .` inside `backend/` reports zero errors (CI's `Ruff lint` gate runs exactly this with `ruff==0.16.3`; config in `backend/pyproject.toml`). A lint failure blocks auto-merge just like a test failure.
 
 ## 3. Independent verification
 - [ ] The Test Agent's black-box tests pass. These are derived only from `docs/requirements.md` / `docs/journeys.md` / `docs/epics.md` and the issue itself — never from reading the implementation or the developer's own tests first (`docs/adr/0008`, `harness-demo/adr/0004`). For infra-only issues with no live HTTP surface yet, this step is marked PASS-by-N/A instead of skipped silently.
@@ -37,6 +38,7 @@ iteration:
 | DoD item | Enforced by |
 |---|---|
 | Tests exist, didn't shrink, pass | `agents/check_test_gate.py` (mechanical, cannot be talked around) |
+| Backend lint clean (`ruff check .`) | `.github/workflows/ci-backend.yml` (`Ruff lint`) + Dev Agent prompt + a `ruff check --fix` backstop in `agent-harness.yml` |
 | Independent functional correctness | `agents/test_agent.py` |
 | Security / architecture / code quality / API design / test quality | `agents/review_agent.py` |
 | No scope creep, protected paths untouched | `agents/dev_agent.py` prompt + Review Agent |
