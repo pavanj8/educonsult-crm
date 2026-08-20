@@ -16,6 +16,7 @@ from app.auth import (
     verify_password,
     verify_refresh_token,
 )
+from app.auth.email_uniqueness import DUPLICATE_EMAIL_DETAIL, ensure_email_available
 from app.db.database import get_db
 from app.models.branch import Branch
 from app.models.tenant import Tenant
@@ -160,23 +161,7 @@ def register_student(
             detail="Branch not found",
         )
 
-    try:
-        existing_user = (
-            db.query(User)
-            .filter(func.lower(User.email) == payload.email)
-            .one_or_none()
-        )
-    except OperationalError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_DB_UNAVAILABLE_DETAIL,
-        ) from None
-
-    if existing_user is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A user with this email already exists",
-        )
+    ensure_email_available(db, payload.email, unavailable_detail=_DB_UNAVAILABLE_DETAIL)
 
     student_user = User(
         email=payload.email,
@@ -199,7 +184,7 @@ def register_student(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A user with this email already exists",
+            detail=DUPLICATE_EMAIL_DETAIL,
         ) from None
     except OperationalError:
         db.rollback()
