@@ -127,6 +127,7 @@ export default function StudentDashboardPage() {
           <label className="application-form__field">
             Program
             <select
+              key={selectedUniversityId ?? 'none'}
               data-testid="application-program"
               name="program_id"
               required

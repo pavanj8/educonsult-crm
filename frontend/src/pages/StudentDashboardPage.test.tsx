@@ -66,6 +66,20 @@ describe('StudentDashboardPage', () => {
     expect(screen.getByRole('option', { name: 'MSc Computer Science' })).toBeInTheDocument()
   })
 
+  it('resets program select when university changes', async () => {
+    const user = userEvent.setup()
+    renderStudentDashboard()
+
+    await screen.findByTestId('application-university')
+    await user.selectOptions(screen.getByTestId('application-university'), '1')
+    await user.selectOptions(screen.getByTestId('application-program'), '10')
+
+    await user.selectOptions(screen.getByTestId('application-university'), '2')
+
+    expect(screen.getByTestId('application-program')).toHaveValue('')
+    expect(screen.getByRole('option', { name: 'Master of Engineering' })).toBeInTheDocument()
+  })
+
   it('creates an application and shows success message', async () => {
     const user = userEvent.setup()
     globalThis.fetch = vi
