@@ -49,3 +49,4 @@ receive new entries.
 | [0019](0019-minimax-agent-loop-replaces-cursor-sdk.md) | Replace the Cursor SDK engine with a direct-MiniMax agent loop | Accepted — implemented | 2026-08-20 |
 | [0020](0020-unified-gate-and-ci-feedback-loop.md) | Unified check gate (`scripts/check.sh`) + CI-failure feedback loop | Accepted — implemented | 2026-08-20 |
 | [0021](0021-agent-latency-context-pack.md) | Cut agent latency with a context pack + efficiency prompts | Accepted — implemented | 2026-08-20 |
+| [0022](0022-event-driven-pipeline-chain.md) | Event-driven pipeline chain (don't depend on the picker cron) | Accepted — implemented | 2026-08-20 |
