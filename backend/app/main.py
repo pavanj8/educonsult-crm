@@ -7,12 +7,8 @@ from sqlalchemy.orm import Session
 import app.models  # noqa: F401 — register ORM models with Base.metadata
 from app.db.database import SQLALCHEMY_DATABASE_URL, SessionLocal, engine
 from app.models.base import Base
-<<<<<<< HEAD
-from app.db.database import SessionLocal
-=======
 from app.pipeline.default_transitions import seed_default_stage_transitions
 from app.routers.applications import router as applications_router
->>>>>>> origin/main
 from app.routers.auth import router as auth_router
 from app.routers.branches import router as branches_router
 from app.routers.master_data import router as master_data_router

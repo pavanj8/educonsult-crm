@@ -9,11 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-<<<<<<< HEAD
-HEAD_REVISION = "f6a7b8c9d0e1"
-=======
-HEAD_REVISION = "f7a8b9c0d1e2"
->>>>>>> origin/main
+HEAD_REVISION = "f8a9b0c1d2e3"
 
 
 def _alembic_config() -> Config:
@@ -58,6 +54,9 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "branches" in table_names
         assert "stage_transitions" in table_names
         assert "applications" in table_names
+        assert "countries" in table_names
+        assert "universities" in table_names
+        assert "programs" in table_names
         user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
         assert "is_active" in user_columns
         assert "name" in user_columns
@@ -66,11 +65,6 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "target_country_id" in user_columns
         assert "target_university_id" in user_columns
         assert "target_program_id" in user_columns
-<<<<<<< HEAD
-        assert "countries" in table_names
-        assert "universities" in table_names
-        assert "programs" in table_names
-=======
         stage_columns = {column["name"] for column in inspect(connection).get_columns("stage_transitions")}
         assert "from_stage" in stage_columns
         assert "to_stage" in stage_columns
@@ -120,7 +114,6 @@ def test_alembic_upgrade_head_seeds_stage_transitions(tmp_path, monkeypatch):
             f"Missing default transition {from_stage.value} -> {to_stage.value}"
         )
         assert seeded[(from_stage.value, to_stage.value)] == (None, True)
->>>>>>> origin/main
 
 
 def test_alembic_downgrade_base_clears_revision(tmp_path, monkeypatch):

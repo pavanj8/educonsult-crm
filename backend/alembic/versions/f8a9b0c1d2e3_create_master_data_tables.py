@@ -1,7 +1,7 @@
 """create master data tables
 
-Revision ID: f6a7b8c9d0e1
-Revises: e5f6a7b8c9d0
+Revision ID: f8a9b0c1d2e3
+Revises: f7a8b9c0d1e2
 Create Date: 2026-08-20 01:00:00.000000
 
 """
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "f6a7b8c9d0e1"
-down_revision: Union[str, None] = "e5f6a7b8c9d0"
+revision: str = "f8a9b0c1d2e3"
+down_revision: Union[str, None] = "f7a8b9c0d1e2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

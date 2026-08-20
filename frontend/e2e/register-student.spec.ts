@@ -64,46 +64,6 @@ async function mockMasterDataRoutes(page: import('@playwright/test').Page) {
   })
 }
 
-async function mockRegisterStudentSuccess(page: import('@playwright/test').Page) {
-  await page.route('**/auth/register-student', async (route) => {
-    await route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 42,
-        email: VALID_REGISTRATION.email,
-        role: 'student',
-        tenant_id: 10,
-        branch_id: 1,
-        name: VALID_REGISTRATION.name,
-        phone: VALID_REGISTRATION.phone,
-        date_of_birth: VALID_REGISTRATION.dateOfBirth,
-        target_country_id: 1,
-        target_university_id: 10,
-        target_program_id: 100,
-        access_token: 'student-access-token',
-        refresh_token: 'student-refresh-token',
-        token_type: 'bearer',
-        created_at: '2026-01-01T00:00:00Z',
-      }),
-    })
-  })
-
-  await page.route('**/auth/me', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 42,
-        email: VALID_REGISTRATION.email,
-        role: 'student',
-        tenant_id: 10,
-        branch_id: 1,
-      }),
-    })
-  })
-}
-
 async function fillRegisterForm(
   page: import('@playwright/test').Page,
   data = VALID_REGISTRATION,
@@ -249,9 +209,9 @@ test.describe('Student registration form', () => {
   test('slower previous slug response does not replace current country options', async ({
     page,
   }) => {
-    let resolveSlow: (() => void) | null = null
+    const releaseGate: { resolve?: () => void } = {}
     const slowReady = new Promise<void>((resolve) => {
-      resolveSlow = resolve
+      releaseGate.resolve = resolve
     })
 
     await page.route('**/tenants/slow/countries', async (route) => {
@@ -279,7 +239,7 @@ test.describe('Student registration form', () => {
     await waitForSelectOption(page, 'register-target-country', 'Canada')
     await expectSelectOptionAbsent(page, 'register-target-country', 'Stale Country')
 
-    resolveSlow?.()
+    releaseGate.resolve?.()
     await page.waitForTimeout(300)
     await waitForSelectOption(page, 'register-target-country', 'Canada')
     await expectSelectOptionAbsent(page, 'register-target-country', 'Stale Country')

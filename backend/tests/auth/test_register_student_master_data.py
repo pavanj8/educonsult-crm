@@ -1,7 +1,7 @@
 """Register-student master-data validation tests (E16/E14; issue #139)."""
 
 from app.models.tenant import Tenant
-from tests.auth.test_register_student import VALID_PASSWORD, make_register_student_payload
+from tests.auth.test_register_student import make_register_student_payload
 from tests.branches.helpers import seed_branch
 from tests.master_data.helpers import seed_master_data_chain
 
