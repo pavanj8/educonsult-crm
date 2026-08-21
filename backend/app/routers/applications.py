@@ -26,6 +26,7 @@ from app.schemas.application import (
     ApplicationResponse,
     CreateApplicationRequest,
     MarkEnrolledRequest,
+    MarkRejectedRequest,
     StageHistoryEntry,
 )
 from app.services.stage_progression import (
@@ -480,6 +481,87 @@ def mark_application_enrolled(
         changed_by_user_id=current_user.id,
         changed_at=_utc_now(),
         reason=payload.details,
+    )
+    db.add(history_entry)
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(application)
+    db.refresh(history_entry)
+
+    return AdvanceStageResponse(
+        application=ApplicationResponse.model_validate(application),
+        history_entry=StageHistoryEntry.model_validate(history_entry),
+    )
+
+
+@router.post("/{application_id}/mark-rejected", response_model=AdvanceStageResponse)
+def mark_application_rejected(
+    application_id: int,
+    payload: MarkRejectedRequest,
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.APPLICATION_ADVANCE_STAGE)),
+    ],
+    db: Session = Depends(get_db),
+) -> AdvanceStageResponse:
+    """Mark an application REJECTED, capturing the REQUIRED reason (E39; J32).
+
+    A dedicated action endpoint for the "Mark Rejected" staff action (frontend
+    #206). Requires ``application:advance_stage`` (consultancy owner, branch
+    manager, or counselor) and, for counselor / branch manager, that the
+    application is in the caller's branch. Validates the (current stage ->
+    ``rejected``) transition, flips ``Application.stage`` to ``rejected``, and
+    appends a :class:`StageHistory` row recording the transition and the reason.
+
+    Errors: 403 (lacks permission / no tenant scope / wrong branch), 404
+    (missing / cross-tenant), 422 (application already in a terminal stage that
+    cannot be rejected, or reason empty/>2000 chars), 503 (database unavailable).
+    """
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+    application = _get_tenant_application(application_id, current_user, db)
+    _enforce_branch_scope(application, current_user)
+
+    from_stage = PipelineStage(application.stage)
+    to_stage = PipelineStage.REJECTED
+
+    try:
+        validate_transition(db, from_stage, to_stage, current_user.tenant_id)
+    except InvalidStageTransitionError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Application in stage '{from_stage.value}' cannot be marked rejected."
+            ),
+        ) from None
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    application.stage = to_stage
+
+    history_entry = StageHistory(
+        tenant_id=application.tenant_id,
+        application_id=application.id,
+        from_stage=from_stage,
+        to_stage=to_stage,
+        changed_by_user_id=current_user.id,
+        changed_at=_utc_now(),
+        reason=payload.reason,
     )
     db.add(history_entry)
 
