@@ -27,11 +27,27 @@ from app.storage.service import (
     get_document_storage,
     set_document_storage,
 )
+from app.storage.validation import (
+    ALLOWED_CONTENT_TYPES,
+    ALLOWED_EXTENSIONS,
+    FILE_TOO_LARGE_DETAIL,
+    FILE_TYPE_NOT_ALLOWED_DETAIL,
+    MAX_FILE_BYTES,
+    MAX_FILE_SIZE_MB,
+    validate_file_size,
+    validate_file_type,
+)
 
 __all__ = [
+    "ALLOWED_CONTENT_TYPES",
+    "ALLOWED_EXTENSIONS",
     "DocumentStorageError",
     "DocumentStorageService",
+    "FILE_TOO_LARGE_DETAIL",
+    "FILE_TYPE_NOT_ALLOWED_DETAIL",
     "InMemoryDocumentStorage",
+    "MAX_FILE_BYTES",
+    "MAX_FILE_SIZE_MB",
     "S3DocumentStorageService",
     "document_storage_bucket",
     "document_storage_endpoint_url",
@@ -39,4 +55,6 @@ __all__ = [
     "document_storage_region",
     "get_document_storage",
     "set_document_storage",
+    "validate_file_size",
+    "validate_file_type",
 ]
