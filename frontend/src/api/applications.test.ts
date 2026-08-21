@@ -172,3 +172,24 @@ describe('fetchAssignedApplications API client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/applications/assigned-to-me?stage=counseling', expect.anything())
   })
 })
+
+describe('markRejected API client', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('posts the reason to the mark-rejected endpoint', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const result = { application: { id: 5 }, history_entry: { to_stage: 'rejected' } }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => result })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { markRejected } = await import('./applications')
+    const res = await markRejected(5, 'Missing documents')
+    expect(res).toEqual(result)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/mark-rejected',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ reason: 'Missing documents' }) }),
+    )
+  })
+})

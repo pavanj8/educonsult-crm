@@ -61,3 +61,17 @@ export async function fetchAssignedApplications(
   const suffix = query.toString() ? `?${query.toString()}` : ''
   return apiFetch<Application[]>(`/applications/assigned-to-me${suffix}`)
 }
+
+/**
+ * Mark an application REJECTED with a REQUIRED reason (E39; Journey J32; #205).
+ * Backed by ``POST /applications/{id}/mark-rejected``.
+ */
+export async function markRejected(
+  applicationId: number,
+  reason: string,
+): Promise<StageTransitionResult> {
+  return apiFetch<StageTransitionResult>(`/applications/${applicationId}/mark-rejected`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
