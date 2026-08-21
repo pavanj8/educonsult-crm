@@ -1,6 +1,6 @@
 """Signup validation tests for POST /auth/register-student (E16, Journey J9, issue #140)."""
 
-from datetime import date, timedelta
+from datetime import date
 
 from app.auth import verify_access_token, verify_refresh_token
 from app.auth.password import verify_password
@@ -13,16 +13,6 @@ from tests.auth.register_student_helpers import (
 )
 from tests.branches.helpers import seed_branch
 from tests.master_data.helpers import seed_master_data_chain
-
-# Re-export ``make_register_student_payload`` (and ``VALID_PASSWORD``) so that
-# other tests in this package -- notably
-# ``tests.auth.test_register_student_master_data`` (issue #139) -- can keep
-# importing them from this module without depending on the internal helper
-# module directly.
-__all__ = [
-    "VALID_PASSWORD",
-    "make_register_student_payload",
-]
 
 
 def test_register_student_success(client, db_session):
@@ -397,7 +387,9 @@ def test_register_student_rejects_implausible_date_of_birth(client, db_session):
 def test_register_student_rejects_student_under_minimum_age(client, db_session):
     tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
-    too_young_dob = (date.today() - timedelta(days=365 * 9)).isoformat()
+    # A DOB less than 10 calendar years before today (here: 9 years ago)
+    # must be rejected by the schema validator.
+    too_young_dob = date.today().replace(year=date.today().year - 9).isoformat()
 
     response = client.post(
         "/auth/register-student",
@@ -409,6 +401,66 @@ def test_register_student_rejects_student_under_minimum_age(client, db_session):
     )
 
     assert response.status_code == 422
+
+
+def test_register_student_accepts_student_at_minimum_age(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    # A DOB exactly 10 calendar years before today is the boundary the schema
+    # allows (age >= 10). Using replace(year=today.year - 10) is deterministic
+    # regardless of leap years, unlike (today - 365*10 days).
+    just_old_enough_dob = date.today().replace(year=date.today().year - 10).isoformat()
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="boundary.age@example.test",
+            date_of_birth=just_old_enough_dob,
+        ),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["date_of_birth"] == just_old_enough_dob
+
+
+def test_register_student_rejects_whitespace_only_name_locates_name_field(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="blank.name.loc@example.test",
+            name="   ",
+        ),
+    )
+
+    assert response.status_code == 422
+    # The Pydantic 422 envelope must surface the offending field path so the
+    # frontend can render a useful "name must not be empty" message.
+    detail = response.json()["detail"]
+    assert any("name" in (entry.get("loc") or []) for entry in detail), detail
+
+
+def test_register_student_rejects_under_minimum_age_locates_date_of_birth_field(client, db_session):
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    too_young_dob = date.today().replace(year=date.today().year - 9).isoformat()
+
+    response = client.post(
+        "/auth/register-student",
+        json=make_register_student_payload(
+            branch_id=branch.id,
+            email="young.loc@example.test",
+            date_of_birth=too_young_dob,
+        ),
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any("date_of_birth" in (entry.get("loc") or []) for entry in detail), detail
 
 
 def test_register_student_rejects_invalid_target_country_id(client, db_session):
