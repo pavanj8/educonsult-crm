@@ -1,5 +1,6 @@
-"""Application routes (E18; E21; Journey J11; J14)."""
+"""Application routes (E18; E21; E25; Journey J11; J14; J18)."""
 
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,6 +12,7 @@ from app.db.database import get_db
 from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
 from app.models.application import Application, ApplicationStage
 from app.models.program import Program
+from app.models.stage_history import StageHistory
 from app.models.university import University
 from app.models.user import User
 from app.pipeline.stages import PipelineStage
@@ -18,11 +20,26 @@ from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
-from app.schemas.application import ApplicationResponse, CreateApplicationRequest
+from app.schemas.application import (
+    AdvanceStageRequest,
+    AdvanceStageResponse,
+    ApplicationResponse,
+    CreateApplicationRequest,
+    StageHistoryEntry,
+)
+from app.services.stage_progression import (
+    InvalidStageTransitionError,
+    validate_transition,
+)
 
 router = APIRouter()
 
 _DB_UNAVAILABLE_DETAIL = "Application service is temporarily unavailable"
+_BRANCH_ACCESS_DENIED_DETAIL = "User has no access to this branch's applications"
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _get_active_student(
@@ -94,6 +111,60 @@ def _validate_university_and_program(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Program does not belong to the selected university",
         )
+
+
+def _get_tenant_application(
+    application_id: int,
+    current_user: AuthenticatedUser,
+    db: Session,
+) -> Application:
+    """Load an application belonging to the caller's tenant, or raise 404.
+
+    Used by the E25 advance-stage endpoint (issue #169). Mirrors the
+    tenant-scoping convention used by the E11/E12 routers so cross-tenant
+    requests surface as 404 (never 403) -- prevents tenant-id enumeration.
+    """
+    try:
+        application = db.get(Application, application_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if application is None or (
+        current_user.tenant_id is not None
+        and application.tenant_id != current_user.tenant_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    return application
+
+
+def _enforce_branch_scope(
+    application: Application,
+    current_user: AuthenticatedUser,
+) -> None:
+    """Block counselors / branch managers from acting on applications in other branches.
+
+    Consultancy owners and super admins keep cross-branch visibility by
+    design (ADR-0004 + Security Analyst finding on iteration #1 of issue
+    #169). A missing ``current_user.branch_id`` is treated as a 403 for
+    the same reason: a counselor without a branch assignment must not
+    be able to advance anything.
+    """
+    if current_user.role in (Role.COUNSELOR, Role.BRANCH_MANAGER):
+        if (
+            current_user.branch_id is None
+            or application.branch_id != current_user.branch_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=_BRANCH_ACCESS_DENIED_DETAIL,
+            )
 
 
 @router.post(
@@ -250,3 +321,98 @@ def list_assigned_applications(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=_DB_UNAVAILABLE_DETAIL,
         ) from None
+
+
+@router.post("/{application_id}/stage", response_model=AdvanceStageResponse)
+def advance_application_stage(
+    application_id: int,
+    payload: AdvanceStageRequest,
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.APPLICATION_ADVANCE_STAGE)),
+    ],
+    db: Session = Depends(get_db),
+) -> AdvanceStageResponse:
+    """Advance an application's pipeline stage and log the transition (E25; J18; #169).
+
+    Requires the ``application:advance_stage`` permission (consultancy
+    owner, branch manager, or counselor). Validates the (current stage →
+    ``payload.to_stage``) transition against the platform-default or
+    tenant-specific rule table (see
+    :func:`app.services.stage_progression.validate_transition`), updates
+    ``Application.stage``, and appends one :class:`StageHistory` row
+    recording ``from_stage`` / ``to_stage`` / ``changed_by_user_id`` /
+    ``changed_at`` / ``reason`` (the optional reason required by
+    Requirements §5 for terminal REJECTED / WITHDRAWN transitions).
+
+    Errors:
+
+    * 401 — caller is not authenticated.
+    * 403 — caller lacks the permission, has no tenant scope, has no
+      branch scope (counselor / branch manager), or is in a different
+      branch than the application.
+    * 404 — application does not exist or belongs to a different tenant.
+    * 422 — ``to_stage`` is not a permitted transition from the current
+      stage, or the request body fails Pydantic validation (e.g.
+      ``reason`` missing for a terminal-stage transition). The
+      application is left untouched; no history row is written.
+    * 503 — database unavailable while loading / writing the application
+      or history row.
+    """
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+    application = _get_tenant_application(application_id, current_user, db)
+    _enforce_branch_scope(application, current_user)
+
+    from_stage = PipelineStage(application.stage)
+    to_stage = payload.to_stage
+
+    try:
+        validate_transition(db, from_stage, to_stage, current_user.tenant_id)
+    except InvalidStageTransitionError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Transition from '{from_stage.value}' to '{to_stage.value}' "
+                "is not allowed."
+            ),
+        ) from None
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    application.stage = to_stage
+
+    history_entry = StageHistory(
+        tenant_id=application.tenant_id,
+        application_id=application.id,
+        from_stage=from_stage,
+        to_stage=to_stage,
+        changed_by_user_id=current_user.id,
+        changed_at=_utc_now(),
+        reason=payload.reason,
+    )
+    db.add(history_entry)
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(application)
+    db.refresh(history_entry)
+
+    return AdvanceStageResponse(
+        application=ApplicationResponse.model_validate(application),
+        history_entry=StageHistoryEntry.model_validate(history_entry),
+    )
