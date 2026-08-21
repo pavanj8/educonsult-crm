@@ -6,6 +6,19 @@ export type ApiError = Error & { status: number }
 
 type ApiFetchInit = RequestInit & {
   skipAuth?: boolean
+  /**
+   * When ``true`` the helper will not set the ``Content-Type`` JSON
+   * header — letting the browser set the boundary for a
+   * ``multipart/form-data`` upload (Journey J20). Any caller-provided
+   * ``Content-Type`` still wins. Defaults to ``false`` (JSON).
+   *
+   * Note: callers can also pass ``headers: { 'Content-Type': undefined }``
+   * to explicitly clear the default JSON header without flipping
+   * ``skipContentType`` — caller-supplied headers are merged last, so
+   * the ``undefined`` overwrites the default. This is the same
+   * "caller-wins" rule that applies to every other header.
+   */
+  skipContentType?: boolean
 }
 
 function createApiError(message: string, status: number): ApiError {
@@ -44,14 +57,19 @@ async function parseErrorMessage(response: Response): Promise<string> {
 }
 
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
-  const { skipAuth = false, ...requestInit } = init ?? {}
+  const { skipAuth = false, skipContentType = false, ...requestInit } = init ?? {}
+  const headers: Record<string, string> = {}
+  if (!skipContentType) {
+    headers['Content-Type'] = 'application/json'
+  }
+  Object.assign(headers, skipAuth ? {} : authHeaders())
+  // Caller-provided headers always win last (lets them pass an explicit
+  // ``Content-Type`` for multipart or ``undefined`` to clear the default).
+  Object.assign(headers, requestInit.headers ?? {})
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...requestInit,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(skipAuth ? {} : authHeaders()),
-      ...requestInit.headers,
-    },
+    headers,
   })
 
   if (!response.ok) {

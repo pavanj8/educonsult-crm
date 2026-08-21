@@ -3,6 +3,7 @@ import {
   type ChecklistItem,
   type ChecklistUpload,
 } from '../../types/checklist'
+import ChecklistItemUpload from './ChecklistItemUpload'
 
 /**
  * Props for {@link ChecklistView}.
@@ -160,7 +161,13 @@ export default function ChecklistView({
                       </p>
                     ) : null}
                   </div>
-                ) : null}
+                ) : (
+                  <ChecklistItemUpload
+                    applicationId={applicationId}
+                    checklistItemTemplateId={item.templateId}
+                    onUploaded={onReload}
+                  />
+                )}
               </li>
             )
           })}

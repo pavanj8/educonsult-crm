@@ -208,4 +208,19 @@ describe('ChecklistView', () => {
     expect(screen.queryByRole('list')).not.toBeInTheDocument()
     expect(screen.queryByTestId('checklist-item-10')).not.toBeInTheDocument()
   })
+
+  it('renders an upload control for items without an upload (E27; Journey J20)', () => {
+    renderView()
+
+    // Only the not-uploaded item (templateId 10) gets the upload UI.
+    expect(screen.getByTestId('checklist-item-upload-10')).toBeInTheDocument()
+    expect(screen.getByTestId('checklist-item-upload-trigger-10')).toBeInTheDocument()
+    expect(screen.getByTestId('checklist-item-upload-input-10')).toBeInTheDocument()
+
+    // Items with an upload (approved / rejected / pending) do NOT show
+    // the upload UI — that re-upload path is owned by E31.
+    expect(screen.queryByTestId('checklist-item-upload-11')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('checklist-item-upload-12')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('checklist-item-upload-13')).not.toBeInTheDocument()
+  })
 })
