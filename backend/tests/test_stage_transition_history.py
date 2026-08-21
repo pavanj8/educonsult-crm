@@ -36,7 +36,6 @@ HTTP route is required. They will continue to gate the behaviour once the
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import pytest
 from sqlalchemy.orm import Session
@@ -70,11 +69,11 @@ def _record_history(
     db: Session,
     *,
     application: Application,
-    from_stage: Optional[PipelineStage],
+    from_stage: PipelineStage | None,
     to_stage: PipelineStage,
-    changed_by_user_id: Optional[int],
-    reason: Optional[str] = None,
-    changed_at: Optional[datetime] = None,
+    changed_by_user_id: int | None,
+    reason: str | None = None,
+    changed_at: datetime | None = None,
 ) -> StageHistory:
     """Insert a StageHistory row mirroring what the advance-stage flow writes.
 
