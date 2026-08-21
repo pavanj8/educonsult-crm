@@ -185,18 +185,52 @@ jobs:
 
       - name: Open or update pull request
         env:
-          # Author the PR as the real user (GH_PAT), not github-actions[bot],
-          # so its CI runs aren't gated by the public-repo first-time-contributor
-          # approval policy (docs/adr/0023). Falls back to GITHUB_TOKEN.
+          # Author the PR as the real user (GH_PAT), not github-actions[bot], so
+          # its CI isn't gated by the public-repo first-time-contributor approval
+          # policy (docs/adr/0023, docs/adr/0026). Falls back to GITHUB_TOKEN.
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          ISSUE: ${{ steps.issue.outputs.number }}
+          REPO: ${{ github.repository }}
         run: |
-          if ! gh pr list --head "${{ steps.branch.outputs.name }}" --json number --jq '.[0].number' | grep -q '[0-9]'; then
-            gh pr create \
-              --title "Issue #${{ steps.issue.outputs.number }}: agent harness implementation" \
-              --body "Automated implementation by the Dev/Test/Review agent harness. Closes #${{ steps.issue.outputs.number }}." \
-              --head "${{ steps.branch.outputs.name }}" \
-              --base main
+          create_pr() {
+            gh pr create -R "$REPO" \
+              --title "Issue #$ISSUE: agent harness implementation" \
+              --body "Automated implementation by the Dev/Test/Review agent harness. Closes #$ISSUE." \
+              --head "$BRANCH" --base main
+          }
+          pr_info() { gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,author --jq '.[0] | "\(.number) \(.author.login)"'; }
+
+          INFO=$(pr_info)
+          if [ -z "$INFO" ]; then
+            # Create; retry a few times for transient GH_PAT/API blips (docs/adr/0026).
+            for i in 1 2 3; do create_pr && break || { echo "pr create attempt $i failed; retrying"; sleep 5; }; done
+            INFO=$(pr_info)
           fi
+          AUTHOR=$(printf '%s' "$INFO" | awk '{print $2}')
+          NUM=$(printf '%s' "$INFO" | awk '{print $1}')
+
+          # A bot-authored PR gets its CI held as action_required (approval gate).
+          # This happens when GH_PAT didn't apply on the ORIGINAL create (e.g. an
+          # earlier attempt in a bad window). Recreate it as the real user.
+          case "$AUTHOR" in
+            github-actions|app/github-actions|"")
+              if [ -n "$NUM" ]; then
+                echo "::warning::PR #$NUM is bot-authored; closing and recreating with GH_PAT so CI is not approval-gated."
+                gh pr close -R "$REPO" "$NUM" || true
+              fi
+              for i in 1 2 3; do create_pr && break || sleep 5; done
+              AUTHOR=$(pr_info | awk '{print $2}')
+              ;;
+          esac
+
+          case "$AUTHOR" in
+            github-actions|app/github-actions|"")
+              echo "::error::PR is still bot-authored / missing -- GH_PAT is not being applied. Refresh the GH_PAT secret (fine-grained PAT with contents + pull-requests write). CI will keep needing manual approval until then."
+              exit 1
+              ;;
+            *) echo "PR for $BRANCH authored by: $AUTHOR" ;;
+          esac
 
       - name: Build gate — don't spend Test/Review/CI on broken Dev output (docs/adr/0023)
         id: buildgate

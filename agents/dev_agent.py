@@ -29,6 +29,12 @@ llm_env.configure_minimax_env()
 REPO_ROOT = target_app.REPO_ROOT
 # Fast/cheap MiniMax tier for Dev (docs/adr/0019). Overridable via env.
 DEFAULT_MODEL = os.environ.get("DEV_AGENT_MODEL", llm_env.DEFAULT_DEV_MODEL)
+# Dev caps at fewer turns than the tool-heavy Test/Review agents (which use the
+# engine's MAX_TURNS=140). With the context pack + str_replace + "run check.sh
+# once" guidance, a well-behaved Dev run finishes well under this; the lower cap
+# stops a churning run from holding the single Dev slot for ~49 min before the
+# rail trips (docs/adr/0026). Overridable via env.
+DEV_MAX_TURNS = int(os.environ.get("DEV_MAX_TURNS", "50"))
 
 
 def read_text(path: Path) -> str:
@@ -215,7 +221,7 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
     )
 
     print(f"--- Dev Agent starting for issue #{issue['number']} (model={model}) ---\n")
-    return minimax_agent.run_agent("dev-agent", prompt, model, REPO_ROOT)
+    return minimax_agent.run_agent("dev-agent", prompt, model, REPO_ROOT, max_turns=DEV_MAX_TURNS)
 
 
 def git_files_changed() -> list[str]:
