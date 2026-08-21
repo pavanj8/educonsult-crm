@@ -1,3 +1,4 @@
+import ApproveAction from '../components/documents/ApproveAction'
 import RejectAction from '../components/documents/RejectAction'
 import { useVerifierQueue } from '../hooks/useVerifierQueue'
 
@@ -13,7 +14,7 @@ function formatUploadedAt(value: string): string {
  * actions land in sibling tickets (E29 #181 approve, E30 #185 reject).
  */
 export default function VerifierDashboardPage() {
-  const { documents, total, loading, error, reload, reject } = useVerifierQueue()
+  const { documents, total, loading, error, reload, reject, approve } = useVerifierQueue()
 
   return (
     <section className="verifier-dashboard" aria-labelledby="verifier-dashboard-heading">
@@ -60,6 +61,11 @@ export default function VerifierDashboardPage() {
                   <td>#{doc.application_id}</td>
                   <td>#{doc.student_id}</td>
                   <td>
+                    <ApproveAction
+                      documentId={doc.id}
+                      documentLabel={doc.original_filename}
+                      onApprove={approve}
+                    />
                     <RejectAction
                       documentId={doc.id}
                       documentLabel={doc.original_filename}

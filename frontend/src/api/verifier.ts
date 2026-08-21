@@ -37,3 +37,17 @@ export async function rejectDocument(
     body: JSON.stringify({ comment }),
   })
 }
+
+/**
+ * Approve a pending document with an OPTIONAL comment (E29; Journey J22; #181).
+ * Backed by ``POST /verifier/documents/{document_id}/approve``.
+ */
+export async function approveDocument(
+  documentId: number,
+  comment?: string,
+): Promise<VerifiedDocument> {
+  return apiFetch<VerifiedDocument>(`/verifier/documents/${documentId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ comment: comment && comment.trim() ? comment.trim() : null }),
+  })
+}
