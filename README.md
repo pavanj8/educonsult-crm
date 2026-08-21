@@ -12,6 +12,12 @@ Issue, which traces back to an epic, a user journey, and a stated
 requirement. See [`docs/adr/`](docs/adr/) for the full history of *why*
 the project is built this way.
 
+The harness runs its Dev/Test/Review agents on **MiniMax (M3)** via its
+Anthropic-compatible endpoint, entirely on GitHub-hosted runners — no
+personal machine, no manual steps once issues exist. It is provider- and
+project-agnostic: to reuse this harness for another product, see
+[`docs/REUSING-THE-HARNESS.md`](docs/REUSING-THE-HARNESS.md).
+
 ## Who this is for
 
 - **Consultancy Owner** — full visibility across all branches of their

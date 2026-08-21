@@ -1,5 +1,5 @@
 """GitHub-Issues-backed replacement for the old file-based ticket_utils.py
-(see harness-demo/adr/0005 and docs/adr/0009). A GitHub Issue IS the ticket:
+(see docs/adr/0009). A GitHub Issue IS the ticket:
 its body is the ticket description/acceptance criteria, its labels carry
 the harness's state machine, and agent reports are posted as comments so
 the full history is visible on the issue itself.
