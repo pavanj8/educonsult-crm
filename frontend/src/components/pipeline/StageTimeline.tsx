@@ -52,22 +52,47 @@ function isTerminal(stage: PipelineStage): boolean {
 }
 
 /**
- * Find the last stage in ``forwardOrder`` that the application has reached,
- * given the history of transitions. The "reached" set is the union of every
- * ``to_stage`` recorded in history plus the application's current stage.
+ * Every forward-path stage the application has reached.
  *
- * Returns ``null`` when no forward-path stage has been reached (e.g. an
- * empty history where the current stage isn't on the forward path).
+ * The pipeline is a forward-only progression (Requirements §5): reaching
+ * stage X at-or-before index N in ``FORWARD_STAGE_ORDER`` logically implies
+ * every earlier forward stage has already been passed. We therefore treat
+ * the application's current stage's forward-order index as the upper bound
+ * of "reached" stages. ``history`` then layers timestamps and reasons on
+ * top: presence in the reached set is what makes an item render as
+ * ``completed``; the actual timestamp/reason (when any) comes from the
+ * matching history entry.
  */
-function lastReachedForwardStage(
-  forwardOrder: readonly PipelineStage[],
+function buildReached(
   currentStage: PipelineStage,
   history: StageHistoryEntry[],
-): PipelineStage | null {
+): Set<PipelineStage> {
   const reached = new Set<PipelineStage>([currentStage])
   for (const entry of history) {
     reached.add(entry.to_stage)
   }
+
+  // Expand to every forward-order position at-or-before the current stage.
+  // Only meaningful when the current stage itself sits on the forward path.
+  const currentIndex = FORWARD_STAGE_ORDER.indexOf(currentStage)
+  if (currentIndex > 0) {
+    for (let i = 0; i < currentIndex; i += 1) {
+      reached.add(FORWARD_STAGE_ORDER[i])
+    }
+  }
+
+  return reached
+}
+
+/**
+ * Find the last stage in ``forwardOrder`` that the application has reached,
+ * given the history of transitions. Used to bound the walk for terminal
+ * stages that are not on the forward path (``rejected`` / ``withdrawn``).
+ */
+function lastReachedForwardStage(
+  forwardOrder: readonly PipelineStage[],
+  reached: Set<PipelineStage>,
+): PipelineStage | null {
   for (let i = forwardOrder.length - 1; i >= 0; i -= 1) {
     const candidate = forwardOrder[i]
     if (reached.has(candidate)) {
@@ -81,9 +106,11 @@ function lastReachedForwardStage(
  * Build the timeline items from the current stage and recorded history.
  *
  * Semantics:
- *   - Stages in the history with ``to_stage == X`` are rendered as
- *     ``completed``, with the latest entry's timestamp / reason winning.
- *   - The application's current stage is rendered as ``current``.
+ *   - Any forward-path stage at-or-before the current stage's index is
+ *     rendered as ``completed`` (Requirements §5: the pipeline is forward-
+ *     only, so reaching stage N logically implies every earlier forward
+ *     stage has been passed). The application's current stage itself is
+ *     rendered as ``current``.
  *   - For a non-terminal current stage, every unvisited forward stage is
  *     rendered as ``future`` so the user sees the full pipeline.
  *   - For a terminal current stage (``enrolled``), the entire forward path
@@ -92,6 +119,9 @@ function lastReachedForwardStage(
  *     / ``withdrawn``), only the forward-path stages the application
  *     actually reached are rendered; the terminal is appended last as
  *     ``current`` so the user sees the outcome.
+ *   - Timestamps and reasons on each item come from the latest history
+ *     entry whose ``to_stage`` matches that stage; otherwise no
+ *     timestamp/reason is shown.
  */
 function buildItems(
   currentStage: PipelineStage,
@@ -105,13 +135,10 @@ function buildItems(
     historyByStage.set(entry.to_stage, entry)
   }
 
-  const reached = new Set<PipelineStage>([currentStage])
-  for (const entry of history) {
-    reached.add(entry.to_stage)
-  }
+  const reached = buildReached(currentStage, history)
 
   const currentIsTerminal = isTerminal(currentStage)
-  const isOnForwardPath = (FORWARD_STAGE_ORDER as readonly PipelineStage[]).includes(currentStage)
+  const isOnForwardPath = FORWARD_STAGE_ORDER.includes(currentStage)
 
   // Decide how far to walk the forward order.
   let walkToIndex: number
@@ -122,11 +149,7 @@ function buildItems(
     walkToIndex = FORWARD_STAGE_ORDER.length - 1
   } else {
     // rejected / withdrawn — only walk as far as the application actually got.
-    const lastReached = lastReachedForwardStage(
-      FORWARD_STAGE_ORDER,
-      currentStage,
-      history,
-    )
+    const lastReached = lastReachedForwardStage(FORWARD_STAGE_ORDER, reached)
     if (lastReached == null) {
       walkToIndex = -1
     } else {
@@ -223,7 +246,7 @@ export default function StageTimeline({
                     ? 'Current stage'
                     : isCompleted
                       ? 'Completed'
-                      : 'Pending'}
+                      : 'Upcoming'}
                 </p>
                 {item.entry?.changed_at ? (
                   <time

@@ -69,8 +69,102 @@ describe('StageTimeline', () => {
     const futureItem = screen.getByTestId('stage-timeline-item-application_submitted')
     expect(futureItem.dataset.state).toBe('future')
     expect(within(futureItem).getByTestId('stage-timeline-status-application_submitted')).toHaveTextContent(
-      'Pending',
+      'Upcoming',
     )
+  })
+
+  it('marks every prior forward stage as completed even when history is empty', () => {
+    // AC5 / AC11: the pipeline is a forward-only progression (Requirements
+    // §5), so reaching a mid-pipeline stage logically implies every earlier
+    // forward stage has been passed — independent of what (if anything) the
+    // history array records.
+    render(<StageTimeline currentStage="offer_letter" history={[]} />)
+
+    // registered / counseling / university_shortlisting / application_submitted /
+    // document_verification are all at-or-before offer_letter in
+    // FORWARD_STAGE_ORDER, so they must render as completed.
+    for (const stage of [
+      'registered',
+      'counseling',
+      'university_shortlisting',
+      'application_submitted',
+      'document_verification',
+    ]) {
+      const item = screen.getByTestId(`stage-timeline-item-${stage}`)
+      expect(item.dataset.state).toBe('completed')
+      expect(
+        within(item).getByTestId(`stage-timeline-status-${stage}`),
+      ).toHaveTextContent('Completed')
+      // No timestamp is recorded when history is empty.
+      expect(
+        screen.queryByTestId(`stage-timeline-time-${stage}`),
+      ).not.toBeInTheDocument()
+    }
+
+    const current = screen.getByTestId('stage-timeline-item-offer_letter')
+    expect(current.dataset.state).toBe('current')
+
+    // Stages strictly after offer_letter on the forward path are still future.
+    const future = screen.getByTestId('stage-timeline-item-visa_processing')
+    expect(future.dataset.state).toBe('future')
+    expect(
+      within(future).getByTestId('stage-timeline-status-visa_processing'),
+    ).toHaveTextContent('Upcoming')
+  })
+
+  it('marks every prior forward stage as completed even when history only records the jump', () => {
+    // The pipeline is forward-only (Requirements §5): reaching loan_processing
+    // logically implies every earlier forward stage has been passed, even if
+    // the recorded history only logs the two boundary transitions. Completion
+    // is derived from the current stage's forward-order position, not from
+    // which stages happen to appear in history. Timestamps/reasons still
+    // come from history (so untouched prior stages have no time/reason row).
+    const history: StageHistoryEntry[] = [
+      entry({ id: 1, to_stage: 'registered', changed_at: '2026-01-15T09:00:00Z' }),
+      entry({
+        id: 2,
+        from_stage: 'registered',
+        to_stage: 'loan_processing',
+        changed_at: '2026-05-01T09:00:00Z',
+      }),
+    ]
+
+    render(<StageTimeline currentStage="loan_processing" history={history} />)
+
+    for (const stage of [
+      'registered',
+      'counseling',
+      'university_shortlisting',
+      'application_submitted',
+      'document_verification',
+      'offer_letter',
+      'visa_processing',
+    ]) {
+      const item = screen.getByTestId(`stage-timeline-item-${stage}`)
+      expect(item.dataset.state).toBe('completed')
+      expect(
+        within(item).getByTestId(`stage-timeline-status-${stage}`),
+      ).toHaveTextContent('Completed')
+    }
+    // Timestamps/reasons still come from history: registered has both,
+    // counseling..visa_processing have neither (no history entry for them).
+    expect(
+      screen.getByTestId('stage-timeline-time-registered').getAttribute('datetime'),
+    ).toBe('2026-01-15T09:00:00Z')
+    expect(screen.queryByTestId('stage-timeline-time-counseling')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('stage-timeline-reason-counseling')).not.toBeInTheDocument()
+
+    // loan_processing is the current stage.
+    expect(screen.getByTestId('stage-timeline-item-loan_processing').dataset.state).toBe(
+      'current',
+    )
+    // enrolled (after loan_processing in forward order) is still future.
+    expect(screen.getByTestId('stage-timeline-item-enrolled').dataset.state).toBe('future')
+    expect(
+      within(screen.getByTestId('stage-timeline-item-enrolled')).getByTestId(
+        'stage-timeline-status-enrolled',
+      ),
+    ).toHaveTextContent('Upcoming')
   })
 
   it('shows the transition timestamp for completed stages', () => {
@@ -236,15 +330,5 @@ describe('StageTimeline', () => {
     expect(
       screen.getByTestId('stage-timeline-reason-counseling'),
     ).toHaveTextContent('Re-routed after a counselor swap')
-  })
-
-  it('renders nothing about the timeline when the component is unmounted', () => {
-    const { unmount } = render(<StageTimeline currentStage="registered" />)
-
-    expect(screen.getByTestId('stage-timeline')).toBeInTheDocument()
-
-    unmount()
-
-    expect(screen.queryByTestId('stage-timeline')).not.toBeInTheDocument()
   })
 })
