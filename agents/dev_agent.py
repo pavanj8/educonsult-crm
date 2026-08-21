@@ -261,10 +261,23 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         ticket_utils.prior_iteration_feedback(issue["number"]),
     )
 
-    status, text, gate_out = "unknown", "", ""
+    status, text, gate_out, wrote_nothing = "unknown", "", "", False
     for attempt in range(1, DEV_BUILD_ATTEMPTS + 1):
         prompt = base_prompt
-        if gate_out:
+        if wrote_nothing:
+            # The #180 failure mode: the agent burned its whole turn budget
+            # exploring and finished without writing a single file. Don't let it
+            # "explore" again — demand an actual implementation this pass.
+            prompt = base_prompt + (
+                f"\n\n## You produced NO code — in-run attempt {attempt} of {DEV_BUILD_ATTEMPTS}\n"
+                f"Your previous attempt finished WITHOUT creating or editing ANY file "
+                f"(`git status` was empty). Exploration is over. You already have the repo map "
+                f"and conventions above. IMPLEMENT the issue NOW: write the actual application "
+                f"and test files with write_file/str_replace. Budget at most a few turns to look "
+                f"up a pattern, then WRITE. Do not finish until `git status` shows your new/edited "
+                f"files — reporting success with an empty diff is a failure.\n"
+            )
+        elif gate_out:
             prompt = base_prompt + (
                 f"\n\n## Build gate STILL FAILING — in-run fix attempt {attempt} of {DEV_BUILD_ATTEMPTS}\n"
                 f"Your previous work did NOT pass `bash scripts/check.sh backend`. Fix ONLY what "
@@ -276,14 +289,19 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         status, text = minimax_agent.run_agent(
             "dev-agent", prompt, model, REPO_ROOT, max_turns=turns,
         )
+        wrote_nothing = not git_files_changed()
         rc, gate_out = _backend_build_check()
+        if wrote_nothing:
+            print(f"\n[dev-agent] NO code changes produced on attempt {attempt}; "
+                  f"retrying with an implement-now directive.", file=sys.stderr)
+            continue
         if rc == 0:
             print(f"\n[dev-agent] build gate PASSED on in-run attempt {attempt}.")
             return status, text
         print(f"\n[dev-agent] build gate FAILED on in-run attempt {attempt}.", file=sys.stderr)
     print(
-        f"[dev-agent] build gate still failing after {DEV_BUILD_ATTEMPTS} in-run attempts; "
-        f"the workflow build gate will route this to needs-rework.", file=sys.stderr,
+        f"[dev-agent] still no green diff after {DEV_BUILD_ATTEMPTS} in-run attempts; "
+        f"the change/build gate will route this to needs-rework.", file=sys.stderr,
     )
     return status, text
 
@@ -340,18 +358,31 @@ def main():
     report_path.write_text(json.dumps(report.to_dict(), indent=2))
     print(f"\nReport written to {report_path}")
 
-    ticket_utils.set_result_label(args.issue_number, "dev", report.pytest_passed)
+    # A ticket that produced NO diff is a FAIL, not a PASS — pytest passing on
+    # the pre-existing suite is meaningless if the agent wrote nothing (the #180
+    # false-PASS: 5 iterations of "Files changed: (none)" reported as PASS while
+    # the branch stayed identical to main). Dev PASS now requires real changes.
+    produced_changes = bool(files_changed)
+    dev_passed = report.pytest_passed and produced_changes
+
+    ticket_utils.set_result_label(args.issue_number, "dev", dev_passed)
+    no_change_note = (
+        "" if produced_changes else
+        "**FAIL: Dev produced NO code changes (empty diff).** The acceptance criteria "
+        "were not implemented; exploration is not delivery.\n\n"
+    )
     details = (
+        f"{no_change_note}"
         f"**Files changed**: {', '.join(report.files_changed) or '(none)'}\n\n"
         f"**pytest**: {report.pytest_summary}\n\n"
         f"**Agent summary**:\n{report.agent_final_message[-1500:]}"
     )
     ticket_utils.report_agent_result(
         args.issue_number, "Dev Agent", args.iteration,
-        "PASS" if report.pytest_passed else "FAIL", details,
+        "PASS" if dev_passed else "FAIL", details,
     )
 
-    sys.exit(0 if report.pytest_passed else 1)
+    sys.exit(0 if dev_passed else 1)
 
 
 if __name__ == "__main__":
