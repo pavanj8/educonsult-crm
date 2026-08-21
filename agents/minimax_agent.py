@@ -307,6 +307,30 @@ def run_agent(
                 return _emit_report(tu.input if isinstance(tu.input, dict) else {})
 
         if resp.stop_reason != "tool_use":
+            # The agent thinks it is done. If a structured report is required but
+            # it did not call the report tool (it printed the verdict as text
+            # instead), force one more turn to submit it -- otherwise the caller
+            # gets an unparseable "UNKNOWN" and a false failure (docs/adr/0028;
+            # the #140 case). This runs unless we are already on the forced turn.
+            if report_tool is not None and not force_report:
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "You finished without calling the `" + report_name + "` tool. "
+                        "Your report MUST be delivered via that tool, not as text. "
+                        "Call it NOW with your final verdict."
+                    ),
+                })
+                try:
+                    resp = client.messages.create(
+                        model=model, max_tokens=MAX_TOKENS, messages=messages,
+                        tools=[report_tool], tool_choice={"type": "tool", "name": report_name},
+                    )
+                    for block in resp.content:
+                        if block.type == "tool_use" and block.name == report_name:
+                            return _emit_report(block.input if isinstance(block.input, dict) else {})
+                except Exception as err:  # noqa: BLE001 -- forced submit failed; fall through
+                    print(f"[{prefix}] forced submit_report failed: {err}", file=sys.stderr)
             print(f"\n\n--- {prefix} finished: stop_reason={resp.stop_reason} turns={turn} ---")
             return "completed", "".join(final_text_parts)
 

@@ -55,3 +55,4 @@ those links are dangling by design and are not restored.
 | [0025](0025-reduce-rework-sibling-awareness-frontend-na.md) | Cut rework — sibling-ticket awareness + frontend Test N/A | Accepted — implemented | 2026-08-21 |
 | [0026](0026-pr-authorship-hardening-dev-turn-cap.md) | Harden PR authorship (no bot-authored PRs) + lower Dev turn cap | Accepted — implemented | 2026-08-21 |
 | [0027](0027-dev-in-run-build-gate-retries.md) | Dev self-verifies + fixes in-run before needs-rework | Accepted — implemented | 2026-08-21 |
+| [0028](0028-force-report-on-early-finish.md) | Force the report tool when a Test/Review agent finishes early | Accepted — implemented | 2026-08-21 |
