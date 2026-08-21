@@ -262,11 +262,20 @@ jobs:
           if bash scripts/check.sh backend > /tmp/gate.log 2>&1; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=scripts/check.sh (backend) failed" >> "$GITHUB_OUTPUT"
+            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=scripts/check.sh (backend) failed" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Tests-only ticket with a test-only diff -> the tests + a green suite ARE
+          # the verification; skip Test/Review (parity with run_local's fast-path,
+          # docs/adr/0031). Only when EVERY changed file is a test file.
+          TITLE=$(gh issue view "$ISSUE" -R ${{ github.repository }} --json title -q .title 2>/dev/null || echo "")
+          NONTEST=$(git diff --name-only origin/main | grep -vE '(/tests/|(^|/)test_|\.test\.tsx?$)' | head -1)
+          if echo "$TITLE" | grep -qiE '\btests?:' && [ -z "$NONTEST" ]; then
+            echo "tests_only=true" >> "$GITHUB_OUTPUT"
+            echo "This is a Tests ticket with a test-only diff — will skip Test/Review."
           fi
 
       - name: Dispatch Test and Review for THIS issue only (docs/adr/0016)
-        if: steps.buildgate.outputs.ok == 'true'
+        if: steps.buildgate.outputs.ok == 'true' && steps.buildgate.outputs.tests_only != 'true'
         working-directory: agents
         run: |
           ISSUE="${{ steps.issue.outputs.number }}"
@@ -276,6 +285,24 @@ jobs:
           gh workflow run agent-test.yml -R ${{ github.repository }} --ref main \
             -f issue_number="$ISSUE" -f iteration="$ITER"
           gh workflow run agent-review.yml -R ${{ github.repository }} --ref main \
+            -f issue_number="$ISSUE" -f iteration="$ITER"
+
+      - name: Fast-path Tests-only ticket — skip Test/Review, go straight to finalize
+        if: steps.buildgate.outputs.ok == 'true' && steps.buildgate.outputs.tests_only == 'true'
+        working-directory: agents
+        run: |
+          ISSUE="${{ steps.issue.outputs.number }}"
+          ITER="${{ steps.iteration.outputs.number }}"
+          python require_dev_completed.py "$ISSUE" "$ITER"
+          # The build gate already ran the full backend suite green; the tests ARE
+          # the deliverable. Mark Test + Review passed (by-N/A) and let finalize
+          # merge on CI (parity with run_local's fast-path, docs/adr/0031).
+          echo "Tests-only ticket #$ISSUE — recording test/review PASS (N/A) and dispatching finalize."
+          gh issue edit "$ISSUE" -R ${{ github.repository }} \
+            --add-label "agent:test-pass" --add-label "agent:review-pass" \
+            --remove-label "agent:test-fail" --remove-label "agent:review-fail" || true
+          gh issue comment "$ISSUE" -R ${{ github.repository }} --body "### Test + Review — iteration $ITER: PASS (N/A, tests-only ticket). Skipped the black-box Test agent and 5-perspective Review — this is a Tests ticket whose diff is entirely test files, so the added tests plus a green full suite are the verification (docs/adr/0031)." || true
+          gh workflow run agent-finalize.yml -R ${{ github.repository }} --ref main \
             -f issue_number="$ISSUE" -f iteration="$ITER"
 
       - name: Skip verification and hand back to rework (build gate failed, docs/adr/0023)
