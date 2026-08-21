@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "d4440f78c1cb"
+HEAD_REVISION = "j3k4l5m6n7o8"
 
 
 def _alembic_config() -> Config:
@@ -60,6 +60,7 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "programs" in table_names
         assert "checklist_item_templates" in table_names
         assert "student_documents" in table_names
+        assert "notifications" in table_names
         user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
         assert "is_active" in user_columns
         assert "name" in user_columns
@@ -140,6 +141,20 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "verified_at",
             "rejection_reason",
             "approval_comment",
+            "created_at",
+            "updated_at",
+        }
+        notification_columns = {
+            column["name"] for column in inspect(connection).get_columns("notifications")
+        }
+        assert notification_columns == {
+            "id",
+            "tenant_id",
+            "user_id",
+            "title",
+            "message",
+            "read_at",
+            "application_id",
             "created_at",
             "updated_at",
         }
