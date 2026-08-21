@@ -54,6 +54,19 @@ def _has_changes() -> bool:
     return bool(_q(["git", "status", "--porcelain"]).stdout.strip())
 
 
+def _changed_paths() -> list[str]:
+    return [l[3:].strip() for l in _q(["git", "status", "--porcelain"]).stdout.splitlines() if l.strip()]
+
+
+def _is_test_only(paths: list[str]) -> bool:
+    """True if EVERY changed path is a test file (adds coverage, no app behavior
+    change) — the condition under which a Tests ticket can skip Test/Review."""
+    def is_test(f: str) -> bool:
+        name = f.rsplit("/", 1)[-1]
+        return "/tests/" in f or name.startswith("test_") or name.endswith((".test.ts", ".test.tsx"))
+    return bool(paths) and all(is_test(f) for f in paths)
+
+
 def _verify(py: str, issue_number: int, iteration: int) -> bool:
     """Run Test + Review; return True only if neither failed (labels they set)."""
     _run([py, str(AGENTS / "test_agent.py"), str(issue_number), "--iteration", str(iteration)])
@@ -143,7 +156,17 @@ def _run_one(repo: str, issue_number: int, iteration: int | None, *, with_verify
         return 1
     print("[run_local] checks passed.")
 
-    if with_verify:
+    # A pure Tests ticket that touched ONLY test files needs no black-box Test or
+    # code Review — the tests plus check.sh's full green suite ARE the verification
+    # (docs/adr/0031). The black-box Test agent can't meaningfully verify added
+    # tests, and Review false-fails such tickets on empty-deliverable grounds
+    # (#158). If it also touched app/ code it changes behavior, so fall through to
+    # the full Test + Review gate.
+    tests_only = queue_picker._discipline(issue) == 2 and _is_test_only(_changed_paths())
+    if tests_only:
+        print("[run_local] Tests-only ticket, test-only diff, full suite green — "
+              "skipping Test/Review and merging on Dev + check.sh.")
+    elif with_verify:
         # Gate merge on the agents' verdicts — do NOT merge a ticket that failed
         # Test or Review, matching the cloud finalize (docs/adr/0031).
         if not _verify(py, issue_number, iteration):
