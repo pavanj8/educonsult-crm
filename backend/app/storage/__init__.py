@@ -13,6 +13,12 @@ singleton used by the upload router. Replacement happens in tests via
 :func:`set_document_storage`.
 """
 
+from app.storage.checklist_completeness import (
+    ChecklistCompletenessItem,
+    ChecklistCompletenessSummary,
+    ChecklistCompletenessUpload,
+    compute_checklist_completeness,
+)
 from app.storage.config import (
     document_storage_bucket,
     document_storage_endpoint_url,
@@ -41,6 +47,9 @@ from app.storage.validation import (
 __all__ = [
     "ALLOWED_CONTENT_TYPES",
     "ALLOWED_EXTENSIONS",
+    "ChecklistCompletenessItem",
+    "ChecklistCompletenessSummary",
+    "ChecklistCompletenessUpload",
     "DocumentStorageError",
     "DocumentStorageService",
     "FILE_TOO_LARGE_DETAIL",
@@ -49,6 +58,7 @@ __all__ = [
     "MAX_FILE_BYTES",
     "MAX_FILE_SIZE_MB",
     "S3DocumentStorageService",
+    "compute_checklist_completeness",
     "document_storage_bucket",
     "document_storage_endpoint_url",
     "document_storage_key_prefix",
