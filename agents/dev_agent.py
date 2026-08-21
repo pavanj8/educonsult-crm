@@ -35,6 +35,40 @@ DEFAULT_MODEL = os.environ.get("DEV_AGENT_MODEL", llm_env.DEFAULT_DEV_MODEL)
 # stops a churning run from holding the single Dev slot for ~49 min before the
 # rail trips (docs/adr/0026). Overridable via env.
 DEV_MAX_TURNS = int(os.environ.get("DEV_MAX_TURNS", "50"))
+# In-run build-gate retries (docs/adr/0027): after the agent finishes, run the
+# canonical backend gate; if it fails, feed the failure straight back and let the
+# agent fix it IN THE SAME RUN, up to this many total attempts, before the ticket
+# ever bounces out to needs-rework + a fresh re-dispatched job. Cheaper than
+# restarting on a new runner. Test/Review still run in their own jobs afterward.
+DEV_BUILD_ATTEMPTS = int(os.environ.get("DEV_BUILD_ATTEMPTS", "2"))
+
+_backend_deps_ready = False
+
+
+def _ensure_backend_deps() -> None:
+    global _backend_deps_ready
+    if _backend_deps_ready:
+        return
+    req = target_app.BACKEND_DIR / "requirements.txt"
+    if req.exists():
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", "-r", str(req), "ruff==0.16.3"],
+            capture_output=True, text=True,
+        )
+    _backend_deps_ready = True
+
+
+def _backend_build_check() -> tuple[int, str]:
+    """Run the canonical backend gate (`scripts/check.sh backend`); returns
+    (returncode, combined output). rc=0 (skip) when there's no backend."""
+    if not (target_app.BACKEND_DIR / "requirements.txt").exists():
+        return 0, "(no backend to check)"
+    _ensure_backend_deps()
+    result = subprocess.run(
+        ["bash", "scripts/check.sh", "backend"],
+        cwd=str(REPO_ROOT), capture_output=True, text=True,
+    )
+    return result.returncode, (result.stdout + result.stderr)
 
 
 def read_text(path: Path) -> str:
@@ -210,7 +244,7 @@ deliberately left out of scope.
 
 
 def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
-    prompt = build_prompt(
+    base_prompt = build_prompt(
         issue,
         read_text(REPO_ROOT / "docs" / "requirements.md"),
         read_text(REPO_ROOT / "docs" / "journeys.md"),
@@ -220,8 +254,30 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         ticket_utils.prior_iteration_feedback(issue["number"]),
     )
 
-    print(f"--- Dev Agent starting for issue #{issue['number']} (model={model}) ---\n")
-    return minimax_agent.run_agent("dev-agent", prompt, model, REPO_ROOT, max_turns=DEV_MAX_TURNS)
+    status, text, gate_out = "unknown", "", ""
+    for attempt in range(1, DEV_BUILD_ATTEMPTS + 1):
+        prompt = base_prompt
+        if gate_out:
+            prompt = base_prompt + (
+                f"\n\n## Build gate STILL FAILING — in-run fix attempt {attempt} of {DEV_BUILD_ATTEMPTS}\n"
+                f"Your previous work did NOT pass `bash scripts/check.sh backend`. Fix ONLY what "
+                f"it reports below (do not rewrite passing code, do not restart), then finish:\n"
+                f"```\n{gate_out[-3000:]}\n```\n"
+            )
+        print(f"--- Dev Agent attempt {attempt}/{DEV_BUILD_ATTEMPTS} for issue #{issue['number']} (model={model}) ---\n")
+        status, text = minimax_agent.run_agent(
+            "dev-agent", prompt, model, REPO_ROOT, max_turns=DEV_MAX_TURNS,
+        )
+        rc, gate_out = _backend_build_check()
+        if rc == 0:
+            print(f"\n[dev-agent] build gate PASSED on in-run attempt {attempt}.")
+            return status, text
+        print(f"\n[dev-agent] build gate FAILED on in-run attempt {attempt}.", file=sys.stderr)
+    print(
+        f"[dev-agent] build gate still failing after {DEV_BUILD_ATTEMPTS} in-run attempts; "
+        f"the workflow build gate will route this to needs-rework.", file=sys.stderr,
+    )
+    return status, text
 
 
 def git_files_changed() -> list[str]:
