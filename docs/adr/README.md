@@ -53,3 +53,4 @@ those links are dangling by design and are not restored.
 | [0023](0023-build-gate-before-verification.md) | Build gate before Test/Review + PR authored via GH_PAT | Accepted — implemented | 2026-08-21 |
 | [0024](0024-agent-edit-tool-and-test-ticket-ordering.md) | Surgical edit tool (`str_replace`) + defer test tickets in the picker | Accepted — implemented | 2026-08-21 |
 | [0025](0025-reduce-rework-sibling-awareness-frontend-na.md) | Cut rework — sibling-ticket awareness + frontend Test N/A | Accepted — implemented | 2026-08-21 |
+| [0026](0026-pr-authorship-hardening-dev-turn-cap.md) | Harden PR authorship (no bot-authored PRs) + lower Dev turn cap | Accepted — implemented | 2026-08-21 |
