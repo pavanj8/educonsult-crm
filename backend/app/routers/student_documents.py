@@ -21,35 +21,16 @@ their application").
 Traceability
 ------------
 * Requirements §5 (Documents: per-stage/program checklist templates;
-  students upload against each checklist item).
+  students upload against each checklist item; default limits 10MB,
+  PDF/JPG/PNG/DOCX).
 * Requirements §2 (Storage: S3-compatible object storage; AWS S3 for
   SaaS, MinIO for on-prem).
 * Journey J20 (Student uploads a document against a checklist item).
 * Epic E27 (Student Document Upload); this router is the file-upload
-  half. Sibling tickets own the StudentDocument read side (#174), the
-  size/type validation (#176), the upload UI (#177), and the
+  half. Sibling tickets own the StudentDocument read side (#174),
+  the size/type validation layer (#176 — see
+  :mod:`app.storage.validation`), the upload UI (#177), and the
   validation+completeness test suite (#178).
-
-Scope of THIS ticket (#175)
----------------------------
-The router is intentionally minimal: it does *not* enforce the
-10 MB / PDF/JPG/PNG/DOCX rules — those land in sibling ticket #176
-which owns the validation layer. The router *does*:
-
-* authorize the caller against the owning student, the tenant, and the
-  active-account flag (cross-tenant access surfaces as 404 to prevent
-  tenant-id enumeration; deactivated students get 403);
-* require the ``file`` form field to be present and non-empty;
-* require the supplied ``application_id`` to belong to the caller's
-  tenant;
-* call :func:`app.storage.DocumentStorageService.store` and translate
-  :class:`DocumentStorageError` into HTTP 503.
-
-The validation layer (#176) is expected to plug in by either adding
-guards inside this router or by inserting a dependency before the
-file is read; both are trivial because the request body is already
-a multipart form and the existing tests can assert on the validation
-contract without changing this router's response shape.
 """
 
 from __future__ import annotations
@@ -75,9 +56,13 @@ from app.schemas.student_document import (
     StudentDocumentUploadResponse,
 )
 from app.storage import (
+    FILE_TOO_LARGE_DETAIL,
+    MAX_FILE_BYTES,
     DocumentStorageError,
     DocumentStorageService,
     get_document_storage,
+    validate_file_size,
+    validate_file_type,
 )
 
 router = APIRouter()
@@ -85,7 +70,10 @@ router = APIRouter()
 _DB_UNAVAILABLE_DETAIL = "Document service is unavailable"
 _STORAGE_UNAVAILABLE_DETAIL = "Document storage is temporarily unavailable"
 
-_MAX_FILE_BYTES_HARD_LIMIT = 50 * 1024 * 1024  # 50 MB safety net; E27 #176 owns the 10 MB rule.
+#: Maximum allowed upload size, in bytes. Re-exported for the in-router
+#: streaming cap below so the value is sourced from a single place (the
+#: validation module — Requirements §5: "default limits 10MB").
+_MAX_FILE_BYTES_HARD_LIMIT = MAX_FILE_BYTES
 
 
 def _utc_now() -> datetime:
@@ -215,13 +203,12 @@ def _resolve_checklist_template(
 async def _read_upload_bytes(upload: UploadFile) -> bytes:
     """Read the multipart upload into memory with a hard cap.
 
-    The 50 MB cap here is a *defensive safety net only* — the 10 MB
-    cap mandated by Requirements §5 is the responsibility of E27
-    sibling ticket #176 ("file type/size validation (10MB, PDF/JPG/
-    PNG/DOCX)"). Keeping a large ceiling at the router layer prevents
-    a single bad request from ballooning the process RSS during a
-    real validation outage, without overriding the future validation
-    layer.
+    The cap is the **10 MB** platform default (Requirements §5; see
+    :data:`app.storage.validation.MAX_FILE_BYTES`). It is enforced
+    while streaming so a malicious client cannot balloon the process
+    RSS by uploading an arbitrarily large payload; the user-facing
+    413 is emitted by :func:`validate_file_size` after the stream
+    completes.
     """
     chunks: list[bytes] = []
     total = 0
@@ -235,7 +222,7 @@ async def _read_upload_bytes(upload: UploadFile) -> bytes:
             chunks.clear()
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="Uploaded file exceeds the maximum allowed size",
+                detail=FILE_TOO_LARGE_DETAIL,
             )
         chunks.append(chunk)
     return b"".join(chunks)
@@ -283,7 +270,10 @@ async def upload_student_document(
     * 403 — caller has ``document:upload`` but is not the application
       owner, is deactivated, or has no tenant scope.
     * 404 — application does not exist or belongs to a different tenant.
-    * 413 — uploaded file exceeds the router-layer hard cap (50 MB).
+    * 413 — uploaded file exceeds the 10 MB cap (Requirements §5).
+    * 415 — uploaded file's extension is not in
+      :data:`app.storage.validation.ALLOWED_EXTENSIONS` (PDF/JPG/PNG/
+      DOCX), or its ``Content-Type`` does not match the extension.
     * 422 — ``checklist_item_template_id`` does not exist or belongs to
       another tenant.
     * 503 — storage backend is unreachable / rejected the upload, or
@@ -314,6 +304,13 @@ async def upload_student_document(
 
     content_type = file.content_type or "application/octet-stream"
     original_filename = file.filename
+
+    # Requirements §5: default limits 10MB, PDF/JPG/PNG/DOCX.
+    # ``validate_file_size`` raises HTTP 413; ``validate_file_type`` raises
+    # HTTP 415. We run both before talking to storage so an oversized /
+    # wrong-type upload never costs a storage round-trip.
+    validate_file_size(len(content))
+    validate_file_type(filename=original_filename, content_type=content_type)
 
     storage: DocumentStorageService = get_document_storage()
     try:
