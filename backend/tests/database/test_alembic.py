@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "h1b2c3d4e5f6"
+HEAD_REVISION = "i2j3k4l5m6n7"
 
 
 def _alembic_config() -> Config:
@@ -58,6 +58,8 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "countries" in table_names
         assert "universities" in table_names
         assert "programs" in table_names
+        assert "checklist_item_templates" in table_names
+        assert "student_documents" in table_names
         user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
         assert "is_active" in user_columns
         assert "name" in user_columns
@@ -100,6 +102,43 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "university_id",
             "program_id",
             "stage",
+            "created_at",
+            "updated_at",
+        }
+        checklist_template_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("checklist_item_templates")
+        }
+        assert checklist_template_columns == {
+            "id",
+            "tenant_id",
+            "stage",
+            "program_id",
+            "name",
+            "description",
+            "required",
+            "order_index",
+            "created_at",
+            "updated_at",
+        }
+        student_document_columns = {
+            column["name"] for column in inspect(connection).get_columns("student_documents")
+        }
+        assert student_document_columns == {
+            "id",
+            "tenant_id",
+            "application_id",
+            "checklist_item_template_id",
+            "status",
+            "original_filename",
+            "content_type",
+            "size_bytes",
+            "storage_path",
+            "uploaded_by_user_id",
+            "uploaded_at",
+            "verified_by_user_id",
+            "verified_at",
+            "rejection_reason",
             "created_at",
             "updated_at",
         }
