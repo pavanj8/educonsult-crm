@@ -59,32 +59,24 @@ jobs:
             echo "busy=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Ordering lives in agents/queue_picker.py — the SAME module the local
+      # runner uses (docs/adr/0024, 0031) — so cloud and laptop can't disagree.
+      - name: Checkout (for queue_picker.py)
+        if: steps.busy.outputs.busy == 'false'
+        uses: actions/checkout@v4
+      - name: Set up Python
+        if: steps.busy.outputs.busy == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Pick next MVP task (untouched or needs-rework) and trigger it
         if: steps.busy.outputs.busy == 'false'
         run: |
-          # Eligible: never-touched (no agent:* label) OR agent:needs-rework
-          # with iteration < MAX_ITERATIONS. Prefer needs-rework so Test/
-          # Review feedback is addressed before starting a new ticket
-          # (docs/adr/0015). Untouched issues still drain when nothing is
-          # waiting on retry.
-          # Ordering (docs/adr/0024): needs-rework first (address feedback before
-          # new work); then defer "Tests:" tickets behind non-test ones, because
-          # a test ticket almost always depends on its epic's implementation
-          # tickets — picking it early makes the Dev agent burn turns discovering
-          # that the code-under-test isn't merged yet (observed on #171); then by
-          # issue number.
-          NEXT=$(gh issue list -R ${{ github.repository }} --label "task,phase:mvp" --state open --limit 300 --json number,labels,title \
-            | jq -r --argjson max "$MAX_ITERATIONS" '
-              def names: [.labels[].name];
-              def iter: [names[] | select(startswith("agent:iteration-")) | split("-") | last | tonumber] | .[0] // 0;
-              def untouched: (names | any(startswith("agent:")) | not);
-              def retryable: ((names | index("agent:needs-rework")) != null) and (iter < $max);
-              def is_rework: (names | index("agent:needs-rework")) != null;
-              def is_test: ((.title // "") | test("\\bTests?:"; "i"));
-              [.[] | select(untouched or retryable)]
-              | sort_by([ (if is_rework then 0 else 1 end), (if is_test then 1 else 0 end), .number ])
-              | .[0].number // empty
-            ')
+          # Eligible + ordering (topological, to minimize dependency-driven
+          # failures): needs-rework first, then epic order, then
+          # Backend->Frontend->Tests, then number. See queue_picker.py.
+          NEXT=$(python agents/queue_picker.py "${{ github.repository }}")
           if [ -n "$NEXT" ]; then
             echo "Triggering harness for issue #$NEXT"
             gh issue edit "$NEXT" -R ${{ github.repository }} --add-label "agent:ready-for-dev"

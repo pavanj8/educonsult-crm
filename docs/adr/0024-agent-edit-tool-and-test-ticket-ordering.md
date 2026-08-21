@@ -39,3 +39,18 @@ Analysis of a real Dev run (#171) surfaced two big per-ticket inefficiencies:
 - The ordering is a heuristic on the title; an explicit `Depends on #N` /
   `Blocked by #N` convention (skip until closed) is the natural future
   generalization if finer control is needed.
+
+## Amendment (2026-08-21, ADR-0031)
+
+The title-only "non-test before test" heuristic was too coarse — it deferred a
+`Tests:` ticket even when its epic's implementation was already merged, and it
+never enforced backend-before-frontend. Ordering now lives in one shared module,
+`agents/queue_picker.py`, used by BOTH the local runner (`agents/run_local.py`)
+and the cloud picker (`agent-harness-queue-picker.yml`) so they cannot diverge.
+The sort key is topological:
+
+    (needs-rework, epic "[E#]", discipline Backend→Frontend→Tests, number)
+
+A test ticket is therefore picked only after its epic's implementation tickets
+(lower discipline) — which, within an epic, guarantees deps are merged first —
+while a test for an already-complete epic is no longer wrongly held back.
