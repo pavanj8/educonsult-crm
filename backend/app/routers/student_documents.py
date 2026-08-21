@@ -252,8 +252,8 @@ async def upload_student_document(
         AuthenticatedUser,
         Depends(require_permission(Permission.DOCUMENT_UPLOAD)),
     ],
-    db: Session = Depends(get_db),
     file: Annotated[UploadFile, File(description="The document to upload")],
+    db: Session = Depends(get_db),
     checklist_item_template_id: Annotated[
         int | None,
         Form(
