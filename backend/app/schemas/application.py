@@ -123,3 +123,23 @@ class MarkRejectedRequest(BaseModel):
             raise ValueError("reason is required")
         self.reason = trimmed
         return self
+
+
+class MarkWithdrawnRequest(BaseModel):
+    """Body for ``POST /applications/{id}/mark-withdrawn`` (E40; Journey J33).
+
+    Marking an application WITHDRAWN REQUIRES a reason (Requirements §5: the
+    terminal REJECTED / WITHDRAWN states each capture a reason). The reason is
+    trimmed; empty / whitespace-only / missing is a 422. Recorded on the
+    resulting StageHistory ``reason`` column.
+    """
+
+    reason: str = Field(max_length=2000)
+
+    @model_validator(mode="after")
+    def _require_non_empty_reason(self) -> "MarkWithdrawnRequest":
+        trimmed = self.reason.strip()
+        if not trimmed:
+            raise ValueError("reason is required")
+        self.reason = trimmed
+        return self
