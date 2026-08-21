@@ -304,6 +304,27 @@ describe('StageTimeline', () => {
     expect(time.textContent).toBe('not-a-date')
   })
 
+  it('renders only the rejected terminal when history is empty and currentStage is rejected', () => {
+    // Edge case: the application is currently rejected with no recorded
+    // history. The user sees the outcome as the only row, with no forward
+    // path ahead — consistent with ``buildItems``'s rejected/withdrawn
+    // walk-to-last-reached rule.
+    render(<StageTimeline currentStage="rejected" history={[]} />)
+
+    expect(screen.queryByTestId('stage-timeline-empty')).not.toBeInTheDocument()
+    expect(screen.getByTestId('stage-timeline-list')).toBeInTheDocument()
+    expect(screen.getByTestId('stage-timeline-item-rejected').dataset.state).toBe('current')
+    expect(screen.getByTestId('stage-timeline-item-rejected').getAttribute('aria-current')).toBe(
+      'step',
+    )
+    // No forward-path rows are shown when nothing was actually reached.
+    expect(screen.queryByTestId('stage-timeline-item-registered')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('stage-timeline-item-counseling')).not.toBeInTheDocument()
+    // No timestamp / reason rendered when history is empty.
+    expect(screen.queryByTestId('stage-timeline-time-rejected')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('stage-timeline-reason-rejected')).not.toBeInTheDocument()
+  })
+
   it('uses the latest history entry per stage when the same stage appears multiple times', () => {
     const history: StageHistoryEntry[] = [
       entry({ id: 1, to_stage: 'registered', changed_at: '2026-01-01T00:00:00Z' }),
