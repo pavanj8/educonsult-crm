@@ -7,6 +7,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import app.db.database as _database_module
 import app.models  # noqa: F401 — register ORM models with Base.metadata
 from app.db.database import get_db
 from app.main import app
@@ -15,6 +16,26 @@ from app.rbac.dependencies import get_current_user
 from app.rbac.user import AuthenticatedUser
 
 TEST_DATABASE_URL = "sqlite://"
+
+# The ORIGINAL database-module objects the routers + this conftest captured at
+# import time. Some tests (tests/database/*) call importlib.reload(app.db.database),
+# which rebinds these to NEW objects and leaks that mutation to every later test:
+# get_db then no longer matches the object routers use, so dependency_overrides on
+# get_db silently stop applying and tests fail depending on run order. Restoring
+# after each test keeps the module identity stable and the suite order-independent
+# (docs/adr/0029).
+_ORIGINAL_DB_ATTRS = {
+    "get_db": _database_module.get_db,
+    "engine": _database_module.engine,
+    "SessionLocal": _database_module.SessionLocal,
+}
+
+
+@pytest.fixture(autouse=True)
+def _restore_database_module_after_reload() -> Generator[None, None, None]:
+    yield
+    for name, obj in _ORIGINAL_DB_ATTRS.items():
+        setattr(_database_module, name, obj)
 
 
 def make_auth_headers(access_token: str = "test-access-token") -> dict[str, str]:

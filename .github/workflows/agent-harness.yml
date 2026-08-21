@@ -134,6 +134,13 @@ jobs:
         id: dev
         working-directory: agents
         continue-on-error: true
+        # Hard wall-clock cap (docs/adr/0029): DEV_MAX_TURNS bounds the turn
+        # COUNT, but a turn that re-runs the full test suite takes minutes, so a
+        # churning run (e.g. #175 at ~41 min) can still hog the single Dev slot.
+        # On timeout the step fails -> build gate -> needs-rework -> retry, which
+        # is cheaper than letting it run unbounded. Sized for a normal pass plus
+        # one in-run retry.
+        timeout-minutes: 30
         run: python dev_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --model "$DEV_AGENT_MODEL"
 
       - name: Ruff auto-fix backstop (docs/adr/0019 follow-up)
