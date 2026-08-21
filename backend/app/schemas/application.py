@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Pydantic schemas for application endpoints (E18/E21; Journey J11/J14).
 
 This module serves the E18 ``/applications`` endpoints (student-facing
@@ -5,13 +6,20 @@ This module serves the E18 ``/applications`` endpoints (student-facing
 counselor dashboard response shape ``ApplicationWithStudentResponse``
 which extends the response with denormalised student fields.
 """
+=======
+"""Pydantic schemas for application endpoints (E18; E21; Journey J11; J14)."""
+>>>>>>> origin/main
 
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+<<<<<<< HEAD
 from app.pipeline.stages import PipelineStage
 from app.rbac.roles import Role
+=======
+from app.models.application import ApplicationStage as ApplicationStageEnum
+>>>>>>> origin/main
 
 
 class CreateApplicationRequest(BaseModel):
@@ -22,18 +30,24 @@ class CreateApplicationRequest(BaseModel):
 
 
 class ApplicationResponse(BaseModel):
+<<<<<<< HEAD
     """Response schema for a single application.
 
     The field set is the union of what E18 returns to the student and what
     E21 returns to the counselor; clients that only care about E18 fields
     (e.g. ``university_id``) can ignore the rest.
     """
+=======
+    """Application data returned by the E18 and E21 endpoints."""
+>>>>>>> origin/main
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     tenant_id: int
+    branch_id: int | None
     student_id: int
+<<<<<<< HEAD
     # E18 fields (NOT NULL; required by POST /applications)
     university_id: int
     program_id: int
@@ -51,6 +65,12 @@ class ApplicationResponse(BaseModel):
     loan_lender: str | None
     loan_amount: int | None
     # Bookkeeping
+=======
+    assigned_counselor_id: int | None
+    university_id: int
+    program_id: int
+    stage: ApplicationStageEnum
+>>>>>>> origin/main
     created_at: datetime
     updated_at: datetime
 

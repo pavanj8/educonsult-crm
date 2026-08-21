@@ -1,3 +1,9 @@
+"""Tests for the Application ORM model (E18; E21; Requirements §5).
+
+Exercises column shape, persistence, stage default, and the multiple-
+applications-per-student invariant for Journey J11 / J14.
+"""
+
 from datetime import datetime, timezone
 
 from sqlalchemy import inspect, select
@@ -13,10 +19,18 @@ def test_application_model_has_required_columns():
         "created_at",
         "enrollment_date",
         "id",
+<<<<<<< HEAD
         "loan_amount",
         "loan_lender",
         "loan_opted_in",
         "loan_status",
+=======
+        "tenant_id",
+        "branch_id",
+        "student_id",
+        "assigned_counselor_id",
+        "university_id",
+>>>>>>> origin/main
         "program_id",
         "stage",
         "stage_reason",
@@ -33,7 +47,9 @@ def test_application_persists_row(db_session):
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,
+        branch_id=2,
         student_id=10,
+        assigned_counselor_id=11,
         university_id=100,
         program_id=200,
         stage=PipelineStage.REGISTERED,
@@ -46,12 +62,39 @@ def test_application_persists_row(db_session):
 
     assert application.id is not None
     assert application.tenant_id == 1
+    assert application.branch_id == 2
     assert application.student_id == 10
+    assert application.assigned_counselor_id == 11
     assert application.university_id == 100
     assert application.program_id == 200
     assert application.stage == PipelineStage.REGISTERED
     assert application.created_at is not None
     assert application.updated_at is not None
+
+
+def test_application_branch_and_counselor_are_nullable(db_session):
+    """E18 rows pre-date E21, so ``branch_id`` and ``assigned_counselor_id`` are nullable.
+
+    E19 (auto-assignment) and E20 (manual reassignment) will populate them
+    and tighten the constraints; until then a fresh Application can be
+    created with both columns ``NULL`` (matching the ORM model and the
+    E18 ``create_application`` code path).
+    """
+    now = datetime.now(timezone.utc)
+    application = Application(
+        tenant_id=1,
+        student_id=10,
+        university_id=100,
+        program_id=200,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(application)
+    db_session.commit()
+    db_session.refresh(application)
+
+    assert application.branch_id is None
+    assert application.assigned_counselor_id is None
 
 
 def test_application_stage_defaults_to_registered(db_session):
