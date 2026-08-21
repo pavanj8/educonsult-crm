@@ -49,6 +49,13 @@ export default function AppLayout() {
               </Link>
             </nav>
           ) : null}
+          {user?.role === 'counselor' ? (
+            <nav className="app-header__nav" aria-label="Main">
+              <Link to="/my-applications" data-testid="nav-my-applications">
+                My applications
+              </Link>
+            </nav>
+          ) : null}
         </div>
         <NotificationBell />
       </header>

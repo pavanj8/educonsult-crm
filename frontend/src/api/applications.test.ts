@@ -144,3 +144,31 @@ describe('markEnrolled API client', () => {
     )
   })
 })
+
+describe('fetchAssignedApplications API client', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('calls the assigned-to-me endpoint with the bearer token', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const apps = [{ id: 1, stage: 'registered' }]
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => apps })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { fetchAssignedApplications } = await import('./applications')
+    const res = await fetchAssignedApplications()
+    expect(res).toEqual(apps)
+    expect(fetchMock).toHaveBeenCalledWith('/applications/assigned-to-me', {
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer stored-access-token' },
+    })
+  })
+
+  it('forwards a stage filter as a query param', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { fetchAssignedApplications } = await import('./applications')
+    await fetchAssignedApplications({ stage: 'counseling' })
+    expect(fetchMock).toHaveBeenCalledWith('/applications/assigned-to-me?stage=counseling', expect.anything())
+  })
+})

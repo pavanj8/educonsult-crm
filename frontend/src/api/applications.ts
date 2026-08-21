@@ -42,3 +42,22 @@ export async function markEnrolled(
     body: JSON.stringify({ details: details && details.trim() ? details.trim() : null }),
   })
 }
+
+export interface AssignedApplicationsParams {
+  stage?: string
+}
+
+/**
+ * The signed-in staff member's assigned application queue (E21; Journey J14).
+ * Backed by ``GET /applications/assigned-to-me`` (scoped server-side by role).
+ */
+export async function fetchAssignedApplications(
+  params: AssignedApplicationsParams = {},
+): Promise<Application[]> {
+  const query = new URLSearchParams()
+  if (params.stage) {
+    query.set('stage', params.stage)
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return apiFetch<Application[]>(`/applications/assigned-to-me${suffix}`)
+}
