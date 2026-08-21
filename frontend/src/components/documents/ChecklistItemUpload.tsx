@@ -1,9 +1,17 @@
-import { useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import type { ChangeEvent } from 'react'
 
 import { useStudentDocumentUpload } from '../../hooks/useStudentDocumentUpload'
 
-/** Maximum upload size in bytes (Requirements §5: default 10 MB). */
+/**
+ * Maximum upload size in bytes (Requirements §5: default 10 MB).
+ *
+ * TODO: this is a client-side guard only; the backend E27 #176 ticket
+ * enforces the size limit authoritatively. If the backend policy ever
+ * changes (e.g. to 5 MB), this constant must be updated in lockstep —
+ * or, preferentially, fetched from a tenant-config endpoint so the two
+ * layers cannot drift.
+ */
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 /** File extensions allowed by the backend (Requirements §5: PDF/JPG/PNG/DOCX). */
@@ -14,6 +22,13 @@ const ALLOWED_MIME_TYPES: Record<string, true> = {
   'image/jpeg': true,
   'image/png': true,
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': true,
+}
+
+/** Suffix used in ``data-testid`` keys for ad-hoc uploads (no template id). */
+const ADHOC_KEY = 'adhoc' as const
+
+function testIdSuffix(checklistItemTemplateId: number | null): string {
+  return checklistItemTemplateId === null ? ADHOC_KEY : String(checklistItemTemplateId)
 }
 
 /**
@@ -86,7 +101,6 @@ export default function ChecklistItemUpload({
   disabled = false,
 }: ChecklistItemUploadProps) {
   const inputId = useId()
-  const inputRef = useRef<HTMLInputElement>(null)
   const [selectedName, setSelectedName] = useState<string | null>(null)
   const [clientError, setClientError] = useState<string | null>(null)
   const { uploading, error, upload, clearError } = useStudentDocumentUpload({
@@ -95,6 +109,7 @@ export default function ChecklistItemUpload({
   })
 
   const displayedError = clientError ?? error
+  const suffix = testIdSuffix(checklistItemTemplateId)
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -126,19 +141,18 @@ export default function ChecklistItemUpload({
   return (
     <div
       className="checklist-item__upload-control"
-      data-testid={`checklist-item-upload-${checklistItemTemplateId ?? 'adhoc'}`}
+      data-testid={`checklist-item-upload-${suffix}`}
     >
       <label
         className="checklist-item__upload-trigger"
         htmlFor={inputId}
-        data-testid={`checklist-item-upload-trigger-${checklistItemTemplateId ?? 'adhoc'}`}
+        data-testid={`checklist-item-upload-trigger-${suffix}`}
       >
         Upload file
       </label>
       <input
-        ref={inputRef}
         id={inputId}
-        data-testid={`checklist-item-upload-input-${checklistItemTemplateId ?? 'adhoc'}`}
+        data-testid={`checklist-item-upload-input-${suffix}`}
         className="visually-hidden"
         type="file"
         accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -148,7 +162,7 @@ export default function ChecklistItemUpload({
       {selectedName ? (
         <p
           className="checklist-item__upload-filename"
-          data-testid={`checklist-item-upload-filename-${checklistItemTemplateId ?? 'adhoc'}`}
+          data-testid={`checklist-item-upload-filename-${suffix}`}
         >
           {selectedName}
         </p>
@@ -156,7 +170,7 @@ export default function ChecklistItemUpload({
       {uploading ? (
         <p
           className="checklist-item__upload-status"
-          data-testid={`checklist-item-upload-status-${checklistItemTemplateId ?? 'adhoc'}`}
+          data-testid={`checklist-item-upload-status-${suffix}`}
           role="status"
         >
           Uploading…
@@ -165,7 +179,7 @@ export default function ChecklistItemUpload({
       {displayedError ? (
         <p
           className="checklist-item__upload-error"
-          data-testid={`checklist-item-upload-error-${checklistItemTemplateId ?? 'adhoc'}`}
+          data-testid={`checklist-item-upload-error-${suffix}`}
           role="alert"
         >
           {displayedError}

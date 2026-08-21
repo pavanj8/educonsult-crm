@@ -11,6 +11,12 @@ type ApiFetchInit = RequestInit & {
    * header — letting the browser set the boundary for a
    * ``multipart/form-data`` upload (Journey J20). Any caller-provided
    * ``Content-Type`` still wins. Defaults to ``false`` (JSON).
+   *
+   * Note: callers can also pass ``headers: { 'Content-Type': undefined }``
+   * to explicitly clear the default JSON header without flipping
+   * ``skipContentType`` — caller-supplied headers are merged last, so
+   * the ``undefined`` overwrites the default. This is the same
+   * "caller-wins" rule that applies to every other header.
    */
   skipContentType?: boolean
 }

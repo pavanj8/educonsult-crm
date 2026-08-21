@@ -1,7 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { uploadStudentDocument } from '../api/studentDocuments'
+import {
+  uploadStudentDocument,
+  type StudentDocumentUploadResponse,
+} from '../api/studentDocuments'
 
 import { useStudentDocumentUpload } from './useStudentDocumentUpload'
 
@@ -17,7 +20,7 @@ vi.mock('../api/studentDocuments', () => ({
   })),
 }))
 
-const mockUploadResponse = {
+const mockUploadResponse: StudentDocumentUploadResponse = {
   id: 99,
   tenant_id: 10,
   application_id: 7,
@@ -33,6 +36,10 @@ const mockUploadResponse = {
   rejection_reason: null,
   created_at: '2026-02-01T10:00:00Z',
   updated_at: '2026-02-01T10:00:00Z',
+}
+
+function makeUploadResponse(overrides: Partial<StudentDocumentUploadResponse>): StudentDocumentUploadResponse {
+  return { ...mockUploadResponse, ...overrides }
 }
 
 function makeFile(name = 'transcript.pdf', type = 'application/pdf'): File {
@@ -58,12 +65,12 @@ describe('useStudentDocumentUpload', () => {
   })
 
   it('sets uploading during the request and clears it on success', async () => {
-    let resolveUpload: (value: unknown) => void = () => {}
+    let resolveUpload: (value: StudentDocumentUploadResponse) => void = () => {}
     vi.mocked(uploadStudentDocument).mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<StudentDocumentUploadResponse>((resolve) => {
           resolveUpload = resolve
-        }) as Promise<typeof mockUploadResponse>,
+        }),
     )
 
     const { result } = renderHook(() =>
@@ -184,21 +191,21 @@ describe('useStudentDocumentUpload', () => {
   })
 
   it('does not let a stale upload clear the in-flight upload error', async () => {
-    let resolveFirst: (value: unknown) => void = () => {}
-    let resolveSecond: (value: unknown) => void = () => {}
+    let resolveFirst: (value: StudentDocumentUploadResponse) => void = () => {}
+    let resolveSecond: (value: StudentDocumentUploadResponse) => void = () => {}
 
     vi.mocked(uploadStudentDocument)
       .mockImplementationOnce(
         () =>
-          new Promise((resolve) => {
+          new Promise<StudentDocumentUploadResponse>((resolve) => {
             resolveFirst = resolve
-          }) as Promise<typeof mockUploadResponse>,
+          }),
       )
       .mockImplementationOnce(
         () =>
-          new Promise((resolve) => {
+          new Promise<StudentDocumentUploadResponse>((resolve) => {
             resolveSecond = resolve
-          }) as Promise<typeof mockUploadResponse>,
+          }),
       )
 
     const { result } = renderHook(() =>
@@ -221,14 +228,14 @@ describe('useStudentDocumentUpload', () => {
 
     // Second request fails first; the hook must record that error.
     await act(async () => {
-      resolveSecond({ id: 2, status: 'pending', original_filename: 'b.pdf' })
+      resolveSecond(makeUploadResponse({ id: 2, original_filename: 'b.pdf' }))
       await secondPromise.catch(() => {})
     })
 
     // Now the stale first request resolves; the hook must NOT clear the
     // error state owned by the second request.
     await act(async () => {
-      resolveFirst({ id: 1, status: 'pending', original_filename: 'a.pdf' })
+      resolveFirst(makeUploadResponse({ id: 1, original_filename: 'a.pdf' }))
       await firstPromise.catch(() => {})
     })
 
@@ -240,21 +247,21 @@ describe('useStudentDocumentUpload', () => {
   })
 
   it('does not let a stale upload overwrite a fresh error', async () => {
-    let resolveFirst: (value: unknown) => void = () => {}
+    let resolveFirst: (value: StudentDocumentUploadResponse) => void = () => {}
     let rejectSecond: (reason?: unknown) => void = () => {}
 
     vi.mocked(uploadStudentDocument)
       .mockImplementationOnce(
         () =>
-          new Promise((resolve) => {
+          new Promise<StudentDocumentUploadResponse>((resolve) => {
             resolveFirst = resolve
-          }) as Promise<typeof mockUploadResponse>,
+          }),
       )
       .mockImplementationOnce(
         () =>
-          new Promise((_resolve, reject) => {
+          new Promise<StudentDocumentUploadResponse>((_resolve, reject) => {
             rejectSecond = reject
-          }) as Promise<typeof mockUploadResponse>,
+          }),
       )
 
     const { result } = renderHook(() =>
@@ -284,7 +291,7 @@ describe('useStudentDocumentUpload', () => {
     // Then the stale first request succeeds; the hook must NOT clear
     // the second request's error.
     await act(async () => {
-      resolveFirst({ id: 1, status: 'pending', original_filename: 'a.pdf' })
+      resolveFirst(makeUploadResponse({ id: 1, original_filename: 'a.pdf' }))
       await firstPromise.catch(() => {})
     })
     expect(result.current.error).toBe('Network error')
