@@ -3,6 +3,10 @@
 Exercises column shape, persistence, the default ``pending`` status,
 nullable ``checklist_item_template_id`` (NULL = ad-hoc upload),
 nullable verifier fields, and rejection-reason semantics.
+
+Includes an issue #174 / E27 / J20 traceability test that pins the
+shape the E27 upload API (sibling ticket #175) needs to persist each
+student upload against a checklist item.
 """
 
 from datetime import datetime, timezone
@@ -350,3 +354,58 @@ def test_student_document_tenant_scoping(db_session):
     assert doc_t1.tenant_id == 1
     assert doc_t2.tenant_id == 2
     assert doc_t1.id != doc_t2.id
+
+
+def test_student_document_round_trip_for_e27_upload_metadata(
+    db_session,
+) -> None:
+    """Issue #174 / E27 / J20: the persisted shape covers every field the
+    E27 upload API (sibling ticket #175) needs to record for a freshly-
+    uploaded student document against a checklist item.
+
+    This pins the *write-side* contract: given a checklist item template
+    id, application id, and upload metadata (original filename, content
+    type, size, storage path), a new ``StudentDocument`` row can be
+    inserted with ``status='pending'``, ``uploaded_at`` set to the
+    upload timestamp, and ``uploaded_by_user_id`` set to the student;
+    every metadata field round-trips losslessly.
+    """
+    now = _utc_now()
+    application = _seed_application(db_session)
+    template = _seed_template(db_session)
+
+    # Shape the E27 upload API will produce: a fresh student upload
+    # against a checklist item, all verifier fields still NULL.
+    document = StudentDocument(
+        tenant_id=1,
+        application_id=application.id,
+        checklist_item_template_id=template.id,
+        status=StudentDocumentStatus.PENDING,
+        original_filename="10th_transcripts.pdf",
+        content_type="application/pdf",
+        size_bytes=2_345_678,
+        storage_path="tenants/1/applications/100/10th_transcripts.pdf",
+        uploaded_by_user_id=100,
+        uploaded_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(document)
+    db_session.commit()
+    db_session.refresh(document)
+
+    assert document.status == StudentDocumentStatus.PENDING
+    assert document.original_filename == "10th_transcripts.pdf"
+    assert document.content_type == "application/pdf"
+    assert document.size_bytes == 2_345_678
+    assert (
+        document.storage_path
+        == "tenants/1/applications/100/10th_transcripts.pdf"
+    )
+    assert document.uploaded_by_user_id == 100
+    assert document.application_id == application.id
+    assert document.checklist_item_template_id == template.id
+    # All verifier fields stay NULL on a freshly-uploaded (pending) row.
+    assert document.verified_by_user_id is None
+    assert document.verified_at is None
+    assert document.rejection_reason is None
