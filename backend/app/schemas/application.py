@@ -91,3 +91,15 @@ class AdvanceStageResponse(BaseModel):
 
     application: ApplicationResponse
     history_entry: StageHistoryEntry
+
+class MarkEnrolledRequest(BaseModel):
+    """Body for ``POST /applications/{id}/mark-enrolled`` (E38; Journey J31).
+
+    Marking an application ENROLLED captures optional free-text enrollment
+    ``details`` (e.g. intake term, offer confirmation notes). Unlike the
+    REJECTED / WITHDRAWN terminal transitions a reason is not mandatory for a
+    positive enrollment outcome (Requirements §5); the value is recorded on the
+    resulting :class:`~app.models.stage_history.StageHistory` ``reason`` column.
+    """
+
+    details: str | None = Field(default=None, max_length=2000)
