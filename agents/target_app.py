@@ -1,35 +1,36 @@
-"""Conventions the harness expects the real EduConsult CRM backend to
-follow, so the Test Agent can boot it generically. These match the task
-text of Epic E1 in docs/epics.md ("Scaffold backend FastAPI app skeleton
-... health check endpoint", "Configure SQLAlchemy engine/session").
+"""Project paths/conventions the harness expects, so the Test Agent can boot the
+backend generically. All project-specific values come from harness.config.json
+via harness_config (docs/adr/0031) -- edit that JSON, not this file, for a new
+project. Defaults describe a FastAPI backend under `backend/` with `app.main:app`.
 
-Until that scaffolding ticket lands, `backend/app/main.py` won't exist --
-callers should check `has_app()` and degrade gracefully (see
-agents/test_agent.py), since early infra-only tickets have no HTTP surface
-to black-box test.
+Until the scaffolding ticket lands the backend app won't exist -- callers should
+check `has_app()` and degrade gracefully (see agents/test_agent.py).
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-BACKEND_DIR = REPO_ROOT / "backend"
-BACKEND_APP_MODULE = "app.main:app"
-BACKEND_HEALTH_PATH = "/health"
-BACKEND_TESTS_DIR = BACKEND_DIR / "tests"
+import harness_config
 
-# Env var the FastAPI app is expected to honor to point at an isolated
-# scratch DB for a single Test Agent run. Not enforced until the
-# DB-layer ticket lands; Test Agent runs against whatever default DB the
-# app defines until then.
+_C = harness_config.CONFIG
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BACKEND_DIR = REPO_ROOT / _C["backend"]["dir"]
+BACKEND_APP_MODULE = _C["backend"]["app_module"]
+BACKEND_HEALTH_PATH = _C["backend"]["health_path"]
+BACKEND_TESTS_DIR = BACKEND_DIR / "tests"
+_FRONTEND_DIR = _C["frontend"]["dir"]
+
+# Env var the app is expected to honor to point at an isolated scratch DB for a
+# single Test Agent run.
 DATABASE_OVERRIDE_ENV_VAR = "DATABASE_OVERRIDE"
 
-# Paths the Dev/Review agents must never modify -- planning docs and the
-# harness's own tooling are out of scope for any ticket's implementation.
-PROTECTED_PATHS = ["docs/", "agents/", ".github/", ".cursor/", "scripts/"]
+# Paths the Dev/Review agents must never modify -- planning docs + harness tooling.
+PROTECTED_PATHS = list(_C["protected_paths"])
 
-APP_CODE_GLOBS = ["backend/app/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx"]
-TEST_CODE_GLOBS = ["backend/tests/**/*.py", "frontend/**/*.test.ts", "frontend/**/*.test.tsx"]
+_bdir = _C["backend"]["dir"]
+APP_CODE_GLOBS = [f"{_bdir}/app/**/*.py", f"{_FRONTEND_DIR}/src/**/*.ts", f"{_FRONTEND_DIR}/src/**/*.tsx"]
+TEST_CODE_GLOBS = [f"{_bdir}/tests/**/*.py", f"{_FRONTEND_DIR}/**/*.test.ts", f"{_FRONTEND_DIR}/**/*.test.tsx"]
 
 
 def has_app() -> bool:

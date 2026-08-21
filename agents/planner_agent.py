@@ -41,7 +41,7 @@ import target_app
 REPO_ROOT = target_app.REPO_ROOT
 DOCS = REPO_ROOT / "docs"
 PLAN_PATH = DOCS / "plan.json"
-DEFAULT_MODEL = os.environ.get("PLANNER_AGENT_MODEL", llm_env.DEFAULT_VERIFY_MODEL)
+DEFAULT_MODEL = os.environ.get("PLANNER_AGENT_MODEL", llm_env.DEFAULT_PLANNER_MODEL)
 MAX_TOKENS = int(os.environ.get("PLANNER_MAX_TOKENS", "16384"))
 # Batch sizes keep each model response well within MAX_TOKENS.
 JOURNEYS_PER_EPIC_BATCH = int(os.environ.get("PLANNER_JOURNEY_BATCH", "6"))
@@ -60,8 +60,18 @@ def _save_plan(plan: dict) -> None:
 
 
 def _chat(system: str, user: str, model: str) -> str:
-    """One MiniMax (Anthropic Messages API) completion; returns the text."""
-    client = llm_env.minimax_client()
+    """One completion against the configured provider; returns the text.
+
+    Provider-agnostic (docs/adr/0031): Anthropic Messages API or OpenAI Chat
+    Completions depending on harness.config.json > llm.
+    """
+    client, api = llm_env.client_and_api()
+    if api == "openai":
+        resp = client.chat.completions.create(
+            model=model, max_tokens=MAX_TOKENS,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        )
+        return resp.choices[0].message.content or ""
     resp = client.messages.create(
         model=model, max_tokens=MAX_TOKENS, system=system,
         messages=[{"role": "user", "content": user}],

@@ -27,12 +27,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      # CURSOR_API_KEY kept provisioned but dormant (docs/adr/0019).
-      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      # Provider-agnostic (docs/adr/0031): base_url + model from harness.config.json.
       ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
-      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TEST_AGENT_MODEL: MiniMax-M3
     steps:
       - name: Checkout issue branch
         uses: actions/checkout@v4
@@ -71,7 +70,7 @@ jobs:
         id: test
         working-directory: agents
         continue-on-error: true
-        run: python test_agent.py ${{ github.event.inputs.issue_number }} --iteration ${{ github.event.inputs.iteration }} --model "$TEST_AGENT_MODEL"
+        run: python test_agent.py ${{ github.event.inputs.issue_number }} --iteration ${{ github.event.inputs.iteration }}
 
       - name: Ensure a test result label exists
         if: always()

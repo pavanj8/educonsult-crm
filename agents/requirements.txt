@@ -1,7 +1,10 @@
-# MiniMax's Anthropic-compatible Messages API drives the harness engine
-# (minimax_agent.py) via ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN
-# (docs/adr/0019).
+# The harness is provider-agnostic (docs/adr/0031): pick a provider in
+# harness.config.json > llm. Anthropic-shape providers (MiniMax's compatible
+# endpoint, Anthropic/Claude) use the `anthropic` client; OpenAI-shape providers
+# (OpenAI + compatible gateways) use the `openai` client. Both are installed so
+# any configured provider works out of the box.
 anthropic>=0.40
+openai>=1.40
 
 # NOTE: cursor-sdk is intentionally NOT installed. The egress probe
 # (docs/adr/0019 follow-up) showed that merely having cursor-sdk on the path
