@@ -22,3 +22,16 @@ export interface PendingDocumentQueue {
   limit: number
   offset: number
 }
+
+/** A document after a verifier decision (approve/reject) — E29/E30. */
+export interface VerifiedDocument {
+  id: number
+  tenant_id: number
+  application_id: number
+  status: string
+  original_filename: string
+  verified_by_user_id: number | null
+  verified_at: string | null
+  rejection_reason: string | null
+  approval_comment: string | null
+}

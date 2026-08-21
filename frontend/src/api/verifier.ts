@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { PendingDocumentQueue } from '../types/verifier'
+import type { PendingDocumentQueue, VerifiedDocument } from '../types/verifier'
 
 export interface PendingDocumentsParams {
   limit?: number
@@ -22,4 +22,18 @@ export async function fetchPendingDocuments(
   }
   const suffix = query.toString() ? `?${query.toString()}` : ''
   return apiFetch<PendingDocumentQueue>(`/verifier/documents/pending${suffix}`)
+}
+
+/**
+ * Reject a pending document with a REQUIRED comment (E30; Journey J23; #184).
+ * Backed by ``POST /verifier/documents/{document_id}/reject``.
+ */
+export async function rejectDocument(
+  documentId: number,
+  comment: string,
+): Promise<VerifiedDocument> {
+  return apiFetch<VerifiedDocument>(`/verifier/documents/${documentId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ comment }),
+  })
 }
