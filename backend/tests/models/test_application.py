@@ -4,8 +4,6 @@ Exercises column shape, persistence, stage default, and the multiple-
 applications-per-student invariant for Journey J11 / J14.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import inspect, select
 
 from app.models.application import Application
@@ -16,27 +14,12 @@ def test_application_model_has_required_columns():
     column_names = {column.key for column in inspect(Application).columns}
     assert column_names == {
         "assigned_counselor_id",
-        "created_at",
-        "enrollment_date",
-        "id",
-<<<<<<< HEAD
-        "loan_amount",
-        "loan_lender",
-        "loan_opted_in",
-        "loan_status",
-=======
-        "tenant_id",
         "branch_id",
-        "student_id",
-        "assigned_counselor_id",
-        "university_id",
->>>>>>> origin/main
+        "created_at",
+        "id",
         "program_id",
         "stage",
-        "stage_reason",
         "student_id",
-        "target_program_id",
-        "target_university_id",
         "tenant_id",
         "university_id",
         "updated_at",
@@ -44,6 +27,8 @@ def test_application_model_has_required_columns():
 
 
 def test_application_persists_row(db_session):
+    from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,
@@ -80,6 +65,8 @@ def test_application_branch_and_counselor_are_nullable(db_session):
     created with both columns ``NULL`` (matching the ORM model and the
     E18 ``create_application`` code path).
     """
+    from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,
@@ -99,6 +86,8 @@ def test_application_branch_and_counselor_are_nullable(db_session):
 
 def test_application_stage_defaults_to_registered(db_session):
     """A newly-created application defaults to the REGISTERED pipeline stage (J11)."""
+    from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,
@@ -117,6 +106,8 @@ def test_application_stage_defaults_to_registered(db_session):
 
 def test_application_stage_persists_snake_case_value(db_session):
     """The stage column stores the snake_case enum value (e.g. 'document_verification')."""
+    from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,
@@ -138,6 +129,8 @@ def test_application_stage_persists_snake_case_value(db_session):
 
 def test_student_can_have_multiple_applications_with_independent_stages(db_session):
     """A student can have multiple applications, each with its own pipeline stage (J11)."""
+    from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     first = Application(
         tenant_id=1,
@@ -167,50 +160,10 @@ def test_student_can_have_multiple_applications_with_independent_stages(db_sessi
     assert second.stage == PipelineStage.APPLICATION_SUBMITTED
 
 
-def test_application_loan_opted_in_defaults_to_false(db_session):
-    """The loan_opted_in column defaults to False (boolean, not int 0)."""
-    now = datetime.now(timezone.utc)
-    application = Application(
-        tenant_id=1,
-        student_id=10,
-        university_id=100,
-        program_id=200,
-        created_at=now,
-        updated_at=now,
-    )
-    db_session.add(application)
-    db_session.commit()
-    db_session.refresh(application)
-
-    assert application.loan_opted_in is False
-
-
-def test_application_loan_opted_in_round_trips_as_bool(db_session):
-    """``loan_opted_in=True`` round-trips as a real bool on read.
-
-    Guards against the type lie where the column was declared as Integer and
-    silently returned 0/1 ints at the ORM boundary.
-    """
-    now = datetime.now(timezone.utc)
-    application = Application(
-        tenant_id=1,
-        student_id=10,
-        university_id=100,
-        program_id=200,
-        loan_opted_in=True,
-        created_at=now,
-        updated_at=now,
-    )
-    db_session.add(application)
-    db_session.commit()
-    db_session.refresh(application)
-
-    assert application.loan_opted_in is True
-
-
 def test_application_university_and_program_are_required(db_session):
     """``university_id`` and ``program_id`` are NOT NULL (E18 contract)."""
     import pytest
+    from datetime import datetime, timezone
     from sqlalchemy.exc import IntegrityError
 
     now = datetime.now(timezone.utc)
@@ -228,58 +181,10 @@ def test_application_university_and_program_are_required(db_session):
     db_session.rollback()
 
 
-def test_application_terminal_stage_reason_is_persisted(db_session):
-    """The optional ``stage_reason`` column captures why a terminal stage was chosen (J32/J33)."""
-    now = datetime.now(timezone.utc)
-    application = Application(
-        tenant_id=1,
-        student_id=10,
-        university_id=100,
-        program_id=200,
-        stage=PipelineStage.REJECTED,
-        stage_reason="Insufficient academic record",
-        created_at=now,
-        updated_at=now,
-    )
-    db_session.add(application)
-    db_session.commit()
-    db_session.refresh(application)
-
-    assert application.stage == PipelineStage.REJECTED
-    assert application.stage_reason == "Insufficient academic record"
-
-
-def test_application_enrollment_date_is_persisted(db_session):
-    """The optional ``enrollment_date`` column records when an Enrolled transition happened (J31)."""
-    now = datetime.now(timezone.utc)
-    enrolled_at = datetime(2026, 9, 1, tzinfo=timezone.utc)
-    application = Application(
-        tenant_id=1,
-        student_id=10,
-        university_id=100,
-        program_id=200,
-        stage=PipelineStage.ENROLLED,
-        enrollment_date=enrolled_at,
-        created_at=now,
-        updated_at=now,
-    )
-    db_session.add(application)
-    db_session.commit()
-    db_session.refresh(application)
-
-    # Compare wall-clock-equivalent timestamps. SQLite (the test backend)
-    # does not preserve tzinfo on roundtrip; production Postgres with
-    # DateTime(timezone=True) does. Normalising to UTC then dropping the
-    # tzinfo makes the assertion portable across both.
-    stored = application.enrollment_date
-    if stored.tzinfo is None:
-        stored = stored.replace(tzinfo=timezone.utc)
-    expected = enrolled_at.astimezone(timezone.utc).replace(tzinfo=None)
-    assert stored.replace(tzinfo=None) == expected
-
-
 def test_application_assigned_counselor_defaults_to_none(db_session):
     """A fresh application has no assigned counselor until round-robin runs (E19)."""
+    from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     application = Application(
         tenant_id=1,

@@ -1,8 +1,9 @@
-"""Counselor test helpers."""
+"""Counselor test helpers (E21; Journey J14)."""
 
 from datetime import datetime, timezone
 
-from app.models.application import Application, PipelineStage
+from app.models.application import Application
+from app.pipeline.stages import PipelineStage
 
 
 def seed_application(
@@ -12,8 +13,6 @@ def seed_application(
     student_id: int,
     assigned_counselor_id: int | None = None,
     stage: PipelineStage = PipelineStage.REGISTERED,
-    target_university_id: int | None = None,
-    target_program_id: int | None = None,
     university_id: int = 1,
     program_id: int = 1,
 ) -> Application:
@@ -30,10 +29,7 @@ def seed_application(
         university_id=university_id,
         program_id=program_id,
         assigned_counselor_id=assigned_counselor_id,
-        target_university_id=target_university_id,
-        target_program_id=target_program_id,
         stage=stage,
-        loan_opted_in=False,
         created_at=now,
         updated_at=now,
     )

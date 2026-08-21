@@ -1,4 +1,13 @@
-"""Counselor dashboard and queue routes (E21; Journey J14)."""
+"""Counselor dashboard and queue routes (E21; Journey J14).
+
+E21 is intentionally narrowed to the COUNSELOR role: ``GET /counselor/queue``
+returns the counselor's own queue (assigned applications joined with the
+student), not a cross-role view. Cross-role queue views (Branch Manager,
+Consultancy Owner) live at ``GET /applications/assigned-to-me`` (E21 backend,
+#156); mixing the three role views into one endpoint produced a
+wrong-data contract for the non-counselor roles, which is why this endpoint
+is narrowed to COUNSELOR only.
+"""
 
 from typing import Annotated
 
@@ -73,11 +82,9 @@ def get_counselor_queue(
 ) -> list[ApplicationWithStudentResponse]:
     """Get the counselor's assigned application queue (E21; Journey J14).
 
-    Restricted to the ``COUNSELOR`` role only. Branch Managers and Consultancy
-    Owners use ``GET /applications/assigned-to-me`` for their broader queue
-    views (E21 backend, #156); mixing the three role views into one endpoint
-    produced a wrong-data contract for the latter two roles, which is why
-    this endpoint is narrowed.
+    Restricted to the ``COUNSELOR`` role only. Cross-role queue views for
+    Branch Manager and Consultancy Owner live at ``GET /applications/assigned-to-me``
+    (E21 backend, #156).
     """
     try:
         query = _counselor_base_query(db, current_user)
@@ -107,19 +114,12 @@ def get_counselor_queue(
                 ApplicationWithStudentResponse(
                     id=app.id,
                     tenant_id=app.tenant_id,
+                    branch_id=app.branch_id,
                     student_id=app.student_id,
                     assigned_counselor_id=app.assigned_counselor_id,
-                    target_university_id=app.target_university_id,
-                    target_program_id=app.target_program_id,
                     university_id=app.university_id,
                     program_id=app.program_id,
                     stage=app.stage,
-                    stage_reason=app.stage_reason,
-                    enrollment_date=app.enrollment_date,
-                    loan_opted_in=app.loan_opted_in,
-                    loan_status=app.loan_status,
-                    loan_lender=app.loan_lender,
-                    loan_amount=app.loan_amount,
                     created_at=app.created_at,
                     updated_at=app.updated_at,
                     student_name=student.name,
