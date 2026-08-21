@@ -34,6 +34,7 @@ from pathlib import Path
 
 import github_ticket_utils as ticket_utils
 import harness_config
+import llm_env
 
 AGENTS = Path(__file__).resolve().parent
 REPO_ROOT = AGENTS.parent
@@ -181,6 +182,17 @@ def main() -> int:
     repo = harness_config.repo()
     if not repo:
         sys.exit("No repo configured (harness.config.json > project.repo).")
+
+    # Preflight: fail fast if the LLM key is missing, BEFORE touching any ticket —
+    # otherwise --loop would churn the whole backlog marking everything needs-rework
+    # and burning iteration counts (docs/adr/0031).
+    if not llm_env.credentials_configured():
+        prov = harness_config.active_provider()
+        sys.exit(
+            f"No LLM credentials: set {prov.get('auth_env', 'the provider key')} for provider "
+            f"{prov.get('name', '?')!r}. If it's in ~/.zshrc, this shell predates it — run "
+            f"`source ~/.zshrc` or open a new terminal, then retry."
+        )
 
     def one(n: int) -> int:
         return _run_one(repo, n, args.iteration, with_verify=args.with_verify,
