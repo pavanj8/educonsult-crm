@@ -16,6 +16,7 @@ from app.routers.master_data import router as master_data_router
 from app.routers.staff import router as staff_router
 from app.routers.student_documents import router as student_documents_router
 from app.routers.tenants import router as tenants_router
+from app.routers.verifier import router as verifier_router
 from app.seed.runner import seed_demo_data_if_empty
 
 
@@ -83,6 +84,7 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(applications_router, prefix="/applications", tags=["applications"])
 app.include_router(checklist_router, prefix="/applications", tags=["checklist"])
 app.include_router(student_documents_router, prefix="/applications", tags=["student-documents"])
+app.include_router(verifier_router, prefix="/verifier", tags=["verifier"])
 app.include_router(branches_router, prefix="/branches", tags=["branches"])
 app.include_router(staff_router, prefix="/staff", tags=["staff"])
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
