@@ -110,3 +110,37 @@ describe('applications API client', () => {
     })
   })
 })
+
+describe('markEnrolled API client', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('posts trimmed details to the mark-enrolled endpoint', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const result = { application: { id: 5 }, history_entry: { to_stage: 'enrolled' } }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => result })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const { markEnrolled } = await import('./applications')
+    const res = await markEnrolled(5, '  Fall 2026  ')
+
+    expect(res).toEqual(result)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/mark-enrolled',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ details: 'Fall 2026' }) }),
+    )
+  })
+
+  it('sends null details when omitted', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { markEnrolled } = await import('./applications')
+    await markEnrolled(5)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/mark-enrolled',
+      expect.objectContaining({ body: JSON.stringify({ details: null }) }),
+    )
+  })
+})
