@@ -16,6 +16,9 @@
     "lint": "npm run lint",
     "build": "npm run build"
   },
+  "execution": {
+    "mode": "github"
+  },
   "models": {
     "dev": "MiniMax-M3",
     "verify": "MiniMax-M3",
