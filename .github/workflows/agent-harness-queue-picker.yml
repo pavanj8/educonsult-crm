@@ -67,14 +67,22 @@ jobs:
           # Review feedback is addressed before starting a new ticket
           # (docs/adr/0015). Untouched issues still drain when nothing is
           # waiting on retry.
-          NEXT=$(gh issue list -R ${{ github.repository }} --label "task,phase:mvp" --state open --limit 300 --json number,labels \
+          # Ordering (docs/adr/0024): needs-rework first (address feedback before
+          # new work); then defer "Tests:" tickets behind non-test ones, because
+          # a test ticket almost always depends on its epic's implementation
+          # tickets — picking it early makes the Dev agent burn turns discovering
+          # that the code-under-test isn't merged yet (observed on #171); then by
+          # issue number.
+          NEXT=$(gh issue list -R ${{ github.repository }} --label "task,phase:mvp" --state open --limit 300 --json number,labels,title \
             | jq -r --argjson max "$MAX_ITERATIONS" '
               def names: [.labels[].name];
               def iter: [names[] | select(startswith("agent:iteration-")) | split("-") | last | tonumber] | .[0] // 0;
               def untouched: (names | any(startswith("agent:")) | not);
               def retryable: ((names | index("agent:needs-rework")) != null) and (iter < $max);
+              def is_rework: (names | index("agent:needs-rework")) != null;
+              def is_test: ((.title // "") | test("\\bTests?:"; "i"));
               [.[] | select(untouched or retryable)]
-              | sort_by([if ((.labels | map(.name) | index("agent:needs-rework")) != null) then 0 else 1 end, .number])
+              | sort_by([ (if is_rework then 0 else 1 end), (if is_test then 1 else 0 end), .number ])
               | .[0].number // empty
             ')
           if [ -n "$NEXT" ]; then
