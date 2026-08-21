@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "d4440f78c1cb"
+HEAD_REVISION = "j3k4l5m6n7o8"
 
 
 def _alembic_config() -> Config:
