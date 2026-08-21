@@ -1,5 +1,5 @@
 """GitHub-Issues-backed replacement for the old file-based ticket_utils.py
-(see harness-demo/adr/0005 and docs/adr/0009). A GitHub Issue IS the ticket:
+(see docs/adr/0009). A GitHub Issue IS the ticket:
 its body is the ticket description/acceptance criteria, its labels carry
 the harness's state machine, and agent reports are posted as comments so
 the full history is visible on the issue itself.
@@ -108,6 +108,39 @@ def prior_iteration_feedback(issue_number: int, limit_chars: int = 12000) -> str
     if len(blob) > limit_chars:
         blob = blob[-limit_chars:]
     return blob
+
+
+def epic_sibling_status(issue: dict) -> str:
+    """Sibling tickets in the same epic and whether each is already merged, so
+    the Dev Agent doesn't re-implement models/migrations a prior ticket already
+    landed on main (docs/adr/0025; the #169 "re-added StageHistory" failure)."""
+    body = issue.get("body") or ""
+    m = re.search(r"[Pp]art of #(\d+)", body)
+    if not m:
+        return ""
+    epic = m.group(1)
+    try:
+        items = json.loads(_run([
+            "gh", "issue", "list", "--state", "all", "--limit", "300",
+            "--json", "number,title,state,body",
+        ]))
+    except (GitHubCliError, json.JSONDecodeError):
+        return ""
+    pat = re.compile(rf"[Pp]art of #{epic}(?!\d)")
+    sibs = [
+        it for it in items
+        if it.get("number") != issue.get("number") and pat.search(it.get("body") or "")
+    ]
+    if not sibs:
+        return ""
+    lines = []
+    for it in sorted(sibs, key=lambda x: x["number"]):
+        if it.get("state") == "CLOSED":
+            mark = "DONE — already merged to main; do NOT re-create its code, build on it"
+        else:
+            mark = "still in progress — its code is NOT on main yet"
+        lines.append(f"- #{it['number']} {it['title']} — {mark}")
+    return "\n".join(lines)
 
 
 def start_new_iteration(issue_number: int, current_iteration: int) -> int:

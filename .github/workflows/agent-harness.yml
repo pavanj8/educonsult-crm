@@ -98,7 +98,7 @@ jobs:
             # is auto-resolved in main's favor; a real conflict in PRODUCT code
             # aborts loudly for manual resolution.
             git merge --no-commit --no-ff origin/main || true
-            for p in agents docs .github harness-demo .cursor scripts; do
+            for p in agents docs .github .cursor scripts; do
               git checkout origin/main -- "$p" 2>/dev/null || true
             done
             git add -A
@@ -203,12 +203,17 @@ jobs:
         if: always()
         run: |
           ISSUE="${{ steps.issue.outputs.number }}"
-          # (a) Dev Agent crashed, or (b) it produced no changes -> nothing worth verifying.
+          # (a) Dev Agent crashed -> nothing worth verifying.
           if [ "${{ steps.dev.outcome }}" != "success" ]; then
             echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=the Dev Agent step failed (crashed / model error)" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          if [ "${{ steps.commit.outputs.changed }}" != "true" ]; then
-            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=the Dev Agent produced no code changes" >> "$GITHUB_OUTPUT"; exit 0
+          # (b) The BRANCH has no work vs main. NOTE: check the branch, not just
+          # this iteration's commit -- a resumed branch already carries valid work
+          # from a prior iteration even when this run adds no new commit (fixes the
+          # false "no code changes" skip on #140, docs/adr/0023).
+          git fetch origin main -q || true
+          if git diff --quiet origin/main; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=the branch has no changes vs main" >> "$GITHUB_OUTPUT"; exit 0
           fi
           # (c) code exists but doesn't pass the canonical gate -> Test/Review would just
           # rediscover that; skip them and hand straight back to rework.

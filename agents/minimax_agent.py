@@ -56,7 +56,11 @@ TOOLS = [
     },
     {
         "name": "write_file",
-        "description": "Create or overwrite a UTF-8 text file (parent dirs are created).",
+        "description": (
+            "Create a NEW file or fully replace a small one (parent dirs are created). "
+            "To change part of an existing file, use `str_replace` instead — do NOT "
+            "rewrite a whole large file just to edit a few lines."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -64,6 +68,25 @@ TOOLS = [
                 "content": {"type": "string", "description": "Full new file contents."},
             },
             "required": ["path", "content"],
+        },
+    },
+    {
+        "name": "str_replace",
+        "description": (
+            "Surgically edit an existing file: replace an exact block of text with new "
+            "text. PREFER THIS over write_file for any change to an existing file — it "
+            "is far cheaper than regenerating the whole file. `old_string` must appear "
+            "EXACTLY ONCE in the file (include enough surrounding context to make it "
+            "unique); it fails if it is missing or appears more than once."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Path relative to the working directory."},
+                "old_string": {"type": "string", "description": "Exact text to replace (must be unique in the file)."},
+                "new_string": {"type": "string", "description": "Replacement text."},
+            },
+            "required": ["path", "old_string", "new_string"],
         },
     },
     {
@@ -125,6 +148,28 @@ def _write_file(cwd: Path, path: str, content: str) -> str:
     return f"Wrote {len(content)} chars to {path}"
 
 
+def _str_replace(cwd: Path, path: str, old: str, new: str) -> str:
+    """Replace an exact, unique block of text in a file (like the Edit tool).
+
+    Refuses if ``old`` is missing or not unique, so the model can't silently
+    corrupt a file — it must include enough context to be unambiguous.
+    """
+    target = _resolve(cwd, path)
+    if not target.exists():
+        return f"ERROR: no such file: {path}"
+    try:
+        content = target.read_text()
+    except (UnicodeDecodeError, OSError) as err:
+        return f"ERROR: could not read {path}: {err}"
+    count = content.count(old)
+    if count == 0:
+        return f"ERROR: old_string not found in {path}. Read the file and copy the exact text (including whitespace)."
+    if count > 1:
+        return f"ERROR: old_string appears {count} times in {path}; add more surrounding context so it is unique."
+    target.write_text(content.replace(old, new, 1))
+    return f"Edited {path} (replaced {len(old)} chars with {len(new)})."
+
+
 def _list_dir(cwd: Path, path: str) -> str:
     target = _resolve(cwd, path or ".")
     if not target.is_dir():
@@ -153,6 +198,8 @@ def _dispatch(name: str, args: dict, cwd: Path) -> str:
             return _read_file(cwd, args["path"])
         if name == "write_file":
             return _write_file(cwd, args["path"], args.get("content", ""))
+        if name == "str_replace":
+            return _str_replace(cwd, args["path"], args["old_string"], args["new_string"])
         if name == "list_dir":
             return _list_dir(cwd, args.get("path", "."))
         if name == "run_command":
