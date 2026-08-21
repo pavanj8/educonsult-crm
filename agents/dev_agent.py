@@ -41,6 +41,11 @@ DEV_MAX_TURNS = int(os.environ.get("DEV_MAX_TURNS", "50"))
 # ever bounces out to needs-rework + a fresh re-dispatched job. Cheaper than
 # restarting on a new runner. Test/Review still run in their own jobs afterward.
 DEV_BUILD_ATTEMPTS = int(os.environ.get("DEV_BUILD_ATTEMPTS", "2"))
+# Retry (in-run fix) attempts get a tighter turn budget than the first pass:
+# a focused "fix exactly what check.sh reports" pass shouldn't need a full
+# DEV_MAX_TURNS, and this caps worst-case Dev run time (docs/adr/0027) so the
+# in-run retries don't hog the single Dev slot for ~2x DEV_MAX_TURNS.
+DEV_RETRY_MAX_TURNS = int(os.environ.get("DEV_RETRY_MAX_TURNS", "20"))
 
 _backend_deps_ready = False
 
@@ -264,9 +269,10 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
                 f"it reports below (do not rewrite passing code, do not restart), then finish:\n"
                 f"```\n{gate_out[-3000:]}\n```\n"
             )
-        print(f"--- Dev Agent attempt {attempt}/{DEV_BUILD_ATTEMPTS} for issue #{issue['number']} (model={model}) ---\n")
+        turns = DEV_MAX_TURNS if attempt == 1 else DEV_RETRY_MAX_TURNS
+        print(f"--- Dev Agent attempt {attempt}/{DEV_BUILD_ATTEMPTS} for issue #{issue['number']} (model={model}, max_turns={turns}) ---\n")
         status, text = minimax_agent.run_agent(
-            "dev-agent", prompt, model, REPO_ROOT, max_turns=DEV_MAX_TURNS,
+            "dev-agent", prompt, model, REPO_ROOT, max_turns=turns,
         )
         rc, gate_out = _backend_build_check()
         if rc == 0:
