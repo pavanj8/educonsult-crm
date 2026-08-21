@@ -1,0 +1,69 @@
+name: Agent Plan (requirements → backlog)
+
+# Turns docs/requirements.md into the whole backlog via the Planning Agent
+# (docs/adr/0030): requirements → journeys → epics → tasks → GitHub issues.
+# Manual only. Run stage-by-stage to review each artifact, or "all" in one go.
+# For a large plan, run once; the Dev/Test/Review harness then delivers it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "journeys | epics | tasks | render | issues | all"
+        default: "all"
+        required: true
+      project:
+        description: "Project name (used in generated docs)"
+        required: false
+      max_journeys:
+        description: "Cap number of journeys for a dry run (blank = as many as needed)"
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
+      GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+      PROJECT_NAME: ${{ github.event.inputs.project }}
+      PLANNER_AGENT_MODEL: MiniMax-M3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agent dependencies
+        working-directory: agents
+        run: pip install -r requirements.txt
+
+      - name: Run the Planning Agent
+        working-directory: agents
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.max_journeys }}" ]; then
+            ARGS="--max-journeys ${{ github.event.inputs.max_journeys }}"
+          fi
+          python planner_agent.py "${{ github.event.inputs.stage }}" $ARGS
+
+      - name: Commit generated plan + docs
+        run: |
+          git config user.name "agent-harness-bot"
+          git config user.email "agent-harness-bot@users.noreply.github.com"
+          git add docs/plan.json docs/journeys.md docs/epics.md 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Planning Agent: generate backlog from requirements (${{ github.event.inputs.stage }})"
+            git push
+          else
+            echo "No plan/doc changes to commit."
+          fi

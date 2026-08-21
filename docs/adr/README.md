@@ -57,3 +57,4 @@ those links are dangling by design and are not restored.
 | [0027](0027-dev-in-run-build-gate-retries.md) | Dev self-verifies + fixes in-run before needs-rework | Accepted — implemented | 2026-08-21 |
 | [0028](0028-force-report-on-early-finish.md) | Force the report tool when a Test/Review agent finishes early | Accepted — implemented | 2026-08-21 |
 | [0029](0029-test-isolation-restore-and-dev-timeout.md) | Fix reload test-isolation leak + hard Dev wall-clock cap | Accepted — implemented | 2026-08-21 |
+| [0030](0030-planning-agent.md) | Planning Agent — requirements → journeys → epics → tasks → issues | Accepted — implemented | 2026-08-21 |
