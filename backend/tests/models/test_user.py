@@ -7,7 +7,6 @@ from sqlalchemy.exc import IntegrityError
 from app.models.user import User
 from app.rbac.roles import Role
 
-
 def test_user_model_has_required_columns():
     column_names = {column.key for column in inspect(User).columns}
     assert column_names == {
@@ -67,7 +66,13 @@ def test_user_persists_role_scoped_rows(
     assert user.is_active is True
 
 
-def test_user_email_is_unique(db_session):
+def test_user_email_is_unique_within_tenant(db_session):
+    """Email uniqueness is scoped per tenant (docs/requirements.md §1).
+
+    A second row with the same email in the same tenant must violate the
+    composite UNIQUE(tenant_id, email) constraint, but the same email in a
+    different tenant is independent and therefore allowed.
+    """
     now = datetime.now(timezone.utc)
     first = User(
         email="duplicate@example.test",
@@ -95,6 +100,39 @@ def test_user_email_is_unique(db_session):
         db_session.commit()
 
     db_session.rollback()
+
+
+def test_user_email_can_be_reused_across_tenants(db_session):
+    """The same email may legitimately belong to users in different tenants."""
+    now = datetime.now(timezone.utc)
+    in_tenant_a = User(
+        email="shared@example.test",
+        password_hash="hash-a",
+        role=Role.STUDENT,
+        tenant_id=1,
+        branch_id=1,
+        created_at=now,
+        updated_at=now,
+    )
+    in_tenant_b = User(
+        email="shared@example.test",
+        password_hash="hash-b",
+        role=Role.STUDENT,
+        tenant_id=2,
+        branch_id=2,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(in_tenant_a)
+    db_session.add(in_tenant_b)
+    db_session.commit()
+
+    db_session.refresh(in_tenant_a)
+    db_session.refresh(in_tenant_b)
+    assert in_tenant_a.id != in_tenant_b.id
+    assert in_tenant_a.tenant_id == 1
+    assert in_tenant_b.tenant_id == 2
+    assert in_tenant_a.email == in_tenant_b.email == "shared@example.test"
 
 
 def test_user_role_persists_snake_case_value(db_session):
