@@ -112,6 +112,15 @@ def _run_one(repo: str, issue_number: int, iteration: int | None, *, with_verify
     if with_verify:
         _run([py, str(AGENTS / "test_agent.py"), str(issue_number), "--iteration", str(iteration)])
         _run([py, str(AGENTS / "review_agent.py"), str(issue_number), "--iteration", str(iteration)])
+        # Gate on the agents' verdicts (labels they set) — do NOT merge a ticket
+        # that failed Test or Review, matching the cloud finalize (docs/adr/0031).
+        labels = ticket_utils.get_issue(issue_number).get("label_names", [])
+        if "agent:test-fail" in labels or "agent:review-fail" in labels:
+            failed = [n for n in ("agent:test-fail", "agent:review-fail") if n in labels]
+            print(f"[run_local] verification FAILED ({', '.join(failed)}) — marking needs-rework, not merging.")
+            ticket_utils.add_label(issue_number, "agent:needs-rework")
+            return 1
+        print("[run_local] Test + Review passed.")
 
     if merge:
         _run(["git", "add", "-A"])
