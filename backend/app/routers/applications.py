@@ -31,6 +31,10 @@ from app.schemas.application import (
     StageHistoryEntry,
 )
 from app.services.counselor_assignment import assign_counselor_round_robin
+from app.services.notifications import (
+    notify_application_created,
+    notify_application_stage_advanced,
+)
 from app.services.stage_progression import (
     InvalidStageTransitionError,
     validate_transition,
@@ -223,6 +227,17 @@ def create_application(
         ) from None
 
     db.refresh(application)
+    # E48 / J41 notification hook: notify the assigned counselor (no-op
+    # when the branch had no active counselors at creation time).
+    notify_application_created(db, application=application)
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
     return application
 
 
@@ -426,6 +441,23 @@ def advance_application_stage(
     db.refresh(application)
     db.refresh(history_entry)
 
+    # E48 / J41 notification hook: notify the application's student.
+    notify_application_stage_advanced(
+        db,
+        application=application,
+        to_stage=to_stage,
+        changed_by_user_id=current_user.id,
+        stage_history_id=history_entry.id,
+    )
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
     return AdvanceStageResponse(
         application=ApplicationResponse.model_validate(application),
         history_entry=StageHistoryEntry.model_validate(history_entry),
@@ -507,6 +539,23 @@ def mark_application_enrolled(
 
     db.refresh(application)
     db.refresh(history_entry)
+
+    # E48 / J41 notification hook: notify the application's student.
+    notify_application_stage_advanced(
+        db,
+        application=application,
+        to_stage=to_stage,
+        changed_by_user_id=current_user.id,
+        stage_history_id=history_entry.id,
+    )
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
 
     return AdvanceStageResponse(
         application=ApplicationResponse.model_validate(application),

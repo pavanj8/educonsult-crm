@@ -3,6 +3,7 @@ from app.models.base import Base, TenantScopedBase
 from app.models.branch import Branch
 from app.models.checklist_item_template import ChecklistItemTemplate
 from app.models.country import Country
+from app.models.notification import Notification
 from app.models.program import Program
 from app.models.stage_history import StageHistory
 from app.models.stage_transition import StageTransition
@@ -18,6 +19,7 @@ __all__ = [
     "Branch",
     "ChecklistItemTemplate",
     "Country",
+    "Notification",
     "Program",
     "StageHistory",
     "StageTransition",
