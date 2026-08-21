@@ -29,6 +29,7 @@ from app.schemas.application import (
     MarkRejectedRequest,
     StageHistoryEntry,
 )
+from app.services.counselor_assignment import assign_counselor_round_robin
 from app.services.stage_progression import (
     InvalidStageTransitionError,
     validate_transition,
@@ -192,12 +193,22 @@ def create_application(
         program_id=payload.program_id,
     )
 
+    # Auto-assign a counselor round-robin within the student's branch (E19; J12;
+    # #151). branch_id is inherited from the student; when the branch has no
+    # active counselor (or the student has no branch) the application is created
+    # unassigned and can be assigned later (E20).
+    assigned_counselor_id = assign_counselor_round_robin(
+        db, tenant_id=student.tenant_id, branch_id=student.branch_id
+    )
+
     application = Application(
         tenant_id=student.tenant_id,
         student_id=student.id,
         university_id=payload.university_id,
         program_id=payload.program_id,
         stage=PipelineStage.REGISTERED,
+        branch_id=student.branch_id,
+        assigned_counselor_id=assigned_counselor_id,
     )
     db.add(application)
 

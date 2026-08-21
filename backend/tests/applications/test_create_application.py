@@ -709,6 +709,10 @@ def test_create_application_returns_503_when_database_unavailable_on_commit(
     # (returning real rows) but commit() raises.
     mock_session = MagicMock()
     mock_session.get.side_effect = [student, university, program]
+    # The round-robin assignment (E19 #151) queries branch counselors before the
+    # commit; return none so the app is created unassigned and the route reaches
+    # the failing commit.
+    mock_session.scalars.return_value.all.return_value = []
     mock_session.commit.side_effect = OperationalError(
         "stmt", {}, Exception("disk full")
     )
