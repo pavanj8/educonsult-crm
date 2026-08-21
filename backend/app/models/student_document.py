@@ -1,11 +1,13 @@
-"""Student document upload model (E27 schema + E26 read model).
+"""Student document upload model (E27 schema + E26 read model; issue #174).
 
 This module owns the *upload status* half of the E26
 ``GET /applications/{application_id}/checklist`` endpoint ("merges
-template + upload status", Journey J19). The actual file upload API,
+template + upload status", Journey J19) and the E27 student document
+upload flow (Journey J20). The actual file upload API,
 S3-compatible storage integration, and 10MB/PDF/JPG/PNG/DOCX validation
-land in E27 (Student Document Upload); here we only need the persisted
-shape so the read API can report each upload's status.
+land in sibling tickets #175 / #176; here we only need the persisted
+shape so the read API can report each upload's status and the upload
+API can persist new rows against a checklist item.
 
 Design (Requirements §5; Journey J19–J24; Epic E27; Epic E26):
 

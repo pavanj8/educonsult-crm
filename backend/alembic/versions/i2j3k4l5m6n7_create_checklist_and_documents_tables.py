@@ -6,7 +6,8 @@ Create Date: 2026-08-22 01:00:00.000000
 
 Adds the two tables that back the E26
 ``GET /applications/{application_id}/checklist`` endpoint ("merges
-template + upload status", Journey J19):
+template + upload status", Journey J19) and the E27 student document
+upload flow (Journey J20):
 
 * ``checklist_item_templates`` — the per-stage/per-program *template*
   half. Defines which documents are required at which pipeline stage
@@ -17,8 +18,9 @@ template + upload status", Journey J19):
   student's actual upload against a checklist item, with a
   ``status`` enum (pending / approved / rejected) capturing the
   verifier's decision. The full upload API and S3-compatible storage
-  integration land in E27; this migration only creates the persisted
-  shape.
+  integration land in sibling tickets #175 / #176; this migration
+  only creates the persisted shape required by issue #174 (E27 schema)
+  and by E26's read-side merge.
 
 The stage ENUM type is reused from ``stage`` (created by
 ``f7a8b9c0d1e2``); on PostgreSQL we pass ``create_type=False`` to
