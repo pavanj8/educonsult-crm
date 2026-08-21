@@ -1107,3 +1107,183 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.application-table__checklist-toggle {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.application-table__checklist-toggle:hover {
+  background: #f3f4f6;
+}
+
+.application-table__checklist-toggle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.application-table__checklist-row {
+  background: #f9fafb;
+}
+
+.application-table__checklist-cell {
+  padding: 1rem 0.75rem;
+}
+
+.checklist-view {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.checklist-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.checklist-view__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.checklist-view__reload {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.checklist-view__reload:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.checklist-view__reload:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.checklist-view__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.checklist-view__status--error {
+  color: #dc2626;
+}
+
+.checklist-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.checklist-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  background: #ffffff;
+}
+
+.checklist-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.checklist-item__name {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.checklist-item__required {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #b91c1c;
+}
+
+.checklist-item__description {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: #4b5563;
+}
+
+.checklist-item__status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.checklist-item__status--not-uploaded {
+  color: #4b5563;
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.checklist-item__status--pending {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.checklist-item__status--approved {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.checklist-item__status--rejected {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.checklist-item__upload {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: #1f2937;
+}
+
+.checklist-item__filename-label,
+.checklist-item__rejection-label {
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.checklist-item__uploaded-at {
+  margin: 0.125rem 0 0;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.checklist-item__rejection {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #7f1d1d;
+}

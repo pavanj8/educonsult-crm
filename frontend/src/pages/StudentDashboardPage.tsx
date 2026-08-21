@@ -9,19 +9,7 @@ import {
 } from '../data/demoMasterData'
 import { useApplications } from '../hooks/useApplications'
 import { useCreateApplication } from '../hooks/useCreateApplication'
-import { PIPELINE_STAGE_LABELS } from '../types/application'
-
-function formatDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) {
-    return iso
-  }
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+import ApplicationRow from '../components/documents/ApplicationRow'
 
 function formatStageLabel(stage: string): string {
   return stage
@@ -130,23 +118,21 @@ export default function StudentDashboardPage() {
                   <th scope="col">Program</th>
                   <th scope="col">Stage</th>
                   <th scope="col">Created</th>
+                  <th scope="col">Documents</th>
                 </tr>
               </thead>
               <tbody>
                 {applications.map((application) => (
-                  <tr key={application.id} data-testid={`application-row-${application.id}`}>
-                    <td>{universityName(application.university_id)}</td>
-                    <td>{programName(application.university_id, application.program_id)}</td>
-                    <td>
-                      <span
-                        className="application-table__stage"
-                        data-testid={`application-stage-${application.id}`}
-                      >
-                        {PIPELINE_STAGE_LABELS[application.stage]}
-                      </span>
-                    </td>
-                    <td>{formatDate(application.created_at)}</td>
-                  </tr>
+                  <ApplicationRow
+                    key={application.id}
+                    application={application}
+                    universityName={universityName(application.university_id)}
+                    programName={
+                      programName(application.university_id, application.program_id) ??
+                      `Program #${application.program_id}`
+                    }
+                    createdAt={application.created_at}
+                  />
                 ))}
               </tbody>
             </table>
