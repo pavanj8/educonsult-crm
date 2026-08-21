@@ -1,4 +1,4 @@
-"""End-to-end student application creation flow (E18, Journey J11, issue #145)."""
+"""End-to-end student application list flow (E18, Journey J11, issue #146)."""
 
 from app.models.tenant import Tenant
 from app.pipeline.stages import PipelineStage
@@ -15,8 +15,8 @@ def _create_tenant(db_session, *, name: str = "Apex EduConsult", slug: str = "ap
     return tenant
 
 
-def test_student_register_login_create_application_flow(client, db_session):
-    """Student registers, signs in with JWT, and creates university/program applications."""
+def test_student_create_then_list_applications_flow(client, db_session):
+    """Student creates multiple applications and lists them with independent stages."""
     tenant = _create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     chain_one = seed_master_data_chain(db_session, tenant_id=tenant.id)
@@ -27,14 +27,14 @@ def test_student_register_login_create_application_flow(client, db_session):
         json=make_register_student_payload(
             tenant_slug=tenant.slug,
             branch_id=branch.id,
-            email="flow.student@example.test",
+            email="list.flow@example.test",
         ),
     )
     assert register_response.status_code == 201
 
     login_response = client.post(
         "/auth/login",
-        json={"email": "flow.student@example.test", "password": VALID_PASSWORD},
+        json={"email": "list.flow@example.test", "password": VALID_PASSWORD},
     )
     assert login_response.status_code == 200
     access_token = login_response.json()["access_token"]
@@ -47,10 +47,6 @@ def test_student_register_login_create_application_flow(client, db_session):
     )
     assert first.status_code == 201
     first_body = first.json()
-    assert first_body["university_id"] == chain_one[1].id
-    assert first_body["program_id"] == chain_one[2].id
-    assert first_body["stage"] == PipelineStage.REGISTERED.value
-    assert first_body["tenant_id"] == tenant.id
 
     second = client.post(
         "/applications",
@@ -61,4 +57,14 @@ def test_student_register_login_create_application_flow(client, db_session):
     second_body = second.json()
     assert second_body["id"] != first_body["id"]
     assert second_body["student_id"] == first_body["student_id"]
-    assert second_body["university_id"] == chain_two[1].id
+
+    list_response = client.get("/applications", headers=headers)
+    assert list_response.status_code == 200
+    body = list_response.json()
+    assert len(body) == 2
+    assert body[0]["id"] == first_body["id"]
+    assert body[1]["id"] == second_body["id"]
+    assert body[0]["university_id"] == chain_one[1].id
+    assert body[1]["university_id"] == chain_two[1].id
+    assert body[0]["stage"] == PipelineStage.REGISTERED.value
+    assert body[1]["stage"] == PipelineStage.REGISTERED.value

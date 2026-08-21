@@ -144,8 +144,10 @@ describe -- nothing more, nothing speculative.
   Only `read_file` the specific files you will edit or directly depend on
   (usually the router/model/schema/test for this ticket's area, plus one
   similar existing file to copy conventions from).
-- Create/modify files with the `write_file` tool. Do NOT write files via shell
-  heredocs (`cat > file << EOF`) — that causes escaping and syntax errors.
+- Create NEW files with `write_file`. To change an EXISTING file, use
+  `str_replace` (surgical edit) — do NOT rewrite a whole large file just to fix
+  a few lines; that wastes time and risks new errors. Never write files via
+  shell heredocs (`cat > file << EOF`) — that causes escaping and syntax errors.
 - Run `bash scripts/check.sh backend` (or `frontend`) ONCE when you believe
   the work is complete; fix exactly what it reports; re-run only after a change.
   Do not re-run the whole suite after every small edit.

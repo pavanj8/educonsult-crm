@@ -73,6 +73,14 @@ export const BRANCH_MANAGER_USER: AuthenticatedUser = {
   branch_id: 1,
 }
 
+export const STUDENT_USER: AuthenticatedUser = {
+  id: 8,
+  email: 'student@demo.test',
+  role: 'student',
+  tenant_id: 10,
+  branch_id: 1,
+}
+
 const ROLE_TOKENS: Record<UserRole, string> = {
   super_admin: 'test-token-super-admin',
   consultancy_owner: 'test-token-consultancy-owner',

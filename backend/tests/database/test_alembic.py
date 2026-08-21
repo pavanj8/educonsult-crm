@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "f8a9b0c1d2e3"
+HEAD_REVISION = "h1b2c3d4e5f6"
 
 
 def _alembic_config() -> Config:
@@ -53,6 +53,7 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "tenants" in table_names
         assert "branches" in table_names
         assert "stage_transitions" in table_names
+        assert "stage_history" in table_names
         assert "applications" in table_names
         assert "countries" in table_names
         assert "universities" in table_names
@@ -72,13 +73,30 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "is_active" in stage_columns
         assert "created_at" in stage_columns
         assert "updated_at" in stage_columns
+        stage_history_columns = {
+            column["name"] for column in inspect(connection).get_columns("stage_history")
+        }
+        assert stage_history_columns == {
+            "id",
+            "tenant_id",
+            "application_id",
+            "from_stage",
+            "to_stage",
+            "changed_by_user_id",
+            "changed_at",
+            "reason",
+            "created_at",
+            "updated_at",
+        }
         application_columns = {
             column["name"] for column in inspect(connection).get_columns("applications")
         }
         assert application_columns == {
             "id",
             "tenant_id",
+            "branch_id",
             "student_id",
+            "assigned_counselor_id",
             "university_id",
             "program_id",
             "stage",

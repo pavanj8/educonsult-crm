@@ -1,9 +1,10 @@
-"""Pydantic schemas for application endpoints (E18; Journey J11)."""
+"""Pydantic schemas for application endpoints (E18; E21; E25; Journey J11; J14; J18)."""
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.models.application import ApplicationStage as ApplicationStageEnum
 from app.pipeline.stages import PipelineStage
 
 
@@ -13,13 +14,80 @@ class CreateApplicationRequest(BaseModel):
 
 
 class ApplicationResponse(BaseModel):
+    """Application data returned by the E18 and E21 endpoints."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     tenant_id: int
+    branch_id: int | None
     student_id: int
+    assigned_counselor_id: int | None
     university_id: int
     program_id: int
-    stage: PipelineStage
+    stage: ApplicationStageEnum
     created_at: datetime
     updated_at: datetime
+
+
+class AdvanceStageRequest(BaseModel):
+    """Body for ``POST /applications/{id}/stage`` (E25; Journey J18; issue #169).
+
+    The target stage the caller wants to advance the application to. The
+    endpoint validates that a (current stage -> to_stage) transition is
+    permitted by the platform-default or tenant-specific rule table
+    (see :mod:`app.services.stage_progression`).
+
+    ``reason`` is an optional free-text note. Per Requirements §5
+    ("Enrolled / Rejected / Withdrawn, three distinct terminal states,
+    each capturing a reason"), a non-empty ``reason`` is REQUIRED for
+    any transition whose ``to_stage`` is ``rejected`` or ``withdrawn``.
+    Forward pipeline transitions and ``enrolled`` may omit it; a
+    validation error (422) is raised when the rule is violated.
+    """
+
+    to_stage: ApplicationStageEnum
+    reason: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _require_reason_for_terminal_rejections(self) -> "AdvanceStageRequest":
+        terminal_rejections = {
+            PipelineStage.REJECTED,
+            PipelineStage.WITHDRAWN,
+        }
+        if (
+            self.to_stage in terminal_rejections
+            and (self.reason is None or not self.reason.strip())
+        ):
+            raise ValueError(
+                f"reason is required when to_stage is '{self.to_stage.value}'"
+            )
+        return self
+
+
+class StageHistoryEntry(BaseModel):
+    """A single stage transition log row (E25; Journey J18; issue #169).
+
+    Returned by the advance-stage endpoint alongside the updated
+    application so clients can render an immediate history entry without a
+    separate list call. Also produced by the future stage-history listing
+    endpoint.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tenant_id: int
+    application_id: int
+    from_stage: ApplicationStageEnum | None
+    to_stage: ApplicationStageEnum
+    changed_by_user_id: int | None
+    changed_at: datetime
+    reason: str | None
+
+
+class AdvanceStageResponse(BaseModel):
+    """Response for ``POST /applications/{id}/stage`` (E25; issue #169)."""
+
+    application: ApplicationResponse
+    history_entry: StageHistoryEntry
