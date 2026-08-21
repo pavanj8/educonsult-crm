@@ -155,13 +155,29 @@ def get_counselor_queue_counts(
     Useful for displaying stage badges in the dashboard. The response is keyed
     by :class:`PipelineStage` enum string values (``registered``, ``counseling``,
     ...) so the JSON wire format matches what the frontend expects.
+
+    The query is restricted to the calling counselor's queue (tenant +
+    branch + ``assigned_counselor_id``) by reusing :func:`_counselor_base_query`.
+    The counts must be scoped to the same rows that ``GET /counselor/queue``
+    returns, so the sum of the per-stage counts always equals the queue
+    length for the same caller. The cardinality is asserted by the
+    ``test_counts_sum_equals_queue_length_for_counselor_with_fewer_apps_than_total``
+    regression test.
     """
     try:
         query = _counselor_base_query(db, current_user)
+        # Alias the subquery FIRST so every column in the outer SELECT is
+        # qualified against the subquery's projection. Referencing the
+        # ``Application`` table directly in the outer SELECT (e.g.
+        # ``Application.stage`` / ``func.count(Application.id)``) makes
+        # SQLAlchemy synthesise an extra implicit JOIN to the live
+        # ``applications`` table, which produces a Cartesian product
+        # (count inflates by the total application count in the DB).
+        subquery = query.subquery()
         rows = db.execute(
-            select(Application.stage, func.count(Application.id))
-            .select_from(query.subquery())
-            .group_by(Application.stage)
+            select(subquery.c.stage, func.count(subquery.c.id))
+            .select_from(subquery)
+            .group_by(subquery.c.stage)
         ).all()
 
         return {stage.value: count for stage, count in rows}

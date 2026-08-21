@@ -412,21 +412,27 @@ def test_queue_skips_applications_with_missing_student(client, db_session, overr
     # Insert an application with a non-existent student_id via raw SQL.
     # This bypasses the ORM so we can create an orphaned record that the FK
     # constraint (ON DELETE CASCADE) would normally prevent.
+    #
+    # The ``applications`` table schema (E18; E21; ``app/models/application.py``)
+    # is: id, tenant_id, student_id, assigned_counselor_id, branch_id,
+    # university_id, program_id, stage, created_at, updated_at.
+    # Do NOT inject ``loan_opted_in`` / ``stage_reason`` / ``enrollment_date``
+    # / ``target_*`` / ``loan_*`` columns here -- they belong to other
+    # epics and are NOT part of the E21 Application model.
     now = datetime.now(timezone.utc)
     with db_session.bind.connect() as conn:
         conn.execute(
             text(
                 "INSERT INTO applications "
                 "(tenant_id, student_id, assigned_counselor_id, stage, "
-                "loan_opted_in, created_at, updated_at, university_id, program_id) "
-                "VALUES (:t, :s, :c, :st, :lo, :ca, :ua, :u, :p)"
+                "created_at, updated_at, university_id, program_id) "
+                "VALUES (:t, :s, :c, :st, :ca, :ua, :u, :p)"
             ),
             {
                 "t": 1,
                 "s": 999999,  # student does not exist
                 "c": counselor,
                 "st": PipelineStage.REGISTERED.value,
-                "lo": False,
                 "ca": now,
                 "ua": now,
                 "u": 1,
@@ -473,3 +479,251 @@ def test_queue_handles_db_unavailable_gracefully(client, db_session, override_au
         assert response.json()["detail"] == "Counselor service is temporarily unavailable"
     finally:
         fastapi_app.dependency_overrides.pop(get_db, None)
+
+
+# ---------------------------------------------------------------------------
+# GET /counselor/queue/counts  (E21; Journey J14)
+#
+# Regression tests for the cartesian-product bug fixed in iteration 5: the
+# outer SELECT referenced ``Application.stage`` / ``Application.id`` after
+# ``.select_from(query.subquery())``, which made SQLAlchemy synthesise an
+# implicit extra JOIN to the live ``applications`` table and inflate
+# per-stage counts by the total application count in the DB. These tests
+# pin down the documented contract ``sum(counts) == len(queue)`` (for the
+# same caller) so the bug cannot recur.
+# ---------------------------------------------------------------------------
+
+
+def test_counts_sum_equals_queue_length_for_counselor_with_fewer_apps_than_total(
+    client, db_session, override_authenticated_user
+):
+    """``sum(counts) == len(queue)`` when the counselor's queue is smaller than
+    the total application count in the DB.
+
+    This is the exact scenario that hid the cartesian-product bug: the
+    counselor's own queue had 3 apps, but the DB had 10 apps total, so the
+    buggy query returned ``{"registered": 30}`` instead of
+    ``{"registered": 3}``.
+    """
+    counselor = _seed_counselor(db_session)
+    student = _seed_student(db_session)
+
+    # 3 apps for this counselor
+    for _ in range(3):
+        seed_application(
+            db_session,
+            student_id=student,
+            assigned_counselor_id=counselor,
+        )
+
+    # 7 additional apps for OTHER counselors to inflate the total DB count
+    other_counselor = _seed_counselor(db_session, email="other.counselor@example.test")
+    for i in range(7):
+        other_student = _seed_student(db_session, email=f"other.student{i}@example.test")
+        seed_application(
+            db_session,
+            student_id=other_student,
+            assigned_counselor_id=other_counselor,
+        )
+
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=counselor, tenant_id=1, branch_id=1)
+    )
+
+    queue_response = client.get("/counselor/queue")
+    counts_response = client.get("/counselor/queue/counts")
+
+    assert queue_response.status_code == 200
+    assert counts_response.status_code == 200
+
+    queue = queue_response.json()
+    counts = counts_response.json()
+
+    assert len(queue) == 3
+    assert sum(counts.values()) == 3
+    assert counts == {"registered": 3}
+
+
+def test_counts_sum_equals_queue_length_for_counselor_who_owns_all_apps(
+    client, db_session, override_authenticated_user
+):
+    """``sum(counts) == len(queue)`` when the counselor owns every app in the DB.
+
+    The cartesian-product bug produced the *right* answer in this case
+    (count == total == queue length), so a fix that only handles the
+    "owns all apps" case is a regression. This test guards the boundary
+    case where the multiplier-factor equals 1.
+    """
+    counselor = _seed_counselor(db_session)
+    students = [_seed_student(db_session, email=f"only.student{i}@example.test") for i in range(4)]
+
+    for student_id in students:
+        seed_application(
+            db_session,
+            student_id=student_id,
+            assigned_counselor_id=counselor,
+        )
+
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=counselor, tenant_id=1, branch_id=1)
+    )
+
+    queue = client.get("/counselor/queue").json()
+    counts = client.get("/counselor/queue/counts").json()
+
+    assert len(queue) == 4
+    assert sum(counts.values()) == 4
+    assert counts == {"registered": 4}
+
+
+def test_counts_groups_by_stage(client, db_session, override_authenticated_user):
+    """Per-stage counts partition the queue correctly across multiple stages."""
+    counselor = _seed_counselor(db_session)
+    students = [_seed_student(db_session, email=f"grouped.student{i}@example.test") for i in range(5)]
+
+    # 2 registered, 2 counseling, 1 application_submitted
+    seed_application(
+        db_session, student_id=students[0], assigned_counselor_id=counselor,
+        stage=PipelineStage.REGISTERED,
+    )
+    seed_application(
+        db_session, student_id=students[1], assigned_counselor_id=counselor,
+        stage=PipelineStage.REGISTERED,
+    )
+    seed_application(
+        db_session, student_id=students[2], assigned_counselor_id=counselor,
+        stage=PipelineStage.COUNSELING,
+    )
+    seed_application(
+        db_session, student_id=students[3], assigned_counselor_id=counselor,
+        stage=PipelineStage.COUNSELING,
+    )
+    seed_application(
+        db_session, student_id=students[4], assigned_counselor_id=counselor,
+        stage=PipelineStage.APPLICATION_SUBMITTED,
+    )
+
+    # Add an app for a different counselor so the counts query would
+    # multiply by more than 1 if the bug were present.
+    other_counselor = _seed_counselor(db_session, email="grouped.other@example.test")
+    other_student = _seed_student(db_session, email="grouped.other.student@example.test")
+    seed_application(
+        db_session, student_id=other_student, assigned_counselor_id=other_counselor,
+        stage=PipelineStage.REGISTERED,
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=counselor, tenant_id=1, branch_id=1)
+    )
+
+    counts = client.get("/counselor/queue/counts").json()
+    queue = client.get("/counselor/queue").json()
+
+    assert counts == {
+        "registered": 2,
+        "counseling": 2,
+        "application_submitted": 1,
+    }
+    # Sum equals the queue length, never the queue length * total DB count.
+    assert sum(counts.values()) == len(queue) == 5
+
+
+def test_counts_is_empty_for_counselor_with_no_apps(client, db_session, override_authenticated_user):
+    """A counselor with no assigned applications gets an empty counts dict."""
+    counselor = _seed_counselor(db_session)
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=counselor, tenant_id=1, branch_id=1)
+    )
+
+    response = client.get("/counselor/queue/counts")
+
+    assert response.status_code == 200
+    assert response.json() == {}
+
+
+def test_counts_is_scoped_to_calling_counselor(client, db_session, override_authenticated_user):
+    """Counts reflect only the calling counselor's apps, not another counselor's."""
+    c1 = _seed_counselor(db_session, email="c1.scoped@example.test")
+    c2 = _seed_counselor(db_session, email="c2.scoped@example.test")
+    s1 = _seed_student(db_session, email="c1.student@example.test")
+    s2 = _seed_student(db_session, email="c2.student@example.test")
+
+    # c1 has 2 registered, c2 has 3 registered.
+    for _ in range(2):
+        seed_application(db_session, student_id=s1, assigned_counselor_id=c1)
+    for _ in range(3):
+        seed_application(db_session, student_id=s2, assigned_counselor_id=c2)
+
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=c1, tenant_id=1, branch_id=1)
+    )
+    response = client.get("/counselor/queue/counts")
+
+    assert response.status_code == 200
+    assert response.json() == {"registered": 2}  # NOT {"registered": 10} (cartesian bug)
+
+
+def test_counts_respects_tenant_isolation(client, db_session, override_authenticated_user):
+    """Counts only include applications in the caller's tenant."""
+    counselor = _seed_counselor(db_session, tenant_id=1)
+    tenant2_counselor = _seed_counselor(db_session, email="t2.cs@example.test", tenant_id=2)
+    tenant1_student = _seed_student(db_session, tenant_id=1, email="t1.cs.student@example.test")
+    tenant2_student = _seed_student(db_session, tenant_id=2, email="t2.cs.student@example.test")
+
+    seed_application(db_session, tenant_id=1, student_id=tenant1_student, assigned_counselor_id=counselor)
+    seed_application(db_session, tenant_id=2, student_id=tenant2_student, assigned_counselor_id=tenant2_counselor)
+
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=counselor, tenant_id=1, branch_id=1)
+    )
+
+    response = client.get("/counselor/queue/counts")
+
+    assert response.status_code == 200
+    assert response.json() == {"registered": 1}
+
+
+def test_counts_respects_branch_isolation(client, db_session, override_authenticated_user):
+    """Counts only include applications whose student belongs to the caller's branch."""
+    counselor = _seed_counselor(db_session, branch_id=1)
+    same_branch_student = _seed_student(
+        db_session, branch_id=1, email="same.branch.counts@example.test"
+    )
+    other_branch_student = _seed_student(
+        db_session, branch_id=2, email="other.branch.counts@example.test"
+    )
+
+    seed_application(
+        db_session, student_id=same_branch_student, assigned_counselor_id=counselor
+    )
+    seed_application(
+        db_session, student_id=other_branch_student, assigned_counselor_id=counselor
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(Role.COUNSELOR, user_id=counselor, tenant_id=1, branch_id=1)
+    )
+
+    response = client.get("/counselor/queue/counts")
+
+    assert response.status_code == 200
+    # The other-branch app is excluded by the inner join on User.branch_id.
+    assert response.json() == {"registered": 1}
+
+
+def test_counts_requires_authentication(client):
+    """Unauthenticated requests are rejected."""
+    response = client.get("/counselor/queue/counts")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+
+def test_counts_requires_counselor_role(client, db_session, override_authenticated_user):
+    """Only the COUNSELOR role may call this endpoint."""
+    student = _seed_student(db_session)
+    override_authenticated_user(make_authenticated_user(Role.STUDENT, user_id=student))
+
+    response = client.get("/counselor/queue/counts")
+
+    assert response.status_code == 403
