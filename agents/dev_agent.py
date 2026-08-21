@@ -100,6 +100,14 @@ def build_prompt(
 ) -> str:
     protected = ", ".join(target_app.PROTECTED_PATHS)
     repo_map = build_repo_map()
+    siblings = ticket_utils.epic_sibling_status(issue)
+    sibling_block = (
+        f"## Sibling tickets in this epic — what already exists (do NOT recreate)\n"
+        f"Some of this epic's work is already merged to `main` and is in the "
+        f"repository map above. Build on it; never re-add a model, migration, "
+        f"schema, or endpoint a DONE ticket already landed.\n\n{siblings}\n"
+        if siblings else ""
+    )
     if prior_feedback:
         feedback_block = (
             f"## Feedback from prior iterations — you MUST address this\n"
@@ -135,6 +143,7 @@ describe -- nothing more, nothing speculative.
 ## Repository map — every existing app/test file (so you do NOT need to explore)
 {repo_map}
 
+{sibling_block}
 ## Definition of Done (docs/definition-of-done.md) -- you must satisfy every item before finishing
 {dod}
 
@@ -168,7 +177,11 @@ describe -- nothing more, nothing speculative.
    anything real.
 5. Follow existing conventions already established in this repo (check
    `backend/` and `frontend/` for prior art before introducing new
-   patterns).
+   patterns). CRITICAL: do NOT re-create code that already exists — if the
+   repository map / sibling tickets show a model, migration, schema, service,
+   or endpoint is already present, IMPORT and EXTEND it. Re-adding an existing
+   model or migration causes duplicate definitions, conflicts, and review
+   failures (this is a common cause of rework).
 6. Before finishing, run the project's canonical check script and iterate
    until it passes — this is the EXACT gate CI enforces, so the PR will NOT
    merge otherwise:
