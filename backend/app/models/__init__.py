@@ -3,6 +3,7 @@ from app.models.base import Base, TenantScopedBase
 from app.models.branch import Branch
 from app.models.country import Country
 from app.models.program import Program
+from app.models.stage_history import StageHistory
 from app.models.stage_transition import StageTransition
 from app.models.tenant import Tenant
 from app.models.university import University
@@ -16,6 +17,7 @@ __all__ = [
     "Branch",
     "Country",
     "Program",
+    "StageHistory",
     "StageTransition",
     "Tenant",
     "University",
