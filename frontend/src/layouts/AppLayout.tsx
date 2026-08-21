@@ -42,6 +42,13 @@ export default function AppLayout() {
               </Link>
             </nav>
           ) : null}
+          {user?.role === 'document_verifier' ? (
+            <nav className="app-header__nav" aria-label="Main">
+              <Link to="/verifier" data-testid="nav-verifier">
+                Verifier queue
+              </Link>
+            </nav>
+          ) : null}
         </div>
         <NotificationBell />
       </header>
