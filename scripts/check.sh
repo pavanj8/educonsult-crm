@@ -24,6 +24,13 @@ BE_TEST="${HARNESS_BACKEND_TEST:-python -m pytest -q}"
 FE_LINT="${HARNESS_FRONTEND_LINT:-npm run lint}"
 FE_BUILD="${HARNESS_FRONTEND_BUILD:-npm run build}"
 
+# Local runs (execution.mode=local, agents/run_local.py) install deps into a
+# backend venv; CI installs them globally and has no venv. Prefer the venv when
+# present so `python`/`pytest`/`ruff` resolve to it locally — a no-op on CI.
+if [ -d "$ROOT/$BE_DIR/venv/bin" ]; then
+  PATH="$ROOT/$BE_DIR/venv/bin:$PATH"; export PATH
+fi
+
 has_backend()  { [ -f "$ROOT/$BE_DIR/pyproject.toml" ] || [ -d "$ROOT/$BE_DIR/app" ]; }
 has_frontend() { [ -f "$ROOT/$FE_DIR/package.json" ]; }
 
