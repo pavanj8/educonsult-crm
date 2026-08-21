@@ -574,6 +574,28 @@ EPICS = [
          ]),
 ]
 
+# Planning Agent integration (docs/adr/0030): when docs/plan.json exists (produced
+# by agents/planner_agent.py from requirements.md), it OVERRIDES the inline EPICS
+# above, so a generated plan drives issue creation without editing this file. This
+# is what makes the harness reusable: a new project supplies requirements.md, the
+# planner generates plan.json, and this script creates the whole backlog.
+_PLAN = REPO_ROOT / "docs" / "plan.json"
+if _PLAN.exists():
+    _plan = json.loads(_PLAN.read_text())
+    EPICS = [
+        dict(
+            key=e["key"],
+            title=e.get("title", ""),
+            area=e.get("area", "general"),
+            phase=e.get("phase", "mvp"),
+            trace=f"Journey {e.get('journey_id', '')}",
+            desc=e.get("desc", ""),
+            tasks=[tuple(t) for t in e.get("tasks", [])],
+        )
+        for e in _plan.get("epics", [])
+    ]
+    print(f"[setup] using generated plan docs/plan.json ({len(EPICS)} epics)")
+
 
 def main():
     print("Creating labels...")
