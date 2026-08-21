@@ -201,6 +201,11 @@ describe -- nothing more, nothing speculative.
 {dod}
 
 ## Working efficiently (do this to avoid wasting time)
+- HARD BUDGET: read AT MOST ~8 files, then START WRITING. You have a limited
+  number of turns; a run that spends them all reading and writes nothing is a
+  FAILED, wasted iteration (this has happened — do not repeat it). Aim to create
+  your first file within your first several actions. When in doubt, write code
+  now and refine it, rather than reading one more file.
 - The repository map above already lists every existing file. Do NOT run
   `find`, `ls`, `tree`, or broad `grep` to discover structure — you have it.
   Only `read_file` the specific files you will edit or directly depend on
@@ -269,10 +274,25 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         ticket_utils.prior_iteration_feedback(issue["number"]),
     )
 
-    status, text, gate_out = "unknown", "", ""
+    status, text, gate_out, wrote_nothing = "unknown", "", "", False
     for attempt in range(1, DEV_BUILD_ATTEMPTS + 1):
         prompt = base_prompt
-        if gate_out:
+        if wrote_nothing:
+            # The #180/#185 failure mode: the agent spends its whole turn budget
+            # READING files and finishes without writing anything. Give it a
+            # focused second pass that demands implementation instead of more
+            # exploration (docs/adr/0031). Not a hard-fail — if it still writes
+            # nothing, run_local's empty-diff flow (Test/Review) decides.
+            prompt = base_prompt + (
+                f"\n\n## You wrote NO code — in-run attempt {attempt} of {DEV_BUILD_ATTEMPTS}\n"
+                f"Your previous attempt spent all its turns READING files and finished without "
+                f"creating or editing a single file (`git status` is empty). STOP exploring — you "
+                f"already have the repository map and every convention you need above. IMPLEMENT the "
+                f"issue NOW: write the actual application and test files with write_file/str_replace "
+                f"in your first few turns. A run that only reads and produces no diff is a wasted "
+                f"iteration; do not finish until `git status` shows your new/edited files.\n"
+            )
+        elif gate_out:
             prompt = base_prompt + (
                 f"\n\n## Gate STILL FAILING — in-run fix attempt {attempt} of {DEV_BUILD_ATTEMPTS}\n"
                 f"Your previous work did NOT pass backend lint + your own tests. Fix ONLY what "
@@ -284,14 +304,19 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         status, text = minimax_agent.run_agent(
             "dev-agent", prompt, model, REPO_ROOT, max_turns=turns,
         )
+        wrote_nothing = not git_files_changed()
         rc, gate_out = _dev_gate()
+        if wrote_nothing:
+            print(f"\n[dev-agent] NO code produced on attempt {attempt}; retrying with an "
+                  f"implement-now directive.", file=sys.stderr)
+            continue
         if rc == 0:
-            print(f"\n[dev-agent] build gate PASSED on in-run attempt {attempt}.")
+            print(f"\n[dev-agent] gate PASSED on in-run attempt {attempt}.")
             return status, text
-        print(f"\n[dev-agent] build gate FAILED on in-run attempt {attempt}.", file=sys.stderr)
+        print(f"\n[dev-agent] gate FAILED on in-run attempt {attempt}.", file=sys.stderr)
     print(
-        f"[dev-agent] build gate still failing after {DEV_BUILD_ATTEMPTS} in-run attempts; "
-        f"the workflow build gate will route this to needs-rework.", file=sys.stderr,
+        f"[dev-agent] no green diff after {DEV_BUILD_ATTEMPTS} in-run attempts; the empty-diff / "
+        f"build gate will route this to needs-rework.", file=sys.stderr,
     )
     return status, text
 
