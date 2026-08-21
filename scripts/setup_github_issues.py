@@ -13,7 +13,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = "pavanj8/educonsult-crm"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agents"))
+import harness_config  # noqa: E402
+
+# Target repo comes from harness.config.json (docs/adr/0031); env override wins.
+REPO = harness_config.repo() or "pavanj8/educonsult-crm"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOD_SOURCE = REPO_ROOT / "docs" / "definition-of-done.md"
 

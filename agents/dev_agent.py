@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import github_ticket_utils as ticket_utils
+import harness_config
 import llm_env
 import minimax_agent
 import target_app
@@ -27,7 +28,8 @@ import target_app
 llm_env.configure_minimax_env()
 
 REPO_ROOT = target_app.REPO_ROOT
-# Fast/cheap MiniMax tier for Dev (docs/adr/0019). Overridable via env.
+PROJECT_NAME = harness_config.project_name()
+# Dev model tier from config (docs/adr/0031). Overridable via env.
 DEFAULT_MODEL = os.environ.get("DEV_AGENT_MODEL", llm_env.DEFAULT_DEV_MODEL)
 # Dev caps at fewer turns than the tool-heavy Test/Review agents (which use the
 # engine's MAX_TURNS=140). With the context pack + str_replace + "run check.sh
@@ -167,7 +169,7 @@ def build_prompt(
             "None — this is the first iteration (or no Test/Review comments yet)."
         )
     return f"""You are the DEV AGENT in an automated engineering harness for the
-EduConsult CRM project. "No ticket, no code" is the hard rule here: you
+{PROJECT_NAME} project. "No ticket, no code" is the hard rule here: you
 implement EXACTLY what the referenced GitHub Issue's acceptance criteria
 describe -- nothing more, nothing speculative.
 

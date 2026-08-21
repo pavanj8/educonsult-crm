@@ -42,15 +42,13 @@ jobs:
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
-      # CURSOR_API_KEY kept provisioned but dormant -- the harness engine is
-      # now MiniMax via its Anthropic-compatible endpoint (docs/adr/0019).
-      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      # Provider-agnostic (docs/adr/0031): base_url + model come from
+      # harness.config.json > llm. Pass every provider key the config might
+      # select; unset secrets resolve to empty and are simply unused.
       ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
-      ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Asymmetric model tiering (docs/adr/0013): cheap MiniMax model to
-      # write, stronger MiniMax model to verify (docs/adr/0019).
-      DEV_AGENT_MODEL: MiniMax-M3
 
     steps:
       - name: Determine issue number
@@ -141,7 +139,7 @@ jobs:
         # is cheaper than letting it run unbounded. Sized for a normal pass plus
         # one in-run retry.
         timeout-minutes: 30
-        run: python dev_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }} --model "$DEV_AGENT_MODEL"
+        run: python dev_agent.py ${{ steps.issue.outputs.number }} --iteration ${{ steps.iteration.outputs.number }}
 
       - name: Ruff auto-fix backstop (docs/adr/0019 follow-up)
         # Best-effort: auto-fixes import-order (I) and unused imports (F401)

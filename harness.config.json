@@ -1,0 +1,28 @@
+{
+  "project": {
+    "name": "EduConsult CRM",
+    "repo": "pavanj8/educonsult-crm"
+  },
+  "backend": {
+    "dir": "backend",
+    "app_module": "app.main:app",
+    "health_path": "/health",
+    "requirements": "requirements.txt",
+    "lint": "ruff check .",
+    "test": "python -m pytest -q"
+  },
+  "frontend": {
+    "dir": "frontend",
+    "lint": "npm run lint",
+    "build": "npm run build"
+  },
+  "models": {
+    "dev": "MiniMax-M3",
+    "verify": "MiniMax-M3",
+    "planner": "MiniMax-M3"
+  },
+  "llm": {
+    "base_url": "https://api.minimax.io/anthropic"
+  },
+  "protected_paths": ["docs/", "agents/", ".github/", ".cursor/", "scripts/"]
+}

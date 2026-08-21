@@ -220,29 +220,40 @@ def run_agent(
     max_turns: int = MAX_TURNS,
     report_tool: dict | None = None,
 ) -> tuple[str, str]:
-    """Drive a MiniMax (Anthropic Messages API) tool-calling agent to completion.
+    """Drive a tool-calling agent to completion against the configured provider.
 
-    Returns ``(status, text)`` where ``status`` is one of ``completed``,
-    ``error``, or ``max_turns`` and ``text`` is the concatenated assistant
-    prose. On a hard failure ``text`` is a diagnostic string so the GitHub
-    issue comment is never a bare "UNKNOWN".
+    Provider-agnostic (docs/adr/0031): builds the active provider's client and
+    dispatches to the matching tool-loop — the Anthropic Messages API shape
+    (MiniMax's compatible endpoint, Anthropic/Claude, or any compatible gateway)
+    or the OpenAI Chat Completions shape (OpenAI + OpenAI-compatible gateways).
 
-    ``report_tool`` (Test/Review agents): an Anthropic tool schema the model
-    MUST call to deliver its final structured report. When it does, the tool's
-    input is captured and appended to the returned text as a ```json block (so
-    the callers' existing parsers work unchanged), and the run ends. This
-    replaces the fragile "emit a ```json block in free text" contract, which
-    silently produced ``UNKNOWN`` when the model ran out of turns or formatted
-    loosely. On the last allowed turn the report tool is *forced* (tool_choice)
-    so the run yields a real report instead of dying as ``max_turns``.
+    Returns ``(status, text)`` where ``status`` is ``completed``, ``error``, or
+    ``max_turns``. On a hard failure ``text`` is a diagnostic string so the
+    GitHub issue comment is never a bare "UNKNOWN".
+
+    ``report_tool`` (Test/Review agents): a tool schema (Anthropic shape:
+    {name, description, input_schema}) the model MUST call to deliver its final
+    structured report. When it does, the tool input is appended to the returned
+    text as a ```json block (so callers' parsers work unchanged) and the run
+    ends. On the last allowed turn the report tool is *forced* so the run yields
+    a real report instead of dying as ``max_turns``.
     """
     cwd = Path(cwd).resolve()
     try:
-        client = llm_env.minimax_client()
+        client, api = llm_env.client_and_api()
     except Exception as err:  # noqa: BLE001 -- missing token / client init
         print(f"[{prefix}] STARTUP FAILURE: {err}", file=sys.stderr)
         return "error", str(err)
 
+    if api == "openai":
+        return _run_openai(client, prefix, prompt, model, cwd, max_turns, report_tool)
+    return _run_anthropic(client, prefix, prompt, model, cwd, max_turns, report_tool)
+
+
+def _run_anthropic(
+    client, prefix: str, prompt: str, model: str, cwd: Path,
+    max_turns: int, report_tool: dict | None,
+) -> tuple[str, str]:
     report_name = report_tool["name"] if report_tool else None
     all_tools = TOOLS + ([report_tool] if report_tool else [])
 
@@ -348,5 +359,124 @@ def run_agent(
         f"Agent exceeded {max_turns} turns without producing a final message "
         f"(docs/adr/0019 safety rail)."
     )
+    print(f"[{prefix}] {hint}", file=sys.stderr)
+    return "max_turns", "".join(final_text_parts) or hint
+
+
+def _to_openai_tool(t: dict) -> dict:
+    """Convert an Anthropic tool schema to OpenAI's function-tool shape."""
+    return {
+        "type": "function",
+        "function": {
+            "name": t["name"],
+            "description": t.get("description", ""),
+            "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
+        },
+    }
+
+
+def _run_openai(
+    client, prefix: str, prompt: str, model: str, cwd: Path,
+    max_turns: int, report_tool: dict | None,
+) -> tuple[str, str]:
+    """OpenAI Chat Completions tool-loop — mirror of the Anthropic driver."""
+    report_name = report_tool["name"] if report_tool else None
+    all_tools = [_to_openai_tool(t) for t in (TOOLS + ([report_tool] if report_tool else []))]
+    report_only = [_to_openai_tool(report_tool)] if report_tool else None
+
+    messages: list[dict] = [{"role": "user", "content": prompt}]
+    final_text_parts: list[str] = []
+
+    def _emit_report(payload: dict) -> tuple[str, str]:
+        final_text_parts.append("\n\n```json\n" + json.dumps(payload, indent=2) + "\n```\n")
+        print(f"\n\n--- {prefix} finished: submitted structured report ---")
+        return "completed", "".join(final_text_parts)
+
+    def _args(raw) -> dict:
+        try:
+            return json.loads(raw) if isinstance(raw, str) else (raw or {})
+        except json.JSONDecodeError:
+            return {}
+
+    for turn in range(1, max_turns + 1):
+        force_report = report_tool is not None and turn == max_turns
+        kwargs: dict = {
+            "model": model, "max_tokens": MAX_TOKENS, "messages": messages,
+            "tools": report_only if force_report else all_tools,
+        }
+        kwargs["tool_choice"] = (
+            {"type": "function", "function": {"name": report_name}} if force_report else "auto"
+        )
+        try:
+            resp = client.chat.completions.create(**kwargs)
+        except Exception as err:  # noqa: BLE001
+            if force_report:
+                kwargs["tool_choice"] = "auto"
+                try:
+                    resp = client.chat.completions.create(**kwargs)
+                    err = None
+                except Exception as err2:  # noqa: BLE001
+                    err = err2
+            if err is not None:
+                hint = (
+                    f"OpenAI-API call failed on turn {turn} (model={model!r}): {err}. "
+                    f"Verify the model ID, the provider key, and quota (docs/adr/0031)."
+                )
+                print(f"[{prefix}] {hint}", file=sys.stderr)
+                return "error", hint
+
+        msg = resp.choices[0].message
+        if msg.content:
+            sys.stdout.write(msg.content)
+            sys.stdout.flush()
+            final_text_parts.append(msg.content)
+        tool_calls = list(msg.tool_calls or [])
+
+        assistant_msg: dict = {"role": "assistant", "content": msg.content or ""}
+        if tool_calls:
+            assistant_msg["tool_calls"] = [
+                {"id": tc.id, "type": "function",
+                 "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                for tc in tool_calls
+            ]
+        messages.append(assistant_msg)
+
+        for tc in tool_calls:
+            if tc.function.name == report_name:
+                return _emit_report(_args(tc.function.arguments))
+
+        if not tool_calls:
+            # Finished without a tool call. If a report is required but was
+            # printed as text, force one more turn to submit it (docs/adr/0028).
+            if report_tool is not None and not force_report:
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"You finished without calling the `{report_name}` tool. Your report "
+                        f"MUST be delivered via that tool, not as text. Call it NOW."
+                    ),
+                })
+                try:
+                    resp = client.chat.completions.create(
+                        model=model, max_tokens=MAX_TOKENS, messages=messages,
+                        tools=report_only,
+                        tool_choice={"type": "function", "function": {"name": report_name}},
+                    )
+                    forced = resp.choices[0].message.tool_calls or []
+                    for tc in forced:
+                        if tc.function.name == report_name:
+                            return _emit_report(_args(tc.function.arguments))
+                except Exception as err:  # noqa: BLE001
+                    print(f"[{prefix}] forced submit_report failed: {err}", file=sys.stderr)
+            print(f"\n\n--- {prefix} finished: finish_reason={resp.choices[0].finish_reason} turns={turn} ---")
+            return "completed", "".join(final_text_parts)
+
+        for tc in tool_calls:
+            args = _args(tc.function.arguments)
+            print(f"\n[{prefix}] tool: {tc.function.name}({json.dumps(args)[:200]})")
+            result = _dispatch(tc.function.name, args, cwd)
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+
+    hint = f"Agent exceeded {max_turns} turns without producing a final message (safety rail)."
     print(f"[{prefix}] {hint}", file=sys.stderr)
     return "max_turns", "".join(final_text_parts) or hint
