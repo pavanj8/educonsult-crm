@@ -20,8 +20,10 @@ Traceability
 
 The endpoint is read-only. Authorization is gated to the application
 owner (the student) plus the staff roles that legitimately need to
-inspect a student's checklist (counselor, branch manager, consultancy
-owner, document verifier). Cross-tenant access returns 404 (never 403)
+inspect a student's checklist (counselor, branch manager, document
+verifier, consultancy owner). Counselors, branch managers, and document
+verifiers are branch-scoped; consultancy owners see any branch in their
+tenant by design (ADR-0004). Cross-tenant access returns 404 (never 403)
 to prevent tenant-id enumeration (ADR-0004).
 """
 
@@ -120,23 +122,18 @@ def _authorize_checklist_read(
 ) -> None:
     """Gate the checklist read to legitimate viewers.
 
-    Rules:
+    Rules (Requirements §3; ADR-0004):
 
     * The student who owns the application can always view their own
       checklist (matches the J19 actor).
-    * Branch Manager and Consultancy Owner (and Super Admin) are
-      allowed by RBAC and may inspect any application within their
-      tenant / branch.
-    * Document Verifier can inspect to verify uploads against the
-      checklist (J21/J22/J23).
-    * Counselor can only inspect applications assigned to them within
-      their own branch.
-    * Receptionist, Visa Processor, and any other role are blocked
-      with 403; they have no business reading a student's checklist.
-
-    Branches are only enforced for counselors; consultancy owners and
-    branch managers retain cross-branch visibility by design
-    (ADR-0004).
+    * Counselors, Branch Managers, and Document Verifiers are
+      branch-scoped (Requirements §3: "Branch Manager manages their own
+      branch only (staff, students, visibility)"; ADR-0004). They may
+      only inspect applications whose ``branch_id`` matches their own.
+    * Consultancy Owner (and Super Admin, who does not pass RBAC here)
+      may inspect any application within their tenant.
+    * Receptionist, Visa Processor, and any other role are blocked at
+      the RBAC layer and never reach this helper.
     """
     if current_user.role == Role.STUDENT:
         if application.student_id != current_user.id:
@@ -146,7 +143,7 @@ def _authorize_checklist_read(
             )
         return
 
-    if current_user.role == Role.COUNSELOR:
+    if current_user.role in (Role.COUNSELOR, Role.BRANCH_MANAGER, Role.DOCUMENT_VERIFIER):
         if (
             current_user.branch_id is None
             or application.branch_id != current_user.branch_id
@@ -155,16 +152,17 @@ def _authorize_checklist_read(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot view checklist for an application outside your branch",
             )
-        # Counselors can only inspect applications assigned to them.
-        if application.assigned_counselor_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Counselor can only view checklists for their assigned applications",
-            )
+        # Counselors additionally require an explicit assignment.
+        if current_user.role == Role.COUNSELOR:
+            if application.assigned_counselor_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Counselor can only view checklists for their assigned applications",
+                )
         return
 
-    # CONSULTANCY_OWNER, BRANCH_MANAGER, SUPER_ADMIN, DOCUMENT_VERIFIER
-    # are all allowed by RBAC at this point; nothing else to check.
+    # CONSULTANCY_OWNER is allowed cross-branch by design (ADR-0004);
+    # SUPER_ADMIN is excluded at the RBAC layer (no DOCUMENT_READ grant).
 
 
 def _load_application_program_id(

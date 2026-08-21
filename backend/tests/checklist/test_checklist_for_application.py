@@ -15,11 +15,11 @@ Authorization matrix under test:
 
 * STUDENT — only own application.
 * COUNSELOR — only assigned applications in own branch.
-* CONSULTANCY_OWNER / BRANCH_MANAGER — across own tenant (branch
-  managers see own branch only).
-* SUPER_ADMIN — across all tenants (no tenant filter).
-* DOCUMENT_VERIFIER — own tenant.
-* RECEPTIONIST / VISA_PROCESSOR — 403.
+* BRANCH_MANAGER — only own branch (Requirements §3).
+* DOCUMENT_VERIFIER — only own branch (Requirements §3 + ADR-0004).
+* CONSULTANCY_OWNER — across own tenant (cross-branch by design).
+* SUPER_ADMIN — has no ``document:read`` grant; blocked at RBAC.
+* RECEPTIONIST / VISA_PROCESSOR — 403 (no ``document:read`` grant).
 """
 
 from datetime import datetime, timedelta, timezone
@@ -1236,6 +1236,118 @@ def test_checklist_branch_manager_can_view_own_branch(
     assert response.status_code == 200
 
 
+def test_checklist_branch_manager_cannot_view_other_branch(
+    client, db_session, override_authenticated_user
+):
+    """A BRANCH_MANAGER must NOT view a checklist for an application in a
+    different branch within the same tenant (Requirements §3 + ADR-0004:
+    Branch Manager manages their own branch only).
+    """
+    tenant = _create_tenant(db_session)
+    own_branch = seed_branch(db_session, tenant_id=tenant.id, name="Own Branch", city="Mumbai")
+    other_branch = seed_branch(
+        db_session, tenant_id=tenant.id, name="Other Branch", city="Delhi"
+    )
+    chain = seed_master_data_chain(db_session, tenant_id=tenant.id)
+    target_student = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=other_branch.id,
+        email="bm-other-branch-target@example.test",
+    )
+    application = _seed_application_with_program(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=other_branch.id,
+        student_id=target_student.id,
+        program_id=chain[2].id,
+        university_id=chain[1].id,
+    )
+    bm = make_db_user(
+        db_session,
+        Role.BRANCH_MANAGER,
+        tenant_id=tenant.id,
+        branch_id=own_branch.id,
+        email="bm-cross-branch@example.test",
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.BRANCH_MANAGER,
+            user_id=bm.id,
+            tenant_id=tenant.id,
+            branch_id=own_branch.id,
+        )
+    )
+
+    response = client.get(
+        f"/applications/{application.id}/checklist",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Cannot view checklist for an application outside your branch"
+    )
+
+
+def test_checklist_branch_manager_without_branch_is_blocked(
+    client, db_session, override_authenticated_user
+):
+    """A BRANCH_MANAGER with branch_id=None cannot read any checklist (403).
+
+    Same security rationale as the counselor case: a branch-scoped role
+    with no branch assignment must not be able to read any application.
+    """
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    chain = seed_master_data_chain(db_session, tenant_id=tenant.id)
+    student = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        email="bm-no-branch-target@example.test",
+    )
+    application = _seed_application_with_program(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        program_id=chain[2].id,
+        university_id=chain[1].id,
+    )
+    bm = make_db_user(
+        db_session,
+        Role.BRANCH_MANAGER,
+        tenant_id=tenant.id,
+        branch_id=None,
+        email="bm-no-branch@example.test",
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.BRANCH_MANAGER,
+            user_id=bm.id,
+            tenant_id=tenant.id,
+            branch_id=None,
+        )
+    )
+
+    response = client.get(
+        f"/applications/{application.id}/checklist",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Cannot view checklist for an application outside your branch"
+    )
+
+
 def test_checklist_consultancy_owner_can_view_any_branch(
     client, db_session, override_authenticated_user
 ):
@@ -1330,6 +1442,114 @@ def test_checklist_document_verifier_can_view(
     )
 
     assert response.status_code == 200
+
+
+def test_checklist_document_verifier_cannot_view_other_branch(
+    client, db_session, override_authenticated_user
+):
+    """A DOCUMENT_VERIFIER must NOT view a checklist for an application in a
+    different branch within the same tenant (Requirements §3 + ADR-0004:
+    Document Verifier is branch-scoped like other operational staff).
+    """
+    tenant = _create_tenant(db_session)
+    own_branch = seed_branch(db_session, tenant_id=tenant.id, name="Own Branch", city="Mumbai")
+    other_branch = seed_branch(
+        db_session, tenant_id=tenant.id, name="Other Branch", city="Delhi"
+    )
+    chain = seed_master_data_chain(db_session, tenant_id=tenant.id)
+    target_student = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=other_branch.id,
+        email="verifier-other-branch-target@example.test",
+    )
+    application = _seed_application_with_program(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=other_branch.id,
+        student_id=target_student.id,
+        program_id=chain[2].id,
+        university_id=chain[1].id,
+    )
+    verifier = make_db_user(
+        db_session,
+        Role.DOCUMENT_VERIFIER,
+        tenant_id=tenant.id,
+        branch_id=own_branch.id,
+        email="verifier-cross-branch@example.test",
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.DOCUMENT_VERIFIER,
+            user_id=verifier.id,
+            tenant_id=tenant.id,
+            branch_id=own_branch.id,
+        )
+    )
+
+    response = client.get(
+        f"/applications/{application.id}/checklist",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Cannot view checklist for an application outside your branch"
+    )
+
+
+def test_checklist_document_verifier_without_branch_is_blocked(
+    client, db_session, override_authenticated_user
+):
+    """A DOCUMENT_VERIFIER with branch_id=None cannot read any checklist (403)."""
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    chain = seed_master_data_chain(db_session, tenant_id=tenant.id)
+    student = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        email="verifier-no-branch-target@example.test",
+    )
+    application = _seed_application_with_program(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        program_id=chain[2].id,
+        university_id=chain[1].id,
+    )
+    verifier = make_db_user(
+        db_session,
+        Role.DOCUMENT_VERIFIER,
+        tenant_id=tenant.id,
+        branch_id=None,
+        email="verifier-no-branch@example.test",
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.DOCUMENT_VERIFIER,
+            user_id=verifier.id,
+            tenant_id=tenant.id,
+            branch_id=None,
+        )
+    )
+
+    response = client.get(
+        f"/applications/{application.id}/checklist",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Cannot view checklist for an application outside your branch"
+    )
 
 
 def test_checklist_super_admin_is_blocked_by_rbac():
@@ -1443,34 +1663,39 @@ def test_checklist_rejects_student_missing_tenant_scope(
 ):
     """A student with tenant_id=None cannot read any checklist (403).
 
-    The student's deactivated/tenant check fires after the application
-    lookup: we seed an application the student *would* own so the 404
-    branch is bypassed and the deactivated-student check fires.
+    The student *owns* the application (so the owner check passes) and is
+    active, but their ``tenant_id`` is missing, so the deactivated-
+    student branch-scope check fires before any tenant-application
+    cross-check. This exercises the same tenant-missing guard that the
+    E18 list-applications router enforces (ADR-0004 + ADR-0020).
     """
     tenant = _create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     chain = seed_master_data_chain(db_session, tenant_id=tenant.id)
-    application = _seed_application_with_program(
-        db_session,
-        tenant_id=tenant.id,
-        branch_id=branch.id,
-        student_id=999,  # The Student row we'll create below.
-        program_id=chain[2].id,
-        university_id=chain[1].id,
-    )
     student = make_db_user(
         db_session,
         Role.STUDENT,
         tenant_id=None,
-        branch_id=1,
+        branch_id=branch.id,
         email="missing-tenant@example.test",
+    )
+    # The application is owned by the same student whose tenant_id is
+    # None; we deliberately use a non-existent program/university pair
+    # because the tenant-scope check fires before FK validation.
+    application = _seed_application_with_program(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        program_id=chain[2].id,
+        university_id=chain[1].id,
     )
     override_authenticated_user(
         make_authenticated_user(
             Role.STUDENT,
             user_id=student.id,
             tenant_id=None,
-            branch_id=1,
+            branch_id=branch.id,
         )
     )
 
