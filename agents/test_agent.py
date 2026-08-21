@@ -101,7 +101,13 @@ class ServerHandle:
     def __enter__(self) -> "ServerHandle":
         import os
         python_bin = target_app.backend_venv_python()
-        env = {**os.environ, target_app.DATABASE_OVERRIDE_ENV_VAR: f"sqlite:///./qa_run_{self.port}.db"}
+        # Self-contained black-box env: isolated sqlite DB + in-memory document
+        # storage, so uploads work in-process with no S3/MinIO to stand up.
+        env = {
+            **os.environ,
+            target_app.DATABASE_OVERRIDE_ENV_VAR: f"sqlite:///./qa_run_{self.port}.db",
+            "DOCUMENT_STORAGE": "memory",
+        }
         self.proc = subprocess.Popen(
             [python_bin, "-m", "uvicorn", target_app.BACKEND_APP_MODULE,
              "--host", "127.0.0.1", "--port", str(self.port)],
@@ -150,6 +156,10 @@ STRICT RULES:
    purely to determine root cause for your report.
 3. Test the system as a black box over real HTTP, against the already-
    running server at: {base_url}
+   The server is fully self-contained: an isolated SQLite DB and IN-MEMORY
+   document storage (`DOCUMENT_STORAGE=memory`). Document upload/download
+   endpoints work in-process — do NOT try to stand up MinIO, S3, Docker, or any
+   external service; just call the endpoints directly.
 4. Do NOT modify anything under `backend/app/`. You may create new files
    under `qa/` for your black-box test scripts.
 

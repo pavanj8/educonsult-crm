@@ -65,17 +65,23 @@ def _ensure_backend_deps() -> None:
     _backend_deps_ready = True
 
 
-def _backend_build_check() -> tuple[int, str]:
-    """Run the canonical backend gate (`scripts/check.sh backend`); returns
-    (returncode, combined output). rc=0 (skip) when there's no backend."""
+def _dev_gate() -> tuple[int, str]:
+    """In-run gate: backend lint + ONLY the tests the agent added/changed — NOT
+    the whole suite. The full regression + build runs exactly once, at the merge
+    gate (`run_local`'s `check.sh all`) and in CI, so we don't re-run hundreds of
+    tests on every in-run attempt/iteration (docs/adr/0031)."""
     if not (target_app.BACKEND_DIR / "requirements.txt").exists():
         return 0, "(no backend to check)"
     _ensure_backend_deps()
-    result = subprocess.run(
-        ["bash", "scripts/check.sh", "backend"],
+    lint = subprocess.run(
+        ["bash", "scripts/check.sh", "backend-lint"],
         cwd=str(REPO_ROOT), capture_output=True, text=True,
     )
-    return result.returncode, (result.stdout + result.stderr)
+    out = lint.stdout + lint.stderr
+    if lint.returncode != 0:
+        return lint.returncode, out
+    rc, tout = run_targeted_tests()
+    return rc, out + "\n" + tout
 
 
 def read_text(path: Path) -> str:
@@ -204,9 +210,12 @@ describe -- nothing more, nothing speculative.
   `str_replace` (surgical edit) — do NOT rewrite a whole large file just to fix
   a few lines; that wastes time and risks new errors. Never write files via
   shell heredocs (`cat > file << EOF`) — that causes escaping and syntax errors.
-- Run `bash scripts/check.sh backend` (or `frontend`) ONCE when you believe
-  the work is complete; fix exactly what it reports; re-run only after a change.
-  Do not re-run the whole suite after every small edit.
+- Validate with the NARROWEST command: `ruff check --fix .` inside `backend/`
+  for lint, and run ONLY the test file(s) you added or changed
+  (`python -m pytest tests/<area>/test_x.py -q` from `backend/`) — NOT the whole
+  suite. The full regression suite + build runs once at the merge gate and in CI;
+  re-running all tests after each edit wastes minutes and grows worse as the
+  project grows.
 
 ## Rules
 1. Implement only what this issue's acceptance criteria describe. If you
@@ -229,16 +238,15 @@ describe -- nothing more, nothing speculative.
    or endpoint is already present, IMPORT and EXTEND it. Re-adding an existing
    model or migration causes duplicate definitions, conflicts, and review
    failures (this is a common cause of rework).
-6. Before finishing, run the project's canonical check script and iterate
-   until it passes — this is the EXACT gate CI enforces, so the PR will NOT
-   merge otherwise:
-   - `bash scripts/check.sh backend` for backend changes (runs `ruff check .`
-     + `pytest`), `bash scripts/check.sh frontend` for frontend changes
-     (`npm run lint` + `npm run build`), or `bash scripts/check.sh` for both.
-   - For ruff, run `ruff check --fix .` inside `backend/` first to auto-fix
-     import order (I) and unused imports (F401), then fix what remains (e.g.
-     F841 unused variables) by hand. Do NOT finish while check.sh reports
-     failure.
+6. Before finishing, make your change pass the NARROW gate — do NOT run the
+   whole suite (the harness gate + CI run the full regression once):
+   - Backend: `ruff check --fix .` inside `backend/` (auto-fixes import order (I)
+     and unused imports (F401); fix remaining e.g. F841 by hand), then run ONLY
+     the tests you added/changed (`python -m pytest tests/<area>/test_x.py -q`)
+     and make them green.
+   - Frontend: `npm run lint`, and if you added a component test run just that
+     spec. The full `npm run build` is part of the merge gate.
+   Do NOT finish while lint fails or your own tests fail.
 7. This is iteration {iteration} for this issue. If the feedback section
    above is non-empty, treating it as optional is a failure.
 
@@ -266,8 +274,8 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         prompt = base_prompt
         if gate_out:
             prompt = base_prompt + (
-                f"\n\n## Build gate STILL FAILING — in-run fix attempt {attempt} of {DEV_BUILD_ATTEMPTS}\n"
-                f"Your previous work did NOT pass `bash scripts/check.sh backend`. Fix ONLY what "
+                f"\n\n## Gate STILL FAILING — in-run fix attempt {attempt} of {DEV_BUILD_ATTEMPTS}\n"
+                f"Your previous work did NOT pass backend lint + your own tests. Fix ONLY what "
                 f"it reports below (do not rewrite passing code, do not restart), then finish:\n"
                 f"```\n{gate_out[-3000:]}\n```\n"
             )
@@ -276,7 +284,7 @@ def run_dev_agent(issue: dict, model: str, iteration: int) -> tuple[str, str]:
         status, text = minimax_agent.run_agent(
             "dev-agent", prompt, model, REPO_ROOT, max_turns=turns,
         )
-        rc, gate_out = _backend_build_check()
+        rc, gate_out = _dev_gate()
         if rc == 0:
             print(f"\n[dev-agent] build gate PASSED on in-run attempt {attempt}.")
             return status, text
@@ -295,12 +303,28 @@ def git_files_changed() -> list[str]:
     return [line[3:].strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-def run_pytest_independently() -> tuple[int, str]:
+def _changed_backend_test_files() -> list[str]:
+    """New/modified backend test files, as paths relative to the backend dir."""
+    bname = target_app.BACKEND_DIR.name
+    rel = []
+    for f in git_files_changed():  # repo-relative
+        if f.startswith(f"{bname}/tests/") and f.endswith(".py") and Path(f).name.startswith("test_"):
+            rel.append(f[len(bname) + 1:])  # strip "<backend>/"
+    return rel
+
+
+def run_targeted_tests() -> tuple[int, str]:
+    """Run ONLY the backend test files the agent added/changed — not the full
+    suite (docs/adr/0031). The full regression runs once at the merge gate + CI.
+    rc=0 when there are no changed backend tests."""
     if not target_app.has_backend_tests():
         return 0, "(no backend/tests/ yet -- nothing to run)"
+    rel = _changed_backend_test_files()
+    if not rel:
+        return 0, "(no new/changed backend test files -- full regression deferred to the gate/CI)"
     python_bin = target_app.backend_venv_python()
     result = subprocess.run(
-        [python_bin, "-m", "pytest", "-v"],
+        [python_bin, "-m", "pytest", "-q", *rel],
         cwd=str(target_app.BACKEND_DIR), capture_output=True, text=True,
     )
     return result.returncode, result.stdout + result.stderr
@@ -317,8 +341,8 @@ def main():
 
     agent_status, final_text = run_dev_agent(issue, args.model, args.iteration)
 
-    print("\n--- Independent verification: running pytest ourselves ---\n")
-    returncode, pytest_output = run_pytest_independently()
+    print("\n--- Verification: running the tests this change added/modified ---\n")
+    returncode, pytest_output = run_targeted_tests()
     print(pytest_output)
 
     files_changed = git_files_changed()

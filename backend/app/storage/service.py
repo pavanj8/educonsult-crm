@@ -234,10 +234,20 @@ _storage_service: DocumentStorageService | None = None
 
 
 def get_document_storage() -> DocumentStorageService:
-    """Return the process-wide storage service, constructing it on first use."""
+    """Return the process-wide storage service, constructing it on first use.
+
+    Honors ``DOCUMENT_STORAGE=memory`` to select the in-memory backend, so the app
+    can be booted for black-box testing (e.g. the Test agent) without S3/MinIO —
+    mirroring how ``DATABASE_OVERRIDE=sqlite`` gives a self-contained database.
+    Unset (or any other value) keeps the production S3 backend, so this is a no-op
+    in real deployments.
+    """
     global _storage_service
     if _storage_service is None:
-        _storage_service = S3DocumentStorageService()
+        if os.environ.get("DOCUMENT_STORAGE", "").strip().lower() in {"memory", "in-memory", "inmemory"}:
+            _storage_service = InMemoryDocumentStorage()
+        else:
+            _storage_service = S3DocumentStorageService()
     return _storage_service
 
 
