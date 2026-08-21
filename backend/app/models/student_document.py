@@ -1,4 +1,5 @@
-"""Student document upload model (E27 schema + E26 read model; issue #174).
+"""Student document upload model (E27 schema + E26 read model; issue #174;
+E29 / J22 ``approval_comment`` column added in issue #181).
 
 This module owns the *upload status* half of the E26
 ``GET /applications/{application_id}/checklist`` endpoint ("merges
@@ -9,7 +10,7 @@ land in sibling tickets #175 / #176; here we only need the persisted
 shape so the read API can report each upload's status and the upload
 API can persist new rows against a checklist item.
 
-Design (Requirements §5; Journey J19–J24; Epic E27; Epic E26):
+Design (Requirements §5; Journey J19–J24; Epic E27; Epic E26; Epic E29):
 
 * Tenant-scoped (ADR-0001: every table has ``tenant_id``). Inherited
   from :class:`TenantScopedBase`.
@@ -39,6 +40,12 @@ Design (Requirements §5; Journey J19–J24; Epic E27; Epic E26):
 * ``rejection_reason`` is the free-text comment recorded by the
   verifier on reject (Journey J23). NULL when ``status`` is not
   ``rejected``.
+* ``approval_comment`` is the parallel free-text comment recorded by
+  the verifier on approve (Journey J22; E29 backend ticket #181).
+  NULL when ``status`` is not ``approved``. Kept as a separate column
+  from ``rejection_reason`` so the two audit trails remain distinct
+  and the model keeps an obvious 1:1 mapping between status value and
+  comment column.
 """
 
 from datetime import datetime
@@ -119,3 +126,4 @@ class StudentDocument(TenantScopedBase):
         nullable=True,
     )
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approval_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
