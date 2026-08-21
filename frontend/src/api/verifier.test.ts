@@ -76,3 +76,26 @@ describe('verifier API client', () => {
     }
   })
 })
+
+describe('rejectDocument API client', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('posts the comment to the reject endpoint', async () => {
+    localStorage.setItem('access_token', 'stored-token')
+    const rejected = { id: 7, status: 'rejected', rejection_reason: 'Not legible' }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => rejected })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const { rejectDocument } = await import('./verifier')
+    const result = await rejectDocument(7, 'Not legible')
+
+    expect(result).toEqual(rejected)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/verifier/documents/7/reject',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ comment: 'Not legible' }) }),
+    )
+  })
+})

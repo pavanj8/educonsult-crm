@@ -22,6 +22,8 @@ from app.schemas.verifier import (
     ApproveDocumentResponse,
     PendingDocumentItem,
     PendingDocumentQueueResponse,
+    RejectDocumentRequest,
+    RejectDocumentResponse,
 )
 
 router = APIRouter()
@@ -225,6 +227,64 @@ def approve_document(
     document.verified_by_user_id = current_user.id
     document.verified_at = _utc_now()
     document.approval_comment = comment
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document service is temporarily unavailable",
+        ) from None
+
+    db.refresh(document)
+    return document
+
+
+@router.post(
+    "/documents/{document_id}/reject",
+    response_model=RejectDocumentResponse,
+)
+def reject_document(
+    document_id: int,
+    payload: RejectDocumentRequest,
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.DOCUMENT_VERIFY)),
+    ],
+    db: Session = Depends(get_db),
+) -> StudentDocument:
+    """Reject a pending student document with a REQUIRED comment (E30; J23; #184).
+
+    Mirrors :func:`approve_document` but a rejection reason is mandatory (the
+    student and the audit trail must always have an explanation). Tenant scope is
+    enforced via :func:`_get_tenant_document`, so cross-tenant requests surface as
+    404 (no tenant enumeration), and only ``pending`` documents can be rejected.
+
+    Errors: 403 (no tenant scope), 404 (missing / cross-tenant), 422 (document not
+    pending, or comment empty/>2000 chars), 503 (database unavailable).
+    """
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no tenant scope",
+        )
+
+    document = _get_tenant_document(document_id, current_user, db)
+
+    if document.status != StudentDocumentStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Only pending documents can be rejected "
+                f"(current status: '{document.status.value}')"
+            ),
+        )
+
+    document.status = StudentDocumentStatus.REJECTED
+    document.verified_by_user_id = current_user.id
+    document.verified_at = _utc_now()
+    document.rejection_reason = payload.comment
 
     try:
         db.commit()
