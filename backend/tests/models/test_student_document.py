@@ -72,6 +72,7 @@ def test_student_document_model_has_required_columns():
         "verified_by_user_id",
         "verified_at",
         "rejection_reason",
+        "approval_comment",
         "created_at",
         "updated_at",
     }
@@ -119,6 +120,7 @@ def test_student_document_persists_full_pending_row(db_session):
     assert document.verified_by_user_id is None
     assert document.verified_at is None
     assert document.rejection_reason is None
+    assert document.approval_comment is None
 
 
 def test_student_document_status_defaults_to_pending(db_session):
@@ -210,6 +212,42 @@ def test_student_document_can_be_rejected_with_reason(db_session):
     assert document.verified_by_user_id == 200
 
 
+def test_student_document_can_be_approved_with_comment(db_session):
+    """A verifier can mark a document ``approved`` with an optional
+    ``approval_comment`` (Journey J22; E29 backend ticket #181).
+    """
+    now = _utc_now()
+    application = _seed_application(db_session)
+    template = _seed_template(db_session)
+
+    document = StudentDocument(
+        tenant_id=1,
+        application_id=application.id,
+        checklist_item_template_id=template.id,
+        status=StudentDocumentStatus.APPROVED,
+        original_filename="passport.pdf",
+        content_type="application/pdf",
+        size_bytes=1024,
+        storage_path="tenants/1/applications/100/passport.pdf",
+        uploaded_by_user_id=100,
+        uploaded_at=now,
+        verified_by_user_id=200,
+        verified_at=now,
+        approval_comment="Clear scan, all fields legible",
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(document)
+    db_session.commit()
+    db_session.refresh(document)
+
+    assert document.status == StudentDocumentStatus.APPROVED
+    assert document.approval_comment == "Clear scan, all fields legible"
+    assert document.verified_by_user_id == 200
+    # Approve never writes ``rejection_reason``.
+    assert document.rejection_reason is None
+
+
 def test_student_document_checklist_item_template_id_is_nullable(db_session):
     """``checklist_item_template_id`` is nullable for ad-hoc uploads."""
     now = _utc_now()
@@ -263,6 +301,7 @@ def test_student_document_verifier_fields_are_nullable_for_pending(db_session):
     assert document.verified_by_user_id is None
     assert document.verified_at is None
     assert document.rejection_reason is None
+    assert document.approval_comment is None
 
 
 def test_student_document_persists_status_value(db_session):
@@ -409,3 +448,4 @@ def test_student_document_round_trip_for_e27_upload_metadata(
     assert document.verified_by_user_id is None
     assert document.verified_at is None
     assert document.rejection_reason is None
+    assert document.approval_comment is None
