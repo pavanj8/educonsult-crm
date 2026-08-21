@@ -262,6 +262,32 @@ def format_failures_markdown(failures: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+def backend_app_changed(base: str = "origin/main") -> bool:
+    """True if this ticket changed backend HTTP-surface code. A frontend-only or
+    tests-only ticket changes no backend/app, so the black-box Test Agent (which
+    only serves the FastAPI backend) has nothing new to exercise (docs/adr/0025;
+    fixes frontend tickets false-failing, e.g. #147)."""
+    subprocess.run(["git", "fetch", "origin", "main"], cwd=str(REPO_ROOT),
+                   capture_output=True, text=True)
+    result = subprocess.run(
+        ["git", "diff", "--name-only", base, "--", "backend/app/"],
+        cwd=str(REPO_ROOT), capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
+def report_not_applicable(issue_number: int, iteration: int, summary: str) -> None:
+    structured = {
+        "status": "PASS", "issue_number": issue_number, "iteration": iteration,
+        "failures": [], "summary": summary,
+    }
+    print_human_report(structured)
+    ticket_utils.set_result_label(issue_number, "test", True)
+    ticket_utils.report_agent_result(
+        issue_number, "Test Agent", iteration, "PASS (not applicable)", summary,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Test Agent: independently verify a GitHub Issue via MiniMax")
     parser.add_argument("issue_number", type=int)
@@ -272,23 +298,22 @@ def main():
     issue = ticket_utils.get_issue(args.issue_number)
 
     if not target_app.has_app():
-        structured = {
-            "status": "PASS",
-            "issue_number": args.issue_number,
-            "iteration": args.iteration,
-            "failures": [],
-            "summary": (
-                "No live application (backend/app/main.py) exists yet -- this "
-                "appears to be an infrastructure-only ticket with no HTTP "
-                "surface to black-box test. Deferring to the Review Agent and "
-                "the hard test gate for this iteration."
-            ),
-        }
-        print_human_report(structured)
-        ticket_utils.set_result_label(args.issue_number, "test", True)
-        ticket_utils.report_agent_result(
-            args.issue_number, "Test Agent", args.iteration, "PASS (not applicable)",
-            structured["summary"],
+        report_not_applicable(
+            args.issue_number, args.iteration,
+            "No live application (backend/app/main.py) exists yet -- this appears "
+            "to be an infrastructure-only ticket with no HTTP surface to black-box "
+            "test. Deferring to the Review Agent and the hard test gate.",
+        )
+        sys.exit(0)
+
+    if not backend_app_changed():
+        report_not_applicable(
+            args.issue_number, args.iteration,
+            "This ticket changed no backend/app code (it is frontend-only or "
+            "tests-only), so there is no new backend HTTP surface for the "
+            "independent black-box Test Agent to exercise -- it only serves the "
+            "FastAPI backend. Marking PASS-by-N/A and deferring to the Review "
+            "Agent and the hard test gate (docs/adr/0025).",
         )
         sys.exit(0)
 

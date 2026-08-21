@@ -98,7 +98,7 @@ jobs:
             # is auto-resolved in main's favor; a real conflict in PRODUCT code
             # aborts loudly for manual resolution.
             git merge --no-commit --no-ff origin/main || true
-            for p in agents docs .github harness-demo .cursor scripts; do
+            for p in agents docs .github .cursor scripts; do
               git checkout origin/main -- "$p" 2>/dev/null || true
             done
             git add -A
