@@ -162,12 +162,7 @@ def register_student(
             detail="Branch not found",
         )
 
-    ensure_email_available(
-        db,
-        payload.email,
-        unavailable_detail=_DB_UNAVAILABLE_DETAIL,
-        tenant_id=tenant.id,
-    )
+    ensure_email_available(db, payload.email, unavailable_detail=_DB_UNAVAILABLE_DETAIL)
     validate_target_master_data(db, tenant.id, payload)
 
     student_user = User(

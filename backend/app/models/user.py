@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -18,16 +18,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    # Per-tenant email uniqueness is enforced at the database layer by a
-    # composite UNIQUE(tenant_id, email) constraint added in migration
-    # ``i2j3k4l5m6n7`` (E16 issue #140; docs/requirements.md §1 — every table
-    # carries ``tenant_id``). The non-unique index remains so the global
-    # case-insensitive login lookup in ``backend/app/routers/auth.py`` can
-    # still use it.
-    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "email", name="uq_users_tenant_id_email"),
-    )
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[Role] = mapped_column(
         Enum(Role, native_enum=False, length=50, values_callable=lambda obj: [e.value for e in obj]),

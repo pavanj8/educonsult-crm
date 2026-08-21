@@ -1,20 +1,4 @@
-"""Email uniqueness validation for user registration (E16; issue #137).
-
-Email uniqueness is scoped per tenant (docs/requirements.md §1 — every table
-carries ``tenant_id``; the same identifier in different tenants is
-independent). ``find_user_by_email`` and ``ensure_email_available`` accept
-an optional ``tenant_id`` keyword argument so that:
-
-* Registration can check uniqueness within the resolved tenant only (the
-  tenant-scoped case required by J9 / E16).
-* Login can perform a global email lookup (no tenant filter), preserving
-  the existing single-account-per-email behaviour for any role.
-
-When ``tenant_id`` is provided, a ``NULL`` tenant_id means the user row is
-a platform-level account (e.g. ``super_admin``) — those rows are excluded
-from the scoped lookup because their ``tenant_id`` does not match any
-non-null tenant id.
-"""
+"""Email uniqueness validation for user registration (E16; issue #137)."""
 
 from fastapi import HTTPException, status
 from sqlalchemy import func
@@ -26,24 +10,14 @@ from app.models.user import User
 DUPLICATE_EMAIL_DETAIL = "A user with this email already exists"
 
 
-def find_user_by_email(
-    db: Session,
-    email: str,
-    *,
-    tenant_id: int | None = None,
-) -> User | None:
-    """Return an existing user with the same email (case-insensitive), if any.
-
-    When ``tenant_id`` is provided, only users belonging to that tenant are
-    considered; platform-level rows (``tenant_id IS NULL``) are excluded so
-    a student registering in tenant A does not collide with a
-    ``super_admin`` (or any other NULL-tenant row) sharing the same email.
-    """
+def find_user_by_email(db: Session, email: str) -> User | None:
+    """Return an existing user with the same email (case-insensitive), if any."""
     normalized_email = email.strip().lower()
-    query = db.query(User).filter(func.lower(User.email) == normalized_email)
-    if tenant_id is not None:
-        query = query.filter(User.tenant_id == tenant_id)
-    return query.one_or_none()
+    return (
+        db.query(User)
+        .filter(func.lower(User.email) == normalized_email)
+        .one_or_none()
+    )
 
 
 def ensure_email_available(
@@ -51,16 +25,10 @@ def ensure_email_available(
     email: str,
     *,
     unavailable_detail: str,
-    tenant_id: int | None = None,
 ) -> None:
-    """Raise HTTP 409 if the email is already registered; 503 if DB is unavailable.
-
-    ``tenant_id`` follows the same convention as :func:`find_user_by_email`:
-    when provided, uniqueness is scoped to that tenant so that the same
-    email may legitimately be reused across different consultancies.
-    """
+    """Raise HTTP 409 if the email is already registered; 503 if DB is unavailable."""
     try:
-        existing_user = find_user_by_email(db, email, tenant_id=tenant_id)
+        existing_user = find_user_by_email(db, email)
     except OperationalError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
