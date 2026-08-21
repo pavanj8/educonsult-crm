@@ -2,9 +2,10 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.application import ApplicationStage as ApplicationStageEnum
+from app.pipeline.stages import PipelineStage
 
 
 class CreateApplicationRequest(BaseModel):
@@ -36,9 +37,32 @@ class AdvanceStageRequest(BaseModel):
     endpoint validates that a (current stage -> to_stage) transition is
     permitted by the platform-default or tenant-specific rule table
     (see :mod:`app.services.stage_progression`).
+
+    ``reason`` is an optional free-text note. Per Requirements §5
+    ("Enrolled / Rejected / Withdrawn, three distinct terminal states,
+    each capturing a reason"), a non-empty ``reason`` is REQUIRED for
+    any transition whose ``to_stage`` is ``rejected`` or ``withdrawn``.
+    Forward pipeline transitions and ``enrolled`` may omit it; a
+    validation error (422) is raised when the rule is violated.
     """
 
     to_stage: ApplicationStageEnum
+    reason: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _require_reason_for_terminal_rejections(self) -> "AdvanceStageRequest":
+        terminal_rejections = {
+            PipelineStage.REJECTED,
+            PipelineStage.WITHDRAWN,
+        }
+        if (
+            self.to_stage in terminal_rejections
+            and (self.reason is None or not self.reason.strip())
+        ):
+            raise ValueError(
+                f"reason is required when to_stage is '{self.to_stage.value}'"
+            )
+        return self
 
 
 class StageHistoryEntry(BaseModel):
@@ -59,6 +83,7 @@ class StageHistoryEntry(BaseModel):
     to_stage: ApplicationStageEnum
     changed_by_user_id: int | None
     changed_at: datetime
+    reason: str | None
 
 
 class AdvanceStageResponse(BaseModel):

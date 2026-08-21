@@ -1,5 +1,6 @@
 """Application routes (E18; E21; E25; Journey J11; J14; J18)."""
 
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -34,6 +35,11 @@ from app.services.stage_progression import (
 router = APIRouter()
 
 _DB_UNAVAILABLE_DETAIL = "Application service is temporarily unavailable"
+_BRANCH_ACCESS_DENIED_DETAIL = "User has no access to this branch's applications"
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _get_active_student(
@@ -136,6 +142,29 @@ def _get_tenant_application(
         )
 
     return application
+
+
+def _enforce_branch_scope(
+    application: Application,
+    current_user: AuthenticatedUser,
+) -> None:
+    """Block counselors / branch managers from acting on applications in other branches.
+
+    Consultancy owners and super admins keep cross-branch visibility by
+    design (ADR-0004 + Security Analyst finding on iteration #1 of issue
+    #169). A missing ``current_user.branch_id`` is treated as a 403 for
+    the same reason: a counselor without a branch assignment must not
+    be able to advance anything.
+    """
+    if current_user.role in (Role.COUNSELOR, Role.BRANCH_MANAGER):
+        if (
+            current_user.branch_id is None
+            or application.branch_id != current_user.branch_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=_BRANCH_ACCESS_DENIED_DETAIL,
+            )
 
 
 @router.post(
@@ -313,13 +342,20 @@ def advance_application_stage(
     :func:`app.services.stage_progression.validate_transition`), updates
     ``Application.stage``, and appends one :class:`StageHistory` row
     recording ``from_stage`` / ``to_stage`` / ``changed_by_user_id`` /
-    ``changed_at``.
+    ``changed_at`` / ``reason`` (the optional reason required by
+    Requirements §5 for terminal REJECTED / WITHDRAWN transitions).
 
     Errors:
 
+    * 401 — caller is not authenticated.
+    * 403 — caller lacks the permission, has no tenant scope, has no
+      branch scope (counselor / branch manager), or is in a different
+      branch than the application.
     * 404 — application does not exist or belongs to a different tenant.
     * 422 — ``to_stage`` is not a permitted transition from the current
-      stage (the application is left untouched; no history row is written).
+      stage, or the request body fails Pydantic validation (e.g.
+      ``reason`` missing for a terminal-stage transition). The
+      application is left untouched; no history row is written.
     * 503 — database unavailable while loading / writing the application
       or history row.
     """
@@ -330,9 +366,10 @@ def advance_application_stage(
         )
 
     application = _get_tenant_application(application_id, current_user, db)
+    _enforce_branch_scope(application, current_user)
 
     from_stage = PipelineStage(application.stage)
-    to_stage = PipelineStage(payload.to_stage.value)
+    to_stage = payload.to_stage
 
     try:
         validate_transition(db, from_stage, to_stage, current_user.tenant_id)
@@ -358,6 +395,8 @@ def advance_application_stage(
         from_stage=from_stage,
         to_stage=to_stage,
         changed_by_user_id=current_user.id,
+        changed_at=_utc_now(),
+        reason=payload.reason,
     )
     db.add(history_entry)
 

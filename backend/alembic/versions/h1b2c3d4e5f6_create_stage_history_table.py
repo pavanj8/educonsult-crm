@@ -2,16 +2,6 @@
 
 Revision ID: h1b2c3d4e5f6
 Revises: g0b1c2d3e4f5
-<<<<<<< HEAD
-Create Date: 2026-08-21 00:00:00.000000
-
-E25 (Application Stage Progression Engine) -- issue #169 advance-stage API
-with history logging. The advance-stage endpoint appends one row per
-successful transition to ``stage_history`` so the frontend stage timeline
-(and any future audit/analytics view) can replay what happened.
-"""
-from collections.abc import Sequence
-=======
 Create Date: 2026-08-21 02:00:00.000000
 
 Adds the per-application stage-history audit log (E25; Journey J18).
@@ -34,7 +24,6 @@ follow-up E25 ticket.
 """
 
 from typing import Sequence, Union
->>>>>>> origin/main
 
 from alembic import op
 import sqlalchemy as sa
@@ -42,20 +31,6 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "h1b2c3d4e5f6"
-<<<<<<< HEAD
-down_revision: str | None = "g0b1c2d3e4f5"
-branch_labels: str | Sequence[str] | None = None
-depends_on: str | Sequence[str] | None = None
-
-
-def upgrade() -> None:
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        # Re-use the DB-level ENUM type created by f7a8b9c0d1e2. Using
-        # create_type=False prevents Alembic from attempting to create a
-        # second copy of the same enum, which would fail on PostgreSQL.
-        stage_enum = sa.Enum(
-=======
 down_revision: Union[str, None] = "g0b1c2d3e4f5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -72,7 +47,6 @@ def _stage_column_type() -> sa.Enum:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         return sa.Enum(
->>>>>>> origin/main
             "registered",
             "counseling",
             "university_shortlisting",
@@ -87,30 +61,6 @@ def _stage_column_type() -> sa.Enum:
             name="stage",
             create_type=False,
         )
-<<<<<<< HEAD
-        from_stage_type = stage_enum
-        to_stage_type = stage_enum
-    else:
-        # SQLite stores as VARCHAR(50) via native_enum=False.
-        stage_enum = sa.Enum(
-            "registered",
-            "counseling",
-            "university_shortlisting",
-            "application_submitted",
-            "document_verification",
-            "offer_letter",
-            "visa_processing",
-            "loan_processing",
-            "enrolled",
-            "rejected",
-            "withdrawn",
-            name="stage",
-            native_enum=False,
-            length=50,
-        )
-        from_stage_type = stage_enum
-        to_stage_type = stage_enum
-=======
     return sa.Enum(
         "registered",
         "counseling",
@@ -131,59 +81,25 @@ def _stage_column_type() -> sa.Enum:
 
 def upgrade() -> None:
     stage_type = _stage_column_type()
->>>>>>> origin/main
 
     op.create_table(
         "stage_history",
         sa.Column("id", sa.Integer(), nullable=False),
-<<<<<<< HEAD
-        sa.Column(
-            "tenant_id",
-            sa.Integer(),
-            sa.ForeignKey("tenants.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-=======
         sa.Column("tenant_id", sa.Integer(), nullable=False),
->>>>>>> origin/main
         sa.Column(
             "application_id",
             sa.Integer(),
             sa.ForeignKey("applications.id", ondelete="CASCADE"),
             nullable=False,
         ),
-<<<<<<< HEAD
-        sa.Column("from_stage", from_stage_type, nullable=True),
-        sa.Column("to_stage", to_stage_type, nullable=False),
-=======
         sa.Column("from_stage", stage_type, nullable=True),
         sa.Column("to_stage", stage_type, nullable=False),
->>>>>>> origin/main
         sa.Column(
             "changed_by_user_id",
             sa.Integer(),
             sa.ForeignKey("users.id", ondelete="SET NULL"),
             nullable=True,
         ),
-<<<<<<< HEAD
-        sa.Column(
-            "changed_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-        ),
-        sa.PrimaryKeyConstraint("id"),
-    )
-=======
         sa.Column("changed_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("reason", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -191,7 +107,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
->>>>>>> origin/main
     op.create_index(
         op.f("ix_stage_history_tenant_id"),
         "stage_history",
