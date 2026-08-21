@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { isApiError } from '../api/client'
-import { fetchPendingDocuments, rejectDocument } from '../api/verifier'
+import { approveDocument, fetchPendingDocuments, rejectDocument } from '../api/verifier'
 import { hasAccessToken } from '../store/authStorage'
 import type { PendingDocument } from '../types/verifier'
 
@@ -74,5 +74,31 @@ export function useVerifierQueue() {
     }
   }, [])
 
-  return { documents, total, loading, error, reload: loadQueue, reject }
+  /**
+   * Approve a document (E29; Journey J22). On success the row leaves the pending
+   * queue; errors are mapped and re-thrown for the caller's form.
+   */
+  const approve = useCallback(async (documentId: number, comment?: string) => {
+    try {
+      await approveDocument(documentId, comment)
+      setDocuments((prev) => prev.filter((doc) => doc.id !== documentId))
+      setTotal((prev) => Math.max(0, prev - 1))
+    } catch (err) {
+      if (isApiError(err) && err.status === 401) {
+        throw new Error('Your session has expired — please sign in again')
+      }
+      if (isApiError(err) && err.status === 403) {
+        throw new Error("You don't have permission to approve documents")
+      }
+      if (isApiError(err) && err.status === 404) {
+        throw new Error('This document is no longer available')
+      }
+      if (isApiError(err) && err.status === 422) {
+        throw new Error(err.message || 'This document cannot be approved')
+      }
+      throw new Error('Failed to approve the document')
+    }
+  }, [])
+
+  return { documents, total, loading, error, reload: loadQueue, reject, approve }
 }

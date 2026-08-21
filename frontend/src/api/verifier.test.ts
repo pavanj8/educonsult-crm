@@ -99,3 +99,35 @@ describe('rejectDocument API client', () => {
     )
   })
 })
+
+describe('approveDocument API client', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('posts the trimmed comment to the approve endpoint', async () => {
+    localStorage.setItem('access_token', 'stored-token')
+    const approved = { id: 7, status: 'approved', approval_comment: 'ok' }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => approved })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { approveDocument } = await import('./verifier')
+    const res = await approveDocument(7, '  ok  ')
+    expect(res).toEqual(approved)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/verifier/documents/7/approve',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ comment: 'ok' }) }),
+    )
+  })
+
+  it('sends null comment when omitted', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { approveDocument } = await import('./verifier')
+    await approveDocument(7)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/verifier/documents/7/approve',
+      expect.objectContaining({ body: JSON.stringify({ comment: null }) }),
+    )
+  })
+})
