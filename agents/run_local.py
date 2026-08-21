@@ -24,9 +24,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -35,6 +33,7 @@ from pathlib import Path
 import github_ticket_utils as ticket_utils
 import harness_config
 import llm_env
+import queue_picker
 
 AGENTS = Path(__file__).resolve().parent
 REPO_ROOT = AGENTS.parent
@@ -61,41 +60,6 @@ def _checkout_fresh_main() -> None:
         _q(["git", "stash", "push", "-u", "-m", "run_local-leftover"])
         _q(["git", "checkout", "main"])
     _q(["git", "pull", "--ff-only", "-q"])
-
-
-def _pick_next_issue(repo: str) -> int | None:
-    """Next eligible ticket, mirroring the cloud queue-picker (docs/adr/0024).
-
-    Eligible: never-touched (no agent:* label) OR agent:needs-rework with
-    iteration < MAX_ITERATIONS. Order: needs-rework first, then non-"Tests:"
-    before "Tests:", then by issue number.
-    """
-    out = _q(["gh", "issue", "list", "-R", repo, "--label", "task,phase:mvp",
-              "--state", "open", "--limit", "300", "--json", "number,labels,title"])
-    issues = json.loads(out.stdout or "[]")
-
-    def names(i: dict) -> list[str]:
-        return [l["name"] for l in i.get("labels", [])]
-
-    def iter_of(i: dict) -> int:
-        vals = [int(n.rsplit("-", 1)[-1]) for n in names(i) if n.startswith("agent:iteration-")]
-        return vals[0] if vals else 0
-
-    def untouched(i: dict) -> bool:
-        return not any(n.startswith("agent:") for n in names(i))
-
-    def retryable(i: dict) -> bool:
-        return "agent:needs-rework" in names(i) and iter_of(i) < MAX_ITERATIONS
-
-    def is_rework(i: dict) -> int:
-        return 0 if "agent:needs-rework" in names(i) else 1
-
-    def is_test(i: dict) -> int:
-        return 1 if re.search(r"\bTests?:", i.get("title", "") or "", re.I) else 0
-
-    eligible = [i for i in issues if untouched(i) or retryable(i)]
-    eligible.sort(key=lambda i: (is_rework(i), is_test(i), i["number"]))
-    return eligible[0]["number"] if eligible else None
 
 
 def _finalize_merge(repo: str, issue_number: int, branch: str, title: str) -> int:
@@ -202,7 +166,7 @@ def main() -> int:
         return one(args.issue_number)
 
     while True:
-        n = _pick_next_issue(repo)
+        n = queue_picker.next_issue(repo)
         if n is None:
             print("[run_local] no eligible open phase:mvp task issues — nothing to do.")
             return 0
