@@ -154,7 +154,12 @@ jobs:
         id: commit
         run: |
           git add -A
-          git diff --cached --quiet || git commit -m "Dev Agent: issue #${{ steps.issue.outputs.number }} iteration ${{ steps.iteration.outputs.number }}"
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Dev Agent: issue #${{ steps.issue.outputs.number }} iteration ${{ steps.iteration.outputs.number }}"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
           git push origin "${{ steps.branch.outputs.name }}"
 
       - name: Mark needs-rework if commit/push failed
@@ -179,6 +184,11 @@ jobs:
         run: python -c "import os, github_ticket_utils as t; t.set_result_label(int(os.environ['ISSUE']), 'gate', os.environ['GATE_OK']=='success')"
 
       - name: Open or update pull request
+        env:
+          # Author the PR as the real user (GH_PAT), not github-actions[bot],
+          # so its CI runs aren't gated by the public-repo first-time-contributor
+          # approval policy (docs/adr/0023). Falls back to GITHUB_TOKEN.
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           if ! gh pr list --head "${{ steps.branch.outputs.name }}" --json number --jq '.[0].number' | grep -q '[0-9]'; then
             gh pr create \
@@ -188,7 +198,31 @@ jobs:
               --base main
           fi
 
+      - name: Build gate — don't spend Test/Review/CI on broken Dev output (docs/adr/0023)
+        id: buildgate
+        if: always()
+        run: |
+          ISSUE="${{ steps.issue.outputs.number }}"
+          # (a) Dev Agent crashed, or (b) it produced no changes -> nothing worth verifying.
+          if [ "${{ steps.dev.outcome }}" != "success" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=the Dev Agent step failed (crashed / model error)" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "${{ steps.commit.outputs.changed }}" != "true" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=the Dev Agent produced no code changes" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # (c) code exists but doesn't pass the canonical gate -> Test/Review would just
+          # rediscover that; skip them and hand straight back to rework.
+          if [ -f backend/requirements.txt ]; then
+            python -m pip install -q -r backend/requirements.txt ruff==0.16.3 >/dev/null 2>&1 || true
+          fi
+          if bash scripts/check.sh backend > /tmp/gate.log 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "reason=scripts/check.sh (backend) failed" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Dispatch Test and Review for THIS issue only (docs/adr/0016)
+        if: steps.buildgate.outputs.ok == 'true'
         working-directory: agents
         run: |
           ISSUE="${{ steps.issue.outputs.number }}"
@@ -199,3 +233,23 @@ jobs:
             -f issue_number="$ISSUE" -f iteration="$ITER"
           gh workflow run agent-review.yml -R ${{ github.repository }} --ref main \
             -f issue_number="$ISSUE" -f iteration="$ITER"
+
+      - name: Skip verification and hand back to rework (build gate failed, docs/adr/0023)
+        if: steps.buildgate.outputs.ok != 'true'
+        run: |
+          ISSUE="${{ steps.issue.outputs.number }}"
+          REASON="${{ steps.buildgate.outputs.reason }}"
+          echo "Build gate failed ($REASON) -- NOT spending Test/Review/CI; flagging needs-rework."
+          {
+            echo "## Harness iteration — build gate failed (Test/Review skipped)"
+            echo ""
+            echo "The Dev output did not pass the build gate, so the expensive Test/Review"
+            echo "agents were not run. Reason: **$REASON**. Fix this first; run"
+            echo "\`bash scripts/check.sh\` locally to reproduce."
+            if [ -f /tmp/gate.log ]; then echo ""; echo '```'; tail -c 4000 /tmp/gate.log; echo '```'; fi
+          } > /tmp/rework.md
+          gh issue comment "$ISSUE" -R ${{ github.repository }} --body-file /tmp/rework.md || true
+          gh issue edit "$ISSUE" -R ${{ github.repository }} --remove-label "agent:ready-to-merge" 2>/dev/null || true
+          gh issue edit "$ISSUE" -R ${{ github.repository }} --add-label "agent:needs-rework"
+          # Advance the queue: the picker re-picks needs-rework (within MAX_ITERATIONS).
+          gh workflow run agent-harness-queue-picker.yml -R ${{ github.repository }} --ref main || true
