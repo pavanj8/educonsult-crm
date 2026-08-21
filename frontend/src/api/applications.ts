@@ -75,3 +75,17 @@ export async function markRejected(
     body: JSON.stringify({ reason }),
   })
 }
+
+/**
+ * Mark an application WITHDRAWN with a REQUIRED reason (E40; Journey J33; #207).
+ * Backed by ``POST /applications/{id}/mark-withdrawn``.
+ */
+export async function markWithdrawn(
+  applicationId: number,
+  reason: string,
+): Promise<StageTransitionResult> {
+  return apiFetch<StageTransitionResult>(`/applications/${applicationId}/mark-withdrawn`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
