@@ -57,7 +57,6 @@ from app.schemas.student_document import (
 )
 from app.storage import (
     FILE_TOO_LARGE_DETAIL,
-    MAX_FILE_BYTES,
     DocumentStorageError,
     DocumentStorageService,
     get_document_storage,
@@ -70,10 +69,14 @@ router = APIRouter()
 _DB_UNAVAILABLE_DETAIL = "Document service is unavailable"
 _STORAGE_UNAVAILABLE_DETAIL = "Document storage is temporarily unavailable"
 
-#: Maximum allowed upload size, in bytes. Re-exported for the in-router
-#: streaming cap below so the value is sourced from a single place (the
-#: validation module — Requirements §5: "default limits 10MB").
-_MAX_FILE_BYTES_HARD_LIMIT = MAX_FILE_BYTES
+#: A defensive upper bound for the streaming read loop. The user-facing
+#: 10 MB cap (Requirements §5: "default limits 10MB") is enforced by
+#: :func:`app.storage.validation.validate_file_size` *after* the stream
+#: completes; this ceiling sits well above that value (50 MB) so its
+#: only job is to keep the process RSS bounded under a hostile payload,
+#: even in the unlikely event the post-read validator is ever relaxed.
+#: See :func:`_read_upload_bytes` for the full rationale.
+_STREAMING_CEILING_BYTES = 50 * 1024 * 1024
 
 
 def _utc_now() -> datetime:
@@ -201,14 +204,17 @@ def _resolve_checklist_template(
 
 
 async def _read_upload_bytes(upload: UploadFile) -> bytes:
-    """Read the multipart upload into memory with a hard cap.
+    """Read the multipart upload into memory with a defensive upper bound.
 
-    The cap is the **10 MB** platform default (Requirements §5; see
-    :data:`app.storage.validation.MAX_FILE_BYTES`). It is enforced
-    while streaming so a malicious client cannot balloon the process
-    RSS by uploading an arbitrarily large payload; the user-facing
-    413 is emitted by :func:`validate_file_size` after the stream
-    completes.
+    The user-facing 10 MB cap is enforced by :func:`app.storage.validation.
+    validate_file_size` after the stream completes — that is the rule from
+    Requirements §5 ("default limits 10MB"). The streaming cap here is a
+    **defensive safety net** set well above :data:`MAX_FILE_BYTES` (50 MB)
+    so the process RSS cannot be ballooned by an arbitrarily large payload
+    even if the validator were ever removed in a future refactor. It is
+    intentionally redundant today; do not lower it to ``MAX_FILE_BYTES``
+    (the only line that should enforce the public 10 MB rule is
+    :func:`validate_file_size`).
     """
     chunks: list[bytes] = []
     total = 0
@@ -217,7 +223,7 @@ async def _read_upload_bytes(upload: UploadFile) -> bytes:
         if not chunk:
             break
         total += len(chunk)
-        if total > _MAX_FILE_BYTES_HARD_LIMIT:
+        if total > _STREAMING_CEILING_BYTES:
             # Drop anything we've buffered so the request is bounded.
             chunks.clear()
             raise HTTPException(

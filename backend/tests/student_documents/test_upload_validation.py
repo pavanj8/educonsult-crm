@@ -583,6 +583,68 @@ def test_router_validation_runs_after_authorization(
     assert in_memory_storage.stored == []
 
 
+def test_router_type_validation_runs_after_authentication(
+    client, db_session, in_memory_storage
+):
+    """Symmetric to :func:`test_router_validation_runs_after_authentication`
+    but for the type path: an unauthenticated wrong-type upload is rejected
+    with 401, not 415. Pins the auth-before-validation invariant for both
+    rejection branches."""
+    response = client.post(
+        "/applications/1/documents",
+        files={"file": ("evil.exe", b"x-bytes", "application/octet-stream")},
+    )
+    assert response.status_code == 401
+    assert in_memory_storage.stored == []
+
+
+def test_router_type_validation_runs_after_authorization(
+    client, db_session, override_authenticated_user, in_memory_storage
+):
+    """Symmetric to :func:`test_router_validation_runs_after_authorization`
+    but for the type path: a wrong-type upload from a non-owner is rejected
+    with 403, not 415."""
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+
+    other_student = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        email="other-owner-type@example.test",
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=other_student.id,
+        stage=PipelineStage.DOCUMENT_VERIFICATION,
+    )
+
+    attacker = make_db_user(
+        db_session,
+        Role.STUDENT,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        email="attacker-type@example.test",
+    )
+    _auth_as_student(
+        override_authenticated_user,
+        user_id=attacker.id,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+    )
+
+    response = client.post(
+        f"/applications/{application.id}/documents",
+        files={"file": ("evil.exe", b"x-bytes", "application/octet-stream")},
+    )
+
+    assert response.status_code == 403
+    assert in_memory_storage.stored == []
+
+
 def test_router_validation_runs_before_storage(
     client, db_session, override_authenticated_user, in_memory_storage
 ):

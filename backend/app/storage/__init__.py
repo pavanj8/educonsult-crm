@@ -34,7 +34,6 @@ from app.storage.validation import (
     FILE_TYPE_NOT_ALLOWED_DETAIL,
     MAX_FILE_BYTES,
     MAX_FILE_SIZE_MB,
-    UnsupportedFileTypeError,
     validate_file_size,
     validate_file_type,
 )
@@ -50,7 +49,6 @@ __all__ = [
     "MAX_FILE_BYTES",
     "MAX_FILE_SIZE_MB",
     "S3DocumentStorageService",
-    "UnsupportedFileTypeError",
     "document_storage_bucket",
     "document_storage_endpoint_url",
     "document_storage_key_prefix",

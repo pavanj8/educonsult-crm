@@ -62,7 +62,6 @@ __all__ = [
     "FILE_TYPE_NOT_ALLOWED_DETAIL",
     "MAX_FILE_BYTES",
     "MAX_FILE_SIZE_MB",
-    "UnsupportedFileTypeError",
     "validate_file_size",
     "validate_file_type",
 ]
@@ -105,19 +104,13 @@ FILE_TOO_LARGE_DETAIL = (
 
 #: Error message returned on file-type rejection (HTTP 415).
 #: Kept generic on purpose so we don't echo the allow-list back to the
-#: client (the client already knows what types the UI accepts).
+#: client (the client already knows what types the UI accepts). The
+#: wording matches :data:`ALLOWED_EXTENSIONS` exactly — Requirements
+#: §5 names "PDF/JPG/PNG/DOCX", and the validator additionally accepts
+#: the ``.jpeg`` synonym for ``.jpg``, so both spellings appear here.
 FILE_TYPE_NOT_ALLOWED_DETAIL = (
-    "Unsupported file type. Only PDF, JPG, PNG, and DOCX files are accepted."
+    "Unsupported file type. Only PDF, JPG/JPEG, PNG, and DOCX files are accepted."
 )
-
-
-class UnsupportedFileTypeError(ValueError):
-    """Raised by :func:`validate_file_type` for non-HTTP callers.
-
-    The router translates this into HTTP 415; tests that exercise the
-    validation helpers directly can assert on the exception type and
-    message instead of constructing an HTTP request.
-    """
 
 
 def _extension_of(filename: str | None) -> str:
