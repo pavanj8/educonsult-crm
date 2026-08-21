@@ -162,6 +162,19 @@ not just general code-quality instinct:
 You MAY also read the full files under `backend/` and `frontend/` for
 context beyond the diff hunks shown above.
 
+## If the diff is EMPTY (no changes vs main)
+An empty diff is NOT automatically a failure. First decide whether the issue's
+acceptance criteria are ALREADY fully satisfied by code that exists on `main`
+(read the relevant backend/frontend files and tests to check each criterion):
+- If they ARE fully met: return **PASS**. Add one non-HIGH note citing the exact
+  existing files/tests that satisfy each criterion. "No code needed" is a valid,
+  correct outcome when the requirement is demonstrably already implemented — do
+  NOT fail it on traceability/"no PR" grounds alone.
+- If they are NOT met (the feature, endpoint, or tests the issue asks for do not
+  exist, or exist only partially): return **FAIL** — the deliverable is missing.
+Judge by whether the requirement is actually satisfied in the codebase, not by
+whether this particular iteration produced a commit.
+
 This is review iteration {iteration} for this issue.
 
 ## Finishing — deliver your report via the tool
