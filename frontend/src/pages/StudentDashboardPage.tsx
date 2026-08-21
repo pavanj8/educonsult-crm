@@ -9,7 +9,7 @@ import {
 } from '../data/demoMasterData'
 import { useApplications } from '../hooks/useApplications'
 import { useCreateApplication } from '../hooks/useCreateApplication'
-import { PIPELINE_STAGE_LABELS } from '../types/application'
+import { STAGE_LABELS } from '../types/application'
 
 function formatDate(iso: string): string {
   const date = new Date(iso)
@@ -142,7 +142,7 @@ export default function StudentDashboardPage() {
                         className="application-table__stage"
                         data-testid={`application-stage-${application.id}`}
                       >
-                        {PIPELINE_STAGE_LABELS[application.stage]}
+                        {STAGE_LABELS[application.stage]}
                       </span>
                     </td>
                     <td>{formatDate(application.created_at)}</td>

@@ -309,6 +309,50 @@ def test_queue_respects_tenant_isolation(client, db_session, override_authentica
     assert data[0]["student_email"] == "t1.student@example.test"
 
 
+def test_queue_respects_branch_isolation(client, db_session, override_authenticated_user):
+    """Counselor only sees applications whose student belongs to their branch.
+
+    Even when an application is assigned to the counselor directly
+    (``assigned_counselor_id`` matches), an application whose student
+    belongs to a different branch must NOT appear in the queue. The
+    assigned_counselor_id filter alone is insufficient because the
+    assigned_counselor_id identifies the owner, not the branch; branch
+    scope is enforced by joining on the student's ``branch_id``.
+    """
+    counselor = _seed_counselor(db_session, branch_id=1)
+    same_branch_student = _seed_student(
+        db_session, branch_id=1, email="same.branch@example.test"
+    )
+    other_branch_student = _seed_student(
+        db_session, branch_id=2, email="other.branch@example.test"
+    )
+
+    same_branch_app = seed_application(
+        db_session,
+        student_id=same_branch_student,
+        assigned_counselor_id=counselor,
+    )
+    other_branch_app = seed_application(
+        db_session,
+        student_id=other_branch_student,
+        assigned_counselor_id=counselor,
+    )
+
+    override_authenticated_user(
+        make_authenticated_user(
+            Role.COUNSELOR, user_id=counselor, tenant_id=1, branch_id=1
+        )
+    )
+
+    response = client.get("/counselor/queue")
+
+    assert response.status_code == 200
+    data = response.json()
+    returned_ids = {app["id"] for app in data}
+    assert same_branch_app.id in returned_ids
+    assert other_branch_app.id not in returned_ids
+
+
 def test_queue_returns_empty_for_counselor_with_no_applications(client, db_session, override_authenticated_user):
     """Counselor with no assigned applications gets empty list."""
     counselor = _seed_counselor(db_session)

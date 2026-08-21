@@ -224,7 +224,15 @@ def test_application_enrollment_date_is_persisted(db_session):
     db_session.commit()
     db_session.refresh(application)
 
-    assert application.enrollment_date == enrolled_at
+    # Compare wall-clock-equivalent timestamps. SQLite (the test backend)
+    # does not preserve tzinfo on roundtrip; production Postgres with
+    # DateTime(timezone=True) does. Normalising to UTC then dropping the
+    # tzinfo makes the assertion portable across both.
+    stored = application.enrollment_date
+    if stored.tzinfo is None:
+        stored = stored.replace(tzinfo=timezone.utc)
+    expected = enrolled_at.astimezone(timezone.utc).replace(tzinfo=None)
+    assert stored.replace(tzinfo=None) == expected
 
 
 def test_application_assigned_counselor_defaults_to_none(db_session):

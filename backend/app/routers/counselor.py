@@ -26,22 +26,40 @@ def _counselor_base_query(
     db: Session,
     current_user: AuthenticatedUser,
 ) -> select:
-    """Build a tenant-scoped base query for the counselor's queue.
+    """Build a tenant- and branch-scoped base query for the counselor's queue.
 
     Tenant scoping goes through :func:`apply_tenant_scope` (ADR-0004) so the
-    multi-tenant invariant is enforced in one place; the per-counselor
-    ``assigned_counselor_id`` filter is what enforces "this counselor's
-    queue". Branch scoping is implicit because a counselor's
-    ``assigned_counselor_id`` only matches applications within the branches
-    they have access to (the row is owned by one branch's round-robin
-    assignment).
+    multi-tenant invariant is enforced in one place. The per-counselor
+    ``assigned_counselor_id`` filter narrows to "this counselor's queue",
+    and the inner join on the student :class:`User` enforces the
+    branch scope: the application is only returned when the student's
+    ``branch_id`` matches the counselor's ``branch_id``.
+
+    Branch scope is required (not implicit) because a counselor's
+    ``assigned_counselor_id`` only identifies the owner, not the branch
+    the application was created in. Without the join, a counselor who
+    happens to be assigned an out-of-branch application (manual
+    reassignment bug, data import, etc.) would see rows outside their
+    branch. The join guarantees the counselor never sees another
+    branch's students even if the assigned_counselor_id filter passes.
     """
+    if current_user.branch_id is None:
+        # A counselor without a branch_id has no scope to enforce; refuse
+        # rather than returning an over-broad result set.
+        raise TenantScopeError(
+            f"User with role {current_user.role.value} requires branch_id for branch-scoped queries"
+        )
+
     statement: select = apply_tenant_scope(
         select(Application).order_by(Application.id),
         Application,
         current_user,
     )
-    return statement.where(Application.assigned_counselor_id == current_user.id)
+    return (
+        statement.join(User, User.id == Application.student_id, isouter=False)
+        .where(Application.assigned_counselor_id == current_user.id)
+        .where(User.branch_id == current_user.branch_id)
+    )
 
 
 @router.get("/queue", response_model=list[ApplicationWithStudentResponse])
@@ -69,11 +87,7 @@ def get_counselor_queue(
 
         if search:
             search_term = f"%{search.strip()}%"
-            query = query.join(
-                User,
-                User.id == Application.student_id,
-                isouter=True,
-            ).where(
+            query = query.where(
                 (User.name.ilike(search_term)) | (User.email.ilike(search_term))
             )
 
@@ -82,6 +96,8 @@ def get_counselor_queue(
         # Build response with student details. Skip applications where the
         # student row is missing (FK CASCADE deleted or orphan insertion) so
         # the frontend receives clean rows instead of synthesised placeholders.
+        # The branch-scope inner join in _counselor_base_query already
+        # guarantees a populated User for every returned application.
         result: list[ApplicationWithStudentResponse] = []
         for app in applications:
             student = db.get(User, app.student_id)

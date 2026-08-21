@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 
 import {
   fetchCounselorQueue,
@@ -13,7 +14,7 @@ interface UseCounselorQueueResult {
   counts: StageCount
   countsLoading: boolean
   filter: CounselorQueueFilter
-  setFilter: (filter: CounselorQueueFilter) => void
+  setFilter: Dispatch<SetStateAction<CounselorQueueFilter>>
   refetch: () => Promise<void>
 }
 
