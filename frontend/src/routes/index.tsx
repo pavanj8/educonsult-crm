@@ -10,13 +10,20 @@ import StaffPage from '../pages/StaffPage'
 import StudentDashboardPage from '../pages/StudentDashboardPage'
 import TenantsPage from '../pages/TenantsPage'
 import VerifierDashboardPage from '../pages/VerifierDashboardPage'
+import CounselorDashboardPage from '../pages/CounselorDashboardPage'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
+import CounselorRoute from './CounselorRoute'
 import ProtectedRoute, { LOGIN_PATH } from './ProtectedRoute'
 import StaffManagerRoute from './StaffManagerRoute'
 import StudentRoute from './StudentRoute'
 import SuperAdminRoute from './SuperAdminRoute'
 import VerifierRoute from './VerifierRoute'
-import { REGISTER_PATH, STUDENT_DASHBOARD_PATH, VERIFIER_DASHBOARD_PATH } from './paths'
+import {
+  COUNSELOR_DASHBOARD_PATH,
+  REGISTER_PATH,
+  STUDENT_DASHBOARD_PATH,
+  VERIFIER_DASHBOARD_PATH,
+} from './paths'
 
 export function AppRoutes() {
   return (
@@ -40,6 +47,9 @@ export function AppRoutes() {
           </Route>
           <Route element={<VerifierRoute />}>
             <Route path={VERIFIER_DASHBOARD_PATH.slice(1)} element={<VerifierDashboardPage />} />
+          </Route>
+          <Route element={<CounselorRoute />}>
+            <Route path={COUNSELOR_DASHBOARD_PATH.slice(1)} element={<CounselorDashboardPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
