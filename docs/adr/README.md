@@ -7,12 +7,12 @@ decisions for the product (the multi-tenant educational consultancy
 management SaaS — see `../requirements.md`, `../journeys.md`,
 `../epics.md`) and for the agent harness that builds it.
 
-`../../harness-demo/adr/` is a **frozen, historical** log from when the
-harness was being designed/validated against a disposable toy app, before
-it graduated to building this product directly (see
-[ADR-0008](0008-agent-harness-adopted-for-delivery.md)). It's kept for
-context on *why* the harness is designed the way it is; it does not
-receive new entries.
+The harness was originally designed/validated against a disposable toy app
+kept under `harness-demo/`, before it graduated to building this product
+directly (see [ADR-0008](0008-agent-harness-adopted-for-delivery.md)). That
+folder was **removed on 2026-08-21** during template/cleanup — a few early
+ADRs (0005–0009) still cite `harness-demo/adr/*` as historical provenance;
+those links are dangling by design and are not restored.
 
 ## Process
 
