@@ -49,6 +49,19 @@ def _q(cmd: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
 
 
+def _has_changes() -> bool:
+    """True if the Dev agent produced any file change in the working tree."""
+    return bool(_q(["git", "status", "--porcelain"]).stdout.strip())
+
+
+def _verify(py: str, issue_number: int, iteration: int) -> bool:
+    """Run Test + Review; return True only if neither failed (labels they set)."""
+    _run([py, str(AGENTS / "test_agent.py"), str(issue_number), "--iteration", str(iteration)])
+    _run([py, str(AGENTS / "review_agent.py"), str(issue_number), "--iteration", str(iteration)])
+    labels = ticket_utils.get_issue(issue_number).get("label_names", [])
+    return not ("agent:test-fail" in labels or "agent:review-fail" in labels)
+
+
 def _checkout_fresh_main() -> None:
     """Move to an up-to-date main without destroying uncommitted work.
 
@@ -98,8 +111,29 @@ def _run_one(repo: str, issue_number: int, iteration: int | None, *, with_verify
     _run(["git", "checkout", "-B", branch])
 
     py = sys.executable
+    # Dev exits non-zero when its pytest run FAILS -> a genuine failure.
     if _run([py, str(AGENTS / "dev_agent.py"), str(issue_number), "--iteration", str(iteration)]) != 0:
-        print("[run_local] Dev agent failed — marking needs-rework.")
+        print("[run_local] Dev agent failed (tests failed or hard error) — marking needs-rework.")
+        ticket_utils.add_label(issue_number, "agent:needs-rework")
+        return 1
+
+    # Empty diff is NOT automatically a failure: the requirement may already be
+    # satisfied by existing code, or Dev may have genuinely failed to implement it
+    # (the #180 case). Dev doesn't get to decide — Test + Review do (docs/adr/0031).
+    if not _has_changes():
+        print("[run_local] Dev produced NO code changes — asking Test + Review whether the requirement is already met.")
+        if not with_verify:
+            print("[run_local] can't judge an empty diff without --with-verify — marking needs-rework.")
+            ticket_utils.add_label(issue_number, "agent:needs-rework")
+            return 1
+        if _verify(py, issue_number, iteration):
+            print(f"[run_local] Test + Review pass with no changes — requirement already satisfied; closing #{issue_number}.")
+            _q(["gh", "issue", "close", str(issue_number), "-R", repo, "--reason", "completed",
+                "--comment", "Closed by run_local (docs/adr/0031): no code change was needed — the "
+                "requirement is already satisfied by existing code, independently confirmed by the "
+                "Test and Review agents."])
+            return 0
+        print("[run_local] empty diff AND verification failed — genuine miss; marking needs-rework.")
         ticket_utils.add_label(issue_number, "agent:needs-rework")
         return 1
 
@@ -110,14 +144,10 @@ def _run_one(repo: str, issue_number: int, iteration: int | None, *, with_verify
     print("[run_local] checks passed.")
 
     if with_verify:
-        _run([py, str(AGENTS / "test_agent.py"), str(issue_number), "--iteration", str(iteration)])
-        _run([py, str(AGENTS / "review_agent.py"), str(issue_number), "--iteration", str(iteration)])
-        # Gate on the agents' verdicts (labels they set) — do NOT merge a ticket
-        # that failed Test or Review, matching the cloud finalize (docs/adr/0031).
-        labels = ticket_utils.get_issue(issue_number).get("label_names", [])
-        if "agent:test-fail" in labels or "agent:review-fail" in labels:
-            failed = [n for n in ("agent:test-fail", "agent:review-fail") if n in labels]
-            print(f"[run_local] verification FAILED ({', '.join(failed)}) — marking needs-rework, not merging.")
+        # Gate merge on the agents' verdicts — do NOT merge a ticket that failed
+        # Test or Review, matching the cloud finalize (docs/adr/0031).
+        if not _verify(py, issue_number, iteration):
+            print("[run_local] verification FAILED — marking needs-rework, not merging.")
             ticket_utils.add_label(issue_number, "agent:needs-rework")
             return 1
         print("[run_local] Test + Review passed.")
