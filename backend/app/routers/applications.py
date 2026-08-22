@@ -31,6 +31,7 @@ from app.schemas.application import (
     StageHistoryEntry,
 )
 from app.services.counselor_assignment import assign_counselor_round_robin
+from app.services.notifications import notify_application_stage_changed
 from app.services.stage_progression import (
     InvalidStageTransitionError,
     validate_transition,
@@ -414,6 +415,11 @@ def advance_application_stage(
     )
     db.add(history_entry)
 
+    notify_application_stage_changed(
+        db, application=application, from_stage=from_stage, to_stage=to_stage,
+        actor_user_id=current_user.id,
+    )
+
     try:
         db.commit()
     except OperationalError:
@@ -496,6 +502,11 @@ def mark_application_enrolled(
     )
     db.add(history_entry)
 
+    notify_application_stage_changed(
+        db, application=application, from_stage=from_stage, to_stage=to_stage,
+        actor_user_id=current_user.id,
+    )
+
     try:
         db.commit()
     except OperationalError:
@@ -577,6 +588,11 @@ def mark_application_rejected(
     )
     db.add(history_entry)
 
+    notify_application_stage_changed(
+        db, application=application, from_stage=from_stage, to_stage=to_stage,
+        actor_user_id=current_user.id,
+    )
+
     try:
         db.commit()
     except OperationalError:
@@ -656,6 +672,11 @@ def mark_application_withdrawn(
         reason=payload.reason,
     )
     db.add(history_entry)
+
+    notify_application_stage_changed(
+        db, application=application, from_stage=from_stage, to_stage=to_stage,
+        actor_user_id=current_user.id,
+    )
 
     try:
         db.commit()
