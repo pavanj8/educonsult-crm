@@ -7,7 +7,7 @@ import {
 } from 'react'
 
 import { useTenantBranding } from '../hooks/useTenantBranding'
-import { pickContrastColor, type BrandColor } from './brandingColor'
+import { pickContrastColor } from './brandingColor'
 
 type BrandingContextValue = {
   /** Tenant id used to load branding — null when unauthenticated. */
@@ -21,9 +21,14 @@ type BrandingContextValue = {
   /**
    * Canonical ``#RRGGBB`` brand color set as a tenant profile field,
    * or null when the tenant has not picked one yet. The app shell
-   * falls back to the platform-default chrome in that case.
+   * falls back to the platform-default chrome in that case. The
+   * backend schema (``app/schemas/tenant.py``) validates this against
+   * ``^#[0-9A-Fa-f]{6}$`` on write so the value reaching the
+   * frontend is always a 6-digit hex string (the TypeScript type
+   * here is intentionally ``string`` because template-literal types
+   * cannot fully express the 6-digit regex yet).
    */
-  brandColor: BrandColor | null
+  brandColor: string | null
   /**
    * Recommended text color (``#ffffff`` or ``#111827``) for content
    * rendered on top of ``brandColor``. Computed from the supplied
