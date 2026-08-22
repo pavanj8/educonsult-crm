@@ -113,23 +113,28 @@ def prior_iteration_feedback(issue_number: int, limit_chars: int = 12000) -> str
 def epic_sibling_status(issue: dict) -> str:
     """Sibling tickets in the same epic and whether each is already merged, so
     the Dev Agent doesn't re-implement models/migrations a prior ticket already
-    landed on main (docs/adr/0025; the #169 "re-added StageHistory" failure)."""
-    body = issue.get("body") or ""
-    m = re.search(r"[Pp]art of #(\d+)", body)
+    landed on main (docs/adr/0025; the #169 "re-added StageHistory" failure).
+
+    Epics are grouped by the ``[E<n>]`` prefix every task title carries -- no
+    separate epic *issue* is needed (docs/adr/0032). Works for legacy tasks too,
+    since they already carry the same title tag.
+    """
+    title = issue.get("title") or ""
+    m = re.match(r"\s*\[(E\d+)\]", title)
     if not m:
         return ""
     epic = m.group(1)
     try:
         items = json.loads(_run([
             "gh", "issue", "list", "--state", "all", "--limit", "300",
-            "--json", "number,title,state,body",
+            "--json", "number,title,state",
         ]))
     except (GitHubCliError, json.JSONDecodeError):
         return ""
-    pat = re.compile(rf"[Pp]art of #{epic}(?!\d)")
+    pat = re.compile(rf"^\s*\[{re.escape(epic)}\]")
     sibs = [
         it for it in items
-        if it.get("number") != issue.get("number") and pat.search(it.get("body") or "")
+        if it.get("number") != issue.get("number") and pat.search(it.get("title") or "")
     ]
     if not sibs:
         return ""

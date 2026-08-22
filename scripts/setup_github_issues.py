@@ -616,44 +616,19 @@ def main():
         num = ensure_milestone(title, desc)
         milestone_numbers[phase] = num
 
-    print("Creating epic issues...")
-    epic_issue_numbers = {}
+    # Epics are NOT created as issues (docs/adr/0032): they never auto-close and
+    # add tracking noise. Each task carries the epic in its `[E<n>]` title prefix
+    # (the harness groups siblings by that tag) and traces to the epic in its
+    # body; docs/epics.md is the human-readable epic record.
+    print("Creating task issues (epics tracked by the [E<n>] title tag, not issues)...")
+    epic_task_numbers = {e["key"]: [] for e in EPICS}
+    title_map = {k: v[0] for k, v in PHASES.items()}
     for epic in EPICS:
-        labels = f"epic,area:{epic['area']},phase:{epic['phase']}"
-        body = (
-            f"**Traceability:** {epic['trace']}\n\n"
-            f"**Description:** {epic['desc']}\n\n"
-            f"_Tasks will be linked below as they are created._\n\n"
-            f"{DOD_CHECKLIST}"
-        )
-        cmd = [
-            "gh", "issue", "create", "-R", REPO,
-            "--title", f"[EPIC] {epic['key']}: {epic['title']}",
-            "--body", body,
-            "--label", labels,
-        ]
-        if milestone_numbers.get(epic["phase"]):
-            title_map = {k: v[0] for k, v in PHASES.items()}
-            cmd += ["--milestone", title_map[epic["phase"]]]
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if r.returncode != 0:
-            print(f"  ! failed epic {epic['key']}: {r.stderr.strip()}", file=sys.stderr)
-            continue
-        url = r.stdout.strip()
-        number = int(url.rstrip("/").split("/")[-1])
-        epic_issue_numbers[epic["key"]] = number
-        print(f"  {epic['key']} -> #{number}")
-
-    print("Creating task issues...")
-    epic_task_numbers = {k: [] for k in epic_issue_numbers}
-    for epic in EPICS:
-        epic_num = epic_issue_numbers.get(epic["key"])
-        if not epic_num:
-            continue
         for task_title, task_desc in epic["tasks"]:
             labels = f"task,area:{epic['area']},phase:{epic['phase']}"
             body = (
-                f"Part of #{epic_num} ({epic['key']}: {epic['title']})\n\n"
+                f"Part of epic {epic['key']}: {epic['title']}\n"
+                f"_Traceability: {epic['trace']}_\n\n"
                 f"{task_desc}\n\n{DOD_CHECKLIST}"
             ).strip()
             cmd = [
@@ -662,40 +637,18 @@ def main():
                 "--body", body,
                 "--label", labels,
             ]
-            title_map = {k: v[0] for k, v in PHASES.items()}
             if milestone_numbers.get(epic["phase"]):
                 cmd += ["--milestone", title_map[epic["phase"]]]
             r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode != 0:
                 print(f"  ! failed task '{task_title}': {r.stderr.strip()}", file=sys.stderr)
                 continue
-            url = r.stdout.strip()
-            number = int(url.rstrip("/").split("/")[-1])
+            number = int(r.stdout.strip().rstrip("/").split("/")[-1])
             epic_task_numbers[epic["key"]].append(number)
-
-    print("Updating epic bodies with task checklists...")
-    for epic in EPICS:
-        epic_num = epic_issue_numbers.get(epic["key"])
-        if not epic_num:
-            continue
-        task_nums = epic_task_numbers.get(epic["key"], [])
-        checklist = "\n".join(f"- [ ] #{n}" for n in task_nums)
-        body = (
-            f"**Traceability:** {epic['trace']}\n\n"
-            f"**Description:** {epic['desc']}\n\n"
-            f"## Tasks\n{checklist}\n\n"
-            f"An epic is Done only once every task above is Done.\n\n"
-            f"{DOD_CHECKLIST}"
-        )
-        r = subprocess.run(
-            ["gh", "issue", "edit", str(epic_num), "-R", REPO, "--body", body],
-            capture_output=True, text=True,
-        )
-        if r.returncode != 0:
-            print(f"  ! failed updating epic #{epic_num}: {r.stderr.strip()}", file=sys.stderr)
+            print(f"  [{epic['key']}] {task_title} -> #{number}")
 
     print("Done.")
-    print(json.dumps({"epics": epic_issue_numbers, "tasks": epic_task_numbers}, indent=2))
+    print(json.dumps({"tasks": epic_task_numbers}, indent=2))
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@
 Status: **Approved**. Granularity increases strictly at each level: **Requirements (11 sections) → Journeys (46) → Epics (53) → Tasks (193)**. Nearly every epic traces to exactly one journey in [`journeys.md`](./journeys.md); a handful of cross-cutting infrastructure epics trace directly to a requirements section instead, since they underpin many journeys rather than fulfilling one. Each epic is broken into small, atomic Task issues in GitHub (one model / one endpoint / one UI component / one test suite per task). GitHub is the source of truth for live status; this document is the traceable planning record generated from `scripts/setup_github_issues.py`.
 
 Repo: [`pavanj8/educonsult-crm`](https://github.com/pavanj8/educonsult-crm)
-Labels: `epic` / `task` + `area:*` + `phase:mvp|phase-2|phase-3`
+Epics are **not** GitHub issues — each task carries its epic in its `[E<n>]` title tag, and this document is the human-readable epic record ([ADR-0032](./adr/0032-epics-are-title-tags-not-issues.md)).
+Labels: `task` + `area:*` + `phase:mvp|phase-2|phase-3`
 Milestones: Phase 1 - MVP, Phase 2, Phase 3
 
 **Totals**: 11 requirement sections → 46 journeys → 53 epics → 193 tasks
