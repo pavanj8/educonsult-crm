@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { isApiError } from '../api/client'
-import { REGISTER_PATH } from '../routes/paths'
+import { REGISTER_PATH, FORGOT_PASSWORD_PATH } from '../routes/paths'
 import { useAuth } from '../store/authStore'
 
 function postLoginPath(location: ReturnType<typeof useLocation>): string {
@@ -115,6 +115,11 @@ export default function LoginPage() {
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+        <p className="login-page__footer">
+          <Link to={FORGOT_PASSWORD_PATH} className="login-page__link">
+            Forgot password?
+          </Link>
+        </p>
         <p className="login-page__footer">
           New student?{' '}
           <Link to={REGISTER_PATH} className="login-page__link">
