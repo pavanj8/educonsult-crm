@@ -58,12 +58,20 @@ from fastapi import HTTPException, status
 __all__ = [
     "ALLOWED_CONTENT_TYPES",
     "ALLOWED_EXTENSIONS",
+    "ALLOWED_LOGO_CONTENT_TYPES",
+    "ALLOWED_LOGO_EXTENSIONS",
     "FILE_TOO_LARGE_DETAIL",
     "FILE_TYPE_NOT_ALLOWED_DETAIL",
+    "LOGO_FILE_TOO_LARGE_DETAIL",
+    "LOGO_FILE_TYPE_NOT_ALLOWED_DETAIL",
+    "LOGO_MAX_FILE_BYTES",
+    "LOGO_MAX_FILE_SIZE_MB",
     "MAX_FILE_BYTES",
     "MAX_FILE_SIZE_MB",
     "validate_file_size",
     "validate_file_type",
+    "validate_logo_file_size",
+    "validate_logo_file_type",
 ]
 
 
@@ -110,6 +118,49 @@ FILE_TOO_LARGE_DETAIL = (
 #: the ``.jpeg`` synonym for ``.jpg``, so both spellings appear here.
 FILE_TYPE_NOT_ALLOWED_DETAIL = (
     "Unsupported file type. Only PDF, JPG/JPEG, PNG, and DOCX files are accepted."
+)
+
+#: Maximum allowed logo upload size, in bytes (2 MB — sufficient for
+#: tenant branding logos that are displayed at typical web sizes; sized
+#: smaller than the 10 MB student-document cap because logos do not
+#: need to be high-resolution photographs).
+LOGO_MAX_FILE_BYTES: int = 2 * 1024 * 1024
+
+#: Human-readable version of :data:`LOGO_MAX_FILE_BYTES` for error messages.
+LOGO_MAX_FILE_SIZE_MB: int = 2
+
+#: Filename extensions accepted by the logo upload endpoint (lowercase,
+#: with dot). Tenant logos are raster images (PNG, JPEG, WebP). SVG is
+#: intentionally excluded because SVG is XML and can carry scripts —
+#: serving an attacker-controlled SVG from a CDN-backed URL is a known
+#: XSS vector that we explicitly avoid in v1.
+ALLOWED_LOGO_EXTENSIONS: frozenset[str] = frozenset(
+    {".png", ".jpg", ".jpeg", ".webp"}
+)
+
+#: ``Content-Type`` values accepted by the logo upload endpoint, keyed
+#: by the lowercase extension the value corresponds to. The router
+#: cross-checks the multipart ``content_type`` against this map so a
+#: malicious client cannot bypass the extension check by claiming
+#: e.g. ``text/plain`` for a non-image renamed to ``.png``.
+ALLOWED_LOGO_CONTENT_TYPES: dict[str, frozenset[str]] = {
+    ".png": frozenset({"image/png"}),
+    ".jpg": frozenset({"image/jpeg"}),
+    ".jpeg": frozenset({"image/jpeg"}),
+    ".webp": frozenset({"image/webp"}),
+}
+
+#: Error message returned on logo size-cap violation (HTTP 413).
+LOGO_FILE_TOO_LARGE_DETAIL = (
+    "Uploaded logo exceeds the maximum allowed size of "
+    f"{LOGO_MAX_FILE_SIZE_MB} MB"
+)
+
+#: Error message returned on logo file-type rejection (HTTP 415). Kept
+#: generic on purpose so we don't echo the allow-list back to the
+#: client (the client already knows what types the UI accepts).
+LOGO_FILE_TYPE_NOT_ALLOWED_DETAIL = (
+    "Unsupported logo file type. Only PNG, JPG/JPEG, and WebP images are accepted."
 )
 
 
@@ -193,6 +244,65 @@ def validate_file_type(
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=FILE_TYPE_NOT_ALLOWED_DETAIL,
+        )
+
+    return extension
+
+
+def validate_logo_file_size(size_bytes: int) -> None:
+    """Raise HTTP 413 if ``size_bytes`` exceeds :data:`LOGO_MAX_FILE_BYTES`.
+
+    The check is strict (>), so an upload of exactly
+    :data:`LOGO_MAX_FILE_BYTES` is accepted; the first rejected byte
+    is one past the cap. Mirrors :func:`validate_file_size` but uses
+    the smaller logo-specific cap (2 MB vs. the 10 MB document cap).
+    """
+    if size_bytes > LOGO_MAX_FILE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=LOGO_FILE_TOO_LARGE_DETAIL,
+        )
+
+
+def _check_logo_extension(filename: str | None) -> str:
+    """Return the lowercase extension or raise HTTP 415 for the logo endpoint.
+
+    A missing extension, an empty extension, or an extension outside
+    :data:`ALLOWED_LOGO_EXTENSIONS` all raise. The caller is expected
+    to have already confirmed ``filename`` is non-empty (the router
+    rejects a missing ``file.filename`` earlier with a 400).
+    """
+    extension = _extension_of(filename)
+    if extension not in ALLOWED_LOGO_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=LOGO_FILE_TYPE_NOT_ALLOWED_DETAIL,
+        )
+    return extension
+
+
+def validate_logo_file_type(
+    *,
+    filename: str | None,
+    content_type: str | None,
+) -> str:
+    """Validate logo ``filename`` / ``content_type`` against the logo allow-list.
+
+    Mirrors :func:`validate_file_type` but uses the logo-specific
+    allow-list (:data:`ALLOWED_LOGO_EXTENSIONS`,
+    :data:`ALLOWED_LOGO_CONTENT_TYPES`). SVG is intentionally rejected
+    because SVG is XML and can carry scripts — serving an
+    attacker-controlled SVG from a CDN-backed URL is a known XSS
+    vector that we explicitly avoid in v1.
+    """
+    extension = _check_logo_extension(filename)
+
+    normalized_content_type = (content_type or "").strip().lower()
+    allowed_types = ALLOWED_LOGO_CONTENT_TYPES[extension]
+    if normalized_content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=LOGO_FILE_TYPE_NOT_ALLOWED_DETAIL,
         )
 
     return extension
