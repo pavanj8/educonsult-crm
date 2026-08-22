@@ -38,6 +38,24 @@ def _restore_database_module_after_reload() -> Generator[None, None, None]:
         setattr(_database_module, name, obj)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter_between_tests() -> Generator[None, None, None]:
+    """Reset the in-process auth rate limiter between tests (E7; Journey J46).
+
+    The limiter is a module-level singleton shared by every ``TestClient``
+    boundary test (the ``client`` fixture reuses one ``FastAPI`` app
+    instance for the lifetime of the session). Without this reset a
+    test that legitimately trips the cap would leak its bucket into the
+    next test, masking regressions / flaking unrelated tests. The reset
+    runs *after* the test body so a test can observe the bucket before
+    it is cleared.
+    """
+    yield
+    from app.auth.rate_limit import reset_for_tests
+
+    reset_for_tests()
+
+
 def make_auth_headers(access_token: str = "test-access-token") -> dict[str, str]:
     """Return Authorization headers for API requests (JWT verification wired in E5)."""
     return {"Authorization": f"Bearer {access_token}"}

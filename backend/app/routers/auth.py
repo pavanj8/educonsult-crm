@@ -26,6 +26,12 @@ from app.auth.email_uniqueness import (
 )
 from app.auth.master_data_validation import validate_target_master_data
 from app.auth.password_policy import validate_password_strength
+from app.auth.rate_limit import (
+    ENDPOINT_FORGOT_PASSWORD,
+    ENDPOINT_REGISTER_STUDENT,
+    login_rate_limit,
+    rate_limit,
+)
 from app.db.database import get_db
 from app.email.password_reset import build_password_reset_url, send_password_reset_email
 from app.email.service import EmailDeliveryError
@@ -58,6 +64,17 @@ _PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
 _INVALID_RESET_TOKEN_DETAIL = "Invalid or expired reset token"
 _PASSWORD_RESET_GENERIC_MESSAGE = "Your password has been reset successfully."
 
+# Rate-limit budgets (E7; Journey J46). Tuned to be tight enough to
+# stop brute-force / credential-stuffing yet generous enough that the
+# documented E2E flows (login, register, forgot password) still pass
+# without hitting the cap.
+_LOGIN_MAX_REQUESTS = 5
+_LOGIN_WINDOW_SECONDS = 60
+_REGISTER_STUDENT_MAX_REQUESTS = 5
+_REGISTER_STUDENT_WINDOW_SECONDS = 60
+_FORGOT_PASSWORD_MAX_REQUESTS = 5
+_FORGOT_PASSWORD_WINDOW_SECONDS = 60
+
 
 def _user_to_authenticated_user(user: User) -> AuthenticatedUser:
     return AuthenticatedUser(
@@ -69,7 +86,19 @@ def _user_to_authenticated_user(user: User) -> AuthenticatedUser:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(
+    payload: LoginRequest,
+    db: Session = Depends(get_db),
+    _rate_limit: Annotated[  # noqa: B008 — FastAPI consumes the dep
+        None,
+        Depends(
+            login_rate_limit(
+                max_requests=_LOGIN_MAX_REQUESTS,
+                window_seconds=_LOGIN_WINDOW_SECONDS,
+            )
+        ),
+    ] = None,
+) -> TokenResponse:
     """Authenticate with email and password; return JWT access and refresh tokens."""
     normalized_email = payload.email.strip().lower()
     try:
@@ -150,6 +179,15 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     "/register-student",
     response_model=RegisterStudentResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(
+            rate_limit(
+                ENDPOINT_REGISTER_STUDENT,
+                max_requests=_REGISTER_STUDENT_MAX_REQUESTS,
+                window_seconds=_REGISTER_STUDENT_WINDOW_SECONDS,
+            )
+        )
+    ],
 )
 def register_student(
     payload: RegisterStudentRequest,
@@ -241,7 +279,19 @@ def register_student(
     )
 
 
-@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    dependencies=[
+        Depends(
+            rate_limit(
+                ENDPOINT_FORGOT_PASSWORD,
+                max_requests=_FORGOT_PASSWORD_MAX_REQUESTS,
+                window_seconds=_FORGOT_PASSWORD_WINDOW_SECONDS,
+            )
+        )
+    ],
+)
 def forgot_password(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),
