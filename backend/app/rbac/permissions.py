@@ -88,6 +88,16 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     ),
     Role.CONSULTANCY_OWNER: frozenset(
         {
+            # ``TENANT_UPDATE`` is intentionally granted here solely so
+            # Journey J3 (E10 task #110 ``PATCH /tenants/{id}/branding``
+            # and E10 task #111 ``POST /tenants/{id}/logo``) can succeed
+            # for the owner of their *own* tenant. Every endpoint that
+            # relies on this permission MUST enforce its own tenant
+            # scope (e.g. via the cross-tenant 404 guard in
+            # ``app.routers.tenants._load_tenant_for_logo_upload``);
+            # future ticket work that wants to reuse ``TENANT_UPDATE``
+            # for a wider mutation surface must add its own tenant
+            # scoping rather than rely on this grant.
             Permission.TENANT_UPDATE,
             Permission.BRANCH_CREATE,
             Permission.BRANCH_READ,

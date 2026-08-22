@@ -1,13 +1,34 @@
-"""Pydantic schemas for tenant management endpoints (E8; Journey J1; E10 task #109)."""
+"""Pydantic schemas for tenant management endpoints (E8; Journey J1; E10 branding).
+
+* E10 task #109 owns the three new columns on ``Tenant``
+  (``logo_url`` / ``brand_color`` / ``currency``) and surfaces them
+  on ``TenantResponse``.
+* E10 task #110 owns ``TenantBrandingUpdateRequest`` and the
+  ``PATCH /tenants/{id}/branding`` endpoint that consumes it.
+* E10 task #111 owns the separate logo-upload endpoint and the
+  storage backend that hands back a signed URL for ``logo_url``.
+"""
 
 import re
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.i18n.currency import InvalidCurrencyCodeError, normalize_currency_code
+
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Canonical CSS hex colour: leading "#", exactly six lowercase or uppercase hex digits.
 _BRAND_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+# The logo URL is the opaque object key returned by the E10 task #111
+# logo-upload endpoint. The endpoint runs against S3/MinIO whose URLs
+# are https:// — accepting ``http://`` here would let a JWT-compromised
+# owner downgrade their tenant's logo to a mixed-content / cleartext
+# URL. The schema therefore requires ``https://`` and leaves any
+# deeper host allow-listing (e.g. pinning to the configured bucket
+# CName) to the upload endpoint that produces the key.
+_LOGO_URL_PATTERN = re.compile(r"^https://.+", re.IGNORECASE)
 
 
 class TenantCreateRequest(BaseModel):
@@ -54,6 +75,93 @@ class TenantResponse(BaseModel):
     slug: str
     logo_url: str | None = None
     brand_color: str | None = None
+    # E10 task #109: ``currency`` is NOT NULL on the row (server default
+    # ``"INR"``) and is therefore always populated on the response.
     currency: str
     created_at: datetime
     updated_at: datetime
+
+
+class TenantBrandingUpdateRequest(BaseModel):
+    """Partial update payload for ``PATCH /tenants/{id}/branding`` (E10, J3).
+
+    Every field is optional; the endpoint applies only the fields the
+    caller explicitly supplied (``model_dump(exclude_unset=True)``). At
+    least one field must be present, otherwise the endpoint rejects the
+    request as unprocessable.
+
+    Field semantics:
+
+    * ``logo_url`` -- opaque URL returned by the E10 logo-upload
+      endpoint (#111). The schema accepts any ``https://`` URL so that
+      a freshly-issued signed S3/MinIO URL is accepted without the
+      logo-upload endpoint having to round-trip through Pydantic
+      again.
+    * ``brand_color`` -- canonical CSS hex form ``#RRGGBB`` (case
+      insensitive on input; stored as the caller-supplied case).
+    * ``currency`` -- ISO 4217 three-letter code; whitespace is
+      stripped and the result upper-cased. Validation is delegated to
+      :func:`app.i18n.currency.normalize_currency_code` so the PATCH
+      endpoint and the E52 currency formatter stay in lock-step. The
+      underlying ``tenants.currency`` column is NOT NULL with server
+      default ``"INR"`` (E10 task #109 contract); the field is
+      therefore *optional* but, when supplied, MUST be a non-empty
+      ISO 4217 code -- an explicit ``null`` or empty-string payload
+      value is rejected as a 422 so the caller cannot use the PATCH
+      to silently clear the column. The router's
+      ``model_dump(exclude_unset=True)`` already drops an *omitted*
+      field, so omitting ``currency`` cleanly means "do not change".
+    """
+
+    logo_url: str | None = Field(default=None, max_length=2048)
+    brand_color: str | None = Field(default=None, max_length=7)
+    currency: str | None = Field(default=None, max_length=3)
+
+    @field_validator("logo_url")
+    @classmethod
+    def _normalize_logo_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Logo URL must not be empty")
+        if not _LOGO_URL_PATTERN.match(stripped):
+            raise ValueError("Logo URL must be an https:// URL")
+        return stripped
+
+    @field_validator("brand_color")
+    @classmethod
+    def _normalize_brand_color(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Brand color must not be empty")
+        if not _BRAND_COLOR_PATTERN.match(stripped):
+            raise ValueError("Brand color must be a #RRGGBB hex value")
+        return stripped
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def _normalize_currency(cls, value: Any) -> Any:
+        if value is None:
+            # Explicit ``null`` from the caller is rejected: the
+            # underlying column is NOT NULL (E10 task #109) and the
+            # PATCH endpoint must not silently clear it. An *omitted*
+            # ``currency`` is fine because Pydantic then uses the
+            # default ``None`` which ``model_dump(exclude_unset=True)``
+            # strips out before the row is touched.
+            raise ValueError("Currency must not be null")
+        if not isinstance(value, str):
+            raise ValueError("Currency must be a string")
+        candidate = value.strip()
+        if not candidate:
+            # Empty / whitespace-only strings are rejected for the
+            # same reason as explicit ``null`` -- they would corrupt
+            # the NOT NULL column if the field validator allowed them
+            # through to ``setattr(tenant, "currency", ...)``.
+            raise ValueError("Currency must not be empty")
+        try:
+            return normalize_currency_code(candidate)
+        except InvalidCurrencyCodeError as exc:
+            raise ValueError(str(exc)) from exc

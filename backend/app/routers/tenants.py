@@ -1,4 +1,4 @@
-"""Tenant management routes (E8; Journey J1; E10 logo upload)."""
+"""Tenant management routes (E8; Journey J1; E10 logo upload + branding PATCH)."""
 
 import secrets
 from typing import Annotated
@@ -18,7 +18,11 @@ from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
-from app.schemas.tenant import TenantCreateRequest, TenantResponse
+from app.schemas.tenant import (
+    TenantBrandingUpdateRequest,
+    TenantCreateRequest,
+    TenantResponse,
+)
 from app.storage import (
     LOGO_FILE_TOO_LARGE_DETAIL,
     LogoStorageError,
@@ -33,6 +37,18 @@ router = APIRouter()
 _DB_UNAVAILABLE_DETAIL = "Tenant service is temporarily unavailable"
 _EMAIL_UNAVAILABLE_DETAIL = "Unable to send owner invite email"
 _STORAGE_UNAVAILABLE_DETAIL = "Logo storage is temporarily unavailable"
+#: Stable 404 detail string used by both the genuine not-found and the
+#: cross-tenant guard paths. Surfacing the same text in both cases is
+#: intentional -- the cross-tenant guard must not leak tenant-id
+#: existence (ADR-0004 tenant enumeration defense); the response code
+#: is therefore indistinguishable from a real "not found".
+TENANT_NOT_FOUND_DETAIL = "Tenant not found"
+#: Stable 422 detail returned when ``PATCH /tenants/{id}/branding`` is
+#: called with an empty payload (no fields supplied). Pydantic's
+#: ``model_dump(exclude_unset=True)`` distinguishes "field present
+#: with value None" from "field omitted entirely", so an entirely
+#: empty body is the only thing that hits this branch.
+BRANDING_EMPTY_PAYLOAD_DETAIL = "At least one branding field must be provided"
 
 #: Defensive upper bound for the streaming read loop (E10 logo upload).
 #: The user-facing 2 MB cap (see :data:`app.storage.validation.LOGO_MAX_FILE_BYTES`)
@@ -170,7 +186,7 @@ def get_tenant(
     if tenant is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
+            detail=TENANT_NOT_FOUND_DETAIL,
         )
 
     return tenant
@@ -234,7 +250,7 @@ def _load_tenant_for_logo_upload(
     if tenant is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
+            detail=TENANT_NOT_FOUND_DETAIL,
         )
 
     if (
@@ -244,9 +260,52 @@ def _load_tenant_for_logo_upload(
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
+            detail=TENANT_NOT_FOUND_DETAIL,
         )
 
+    return tenant
+
+
+@router.patch("/{tenant_id}/branding", response_model=TenantResponse)
+def update_tenant_branding(
+    tenant_id: int,
+    payload: TenantBrandingUpdateRequest,
+    current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.TENANT_UPDATE))
+    ],
+    db: Session = Depends(get_db),
+) -> Tenant:
+    """Update a tenant's branding (logo, color, currency) (E10; Journey J3).
+
+    Permission gate is ``TENANT_UPDATE``: super admins (platform-wide
+    tenant management) and consultancy owners of the target tenant
+    (own tenant's branding per Requirements §1 white-labeling).
+    Owners from a *different* tenant are rejected by the explicit
+    cross-tenant guard below, not by RBAC, so a tenant's owner can
+    still update their own branding without listing it.
+    """
+    tenant = _load_tenant_for_logo_upload(tenant_id, current_user, db)
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=BRANDING_EMPTY_PAYLOAD_DETAIL,
+        )
+
+    for field, value in update_data.items():
+        setattr(tenant, field, value)
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(tenant)
     return tenant
 
 
