@@ -59,8 +59,8 @@ describe('useTenantBranding', () => {
     // The hook short-circuits when there's no authenticated user, so
     // no request to /tenants/{id} is fired.
     expect(
-      fetchSpy.mock.calls.some((call) => {
-        const [arg] = call as [unknown]
+      fetchSpy.mock.calls.some((call: unknown[]) => {
+        const arg = call[0]
         return typeof arg === 'string' && arg.includes('/tenants/')
       }),
     ).toBe(false)
@@ -123,8 +123,8 @@ describe('useTenantBranding', () => {
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
       expect(
-        fetchSpy.mock.calls.some((call) => {
-          const [arg] = call as [unknown]
+        fetchSpy.mock.calls.some((call: unknown[]) => {
+          const arg = call[0]
           return typeof arg === 'string' && arg.includes('/tenants/7')
         }),
       ).toBe(true)
@@ -153,8 +153,8 @@ describe('useTenantBranding', () => {
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
       expect(
-        fetchSpy.mock.calls.some((call) => {
-          const [arg] = call as [unknown]
+        fetchSpy.mock.calls.some((call: unknown[]) => {
+          const arg = call[0]
           return typeof arg === 'string' && arg.includes('/tenants/7')
         }),
       ).toBe(true)
@@ -237,8 +237,8 @@ describe('useTenantBranding', () => {
       expect(result.current.tenant?.id).toBe(7)
     })
 
-    const tenantCalls = fetchSpy.mock.calls.filter((call) => {
-      const [arg] = call as [unknown]
+    const tenantCalls = fetchSpy.mock.calls.filter((call: unknown[]) => {
+      const arg = call[0]
       return typeof arg === 'string' && arg.includes('/tenants/')
     })
     expect(tenantCalls).toHaveLength(1)

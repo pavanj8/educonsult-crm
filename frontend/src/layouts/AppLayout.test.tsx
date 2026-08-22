@@ -128,6 +128,7 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
   })
 
   it('renders the tenant name and logo when branding is available', async () => {
+    localStorage.setItem('access_token', 'test-token')
     setupFetchMock(fetchSpy, {
       '/auth/me': {
         ok: true,
@@ -147,11 +148,6 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
     })
 
     render(<LayoutHarness />)
-
-    // DEBUG
-    await new Promise((r) => setTimeout(r, 500))
-    console.log('DEBUG calls:', fetchSpy.mock.calls.map((c) => c[0]))
-    console.log('DEBUG brand-color var:', document.documentElement.style.getPropertyValue('--brand-color'))
 
     // The CSS-variable side-effect on ``document.documentElement`` is
     // the deterministic signal that the provider has finished
@@ -207,9 +203,10 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
     // Wait for the branding fetch to fire and settle.
     await waitFor(() => {
       expect(
-        fetchSpy.mock.calls.some(([url]) =>
-          typeof url === 'string' && url.includes('/tenants/7'),
-        ),
+        fetchSpy.mock.calls.some((call: unknown[]) => {
+          const url = call[0]
+          return typeof url === 'string' && url.includes('/tenants/7')
+        }),
       ).toBe(true)
     })
 

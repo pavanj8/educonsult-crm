@@ -3,6 +3,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider } from '../store/authStore'
+import { BrandingProvider } from '../store/brandingStore'
 import { AppRoutes } from './index'
 import { REGISTER_PATH } from './paths'
 import { LOGIN_PATH } from './ProtectedRoute'
@@ -60,10 +61,12 @@ function LocationStateProbe() {
 function renderAppAt(path: string) {
   return render(
     <AuthProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <LocationStateProbe />
-        <AppRoutes />
-      </MemoryRouter>
+      <BrandingProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <LocationStateProbe />
+          <AppRoutes />
+        </MemoryRouter>
+      </BrandingProvider>
     </AuthProvider>,
   )
 }
