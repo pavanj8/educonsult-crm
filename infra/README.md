@@ -16,6 +16,7 @@ shared by both modes:
 | [`docker-compose.yml`](docker-compose.yml) | Local development stack (Postgres, MinIO, MailHog). Not for production. |
 | [`docker-compose.prod.yml`](docker-compose.prod.yml) | Production-shaped stack used for **on-prem single-tenant** installs; also the shape SaaS runs per-environment. |
 | [`.env.example`](.env.example) | Example variables for local development. |
+| [`.env.prod.example`](.env.prod.example) | Template for the on-prem production env file — every variable the prod compose file interpolates, plus the backend process vars. |
 | [`ENVIRONMENT.md`](ENVIRONMENT.md) | Full reference for every runtime-configurable variable across all three deployment contexts (local dev, SaaS, on-prem). |
 
 If you only need a list of environment variables, read `ENVIRONMENT.md`
@@ -85,30 +86,39 @@ Docker Hub mirrors used by `docker-compose.prod.yml`.
 
 ### 3.2 Create the on-prem environment file
 
-Copy the example and edit it for your install. **Do not commit this
-file** — it contains secrets:
+Copy the production template and edit it for your install. **Do not
+commit this file** — it contains secrets:
 
 ```bash
-cp infra/.env.example infra/.env.prod
+cp infra/.env.prod.example infra/.env.prod
 $EDITOR infra/.env.prod
 ```
 
-Set at minimum:
+The template documents every variable the prod compose file
+interpolates (`POSTGRES_*`, `MINIO_*`, `BACKEND_IMAGE`, `FRONTEND_IMAGE`,
+`BACKEND_ENV_FILE`, `FRONTEND_PORT`, `MINIO_REGION`) and every backend
+process variable the same file is loaded into
+([`backend/Dockerfile`](../backend/Dockerfile) → `migrate` + `backend`
+services, via `BACKEND_ENV_FILE`). Replace every `__SET_ME__` placeholder
+with a real value:
 
-| Variable | Why it matters |
+| Group | Why it matters |
 |---|---|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Database credentials. Use a long random password. |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Object-storage admin credentials. The same values double as the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` the backend uses against MinIO. |
 | `MINIO_BUCKET` | Bucket the backend reads/writes student documents under (default `educonsult-documents`). |
-| `BACKEND_IMAGE` / `FRONTEND_IMAGE` | Image:tag references the host will pull (e.g. `registry.example.com/educonsult-backend:1.4.2`). |
-| `BACKEND_ENV_FILE` | Path (relative to `infra/`) to the file that holds the **backend's own** env vars (`JWT_SECRET`, `SMTP_*`, etc.). See [ENVIRONMENT.md](ENVIRONMENT.md) for the full list. |
-| `FRONTEND_PORT` | Host port that maps to the frontend container's port 80 (default `8080`). |
 | `MINIO_REGION` | Any non-empty value; only used for S3 SDK compatibility. |
+| `BACKEND_IMAGE` / `FRONTEND_IMAGE` | Image:tag references the host will pull (e.g. `registry.example.com/educonsult-backend:1.4.2`). |
+| `BACKEND_ENV_FILE` | Path (relative to `infra/`) to the file that holds the **backend's own** env vars. Leave as `.env.prod` to reuse this same file. |
+| `FRONTEND_PORT` | Host port that maps to the frontend container's port 80 (default `8080`). |
+| `DATABASE_URL` | Full SQLAlchemy URL the backend uses. The compose file also writes a derived one into the `migrate` / `backend` service `environment:` blocks, but having it here too makes the file self-contained. |
+| `JWT_SECRET_KEY` | HMAC signing key for access + refresh tokens. **Must** override the dev default — see [§6 Incident response](#incident-response) for what rotating it does. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_FROM` | Real SMTP relay — never the dev MailHog defaults. |
+| `APP_BASE_URL` | Public origin of the frontend; used to build absolute URLs in outbound email. |
+| `DOCUMENT_STORAGE_*` + `AWS_*` | S3-compatible storage config. For bundled MinIO the template is already filled in. |
 
-For the complete reference — including the backend's `JWT_SECRET`,
-`SMTP_*`, optional `DOCUMENT_STORAGE=memory` switch for throwaway
-environments, and the frontend's `BACKEND_UPSTREAM` — read
-[`ENVIRONMENT.md`](ENVIRONMENT.md).
+For per-variable defaults, scope, and the rationale for each "required
+for production" tag, read [`ENVIRONMENT.md`](ENVIRONMENT.md).
 
 ### 3.3 Start the stack
 
@@ -163,14 +173,54 @@ sufficient.
 
 The product does not self-signup: tenancy is created by a Super
 Admin (Requirements §1). For a single-tenant on-prem install, the
-simplest path is to bootstrap the Super Admin row directly against
-the on-prem Postgres using the backend's existing tooling — follow
-the same flow your customer-success team uses for SaaS tenant
-provisioning, just pointed at this stack's `DATABASE_URL`.
+simplest path is to insert the first Super Admin row directly into
+Postgres — the platform has no self-signup, and there is no UI for
+provisioning the very first super-admin user. Generate a bcrypt hash
+for a strong password and INSERT one row:
+
+```bash
+# 1. Generate a bcrypt hash for the super-admin password (run on the host).
+docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yml \
+  run --rm backend \
+  python -c "from app.auth.password import hash_password; print(hash_password('CHANGE_ME_STRONG_PASSWORD'))"
+
+# 2. INSERT the row. Replace the bcrypt hash with the output of step 1.
+docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yml \
+  exec postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "INSERT INTO users (email, password_hash, role, tenant_id, branch_id, is_active) \
+   VALUES ('admin@example.com', '\$2b\$12\$...bcrypt_hash_from_step_1...', 'super_admin', NULL, NULL, true);"
+```
+
+Notes on the INSERT:
+
+- `role` must be the literal string `super_admin` (matches
+  [`Role.SUPER_ADMIN`](../backend/app/rbac/roles.py)) — `tenant_id`
+  and `branch_id` are `NULL` because super admins are platform-scoped,
+  not tenant-scoped.
+- `is_active=true` is required; the `/auth/login` endpoint refuses
+  inactive users.
+- `email` is globally unique (the `users.email` unique index enforces
+  this across tenants), so pick an address no demo seed has used.
+- After this row exists, log in via `POST /auth/login` with that email
+  + password to obtain a JWT, then create the first tenant via
+  `POST /tenants` (the Super Admin API documented under
+  [`backend/app/routers/tenants.py`](../backend/app/routers/tenants.py)).
 
 ---
 
 ## 4. SaaS deployment (operator-facing summary)
+
+> **Status:** the production container images and the
+> `infra/docker-compose.prod.yml` shape are the basis for SaaS (per
+> ADR-0003 — one codebase, one image set, one orchestration shape).
+> **SaaS-specific deployment artefacts are not part of this repo yet**:
+> there is no committed Terraform module for RDS / Cloud SQL
+> provisioning, no committed per-environment S3 / IAM bootstrap, no
+> committed SaaS-side Helm chart or Terraform plan. The differences
+> below describe the *target* shape; the actual environment-bootstrap
+> scripts that wire those managed services up live in EduConsult's
+> private infra repo and are not reproduced here.
 
 This section is for the EduConsult SRE / platform team running the
 hosted service. The procedure is identical to [§3](#3-on-prem-deployment-step-by-step)
@@ -252,6 +302,14 @@ strategy that meets the product's soft-delete + export promise
    `docker compose up` will not be able to talk to the existing
    volumes.
 
+> **Test restores periodically.** A backup that has never been
+> restored is not a backup. At least once per quarter, stand up a
+> throwaway host (or a `docker compose -f docker-compose.yml`
+> variant), restore the latest `pg_dump`, point the backend at it,
+> and confirm logins + a sample document download succeed. The
+> same applies to MinIO: pull a bucket mirror and verify a sample
+> object against the restored bucket.
+
 ### Upgrades
 
 Upgrades are image-tag changes. For a routine patch release:
@@ -272,6 +330,32 @@ docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yml \
 
 Schema changes ship as new Alembic revisions in the backend image;
 `migrate` is the only thing that ever touches the schema.
+
+### Incident response
+
+A few operator-facing reminders that are easy to miss when reading
+this guide cold:
+
+- **`JWT_SECRET_KEY` rotation invalidates every outstanding token.**
+  Every access token *and* refresh token currently issued signs with
+  the active `JWT_SECRET_KEY`. After you change it (e.g. in a
+  suspected compromise), every logged-in user — across every role,
+  including Super Admin — is forced to re-authenticate. There is no
+  per-token revocation list in v1; rotating the secret is the only
+  way to flush sessions globally. Plan a brief, announced outage
+  window and broadcast a "you will be asked to log in again" notice
+  before rotating in production.
+- **Audit log review is part of operations, not just security.**
+  Requirements §8 mandates a basic audit trail on key actions
+  (pipeline stage changes, document approvals, user management).
+  Add a recurring review slot — at minimum a weekly skim, monthly a
+  deeper pass — to whatever on-call rotation owns the install. The
+  audit log is the primary signal for both abuse detection
+  (unauthorised stage advances) and customer-support escalation
+  ("who marked this document rejected, and when?").
+- **Backups are only useful if you test restore.** See the
+  "Test restores periodically" note above — treat that as part of
+  the runbook, not a footnote.
 
 ---
 
