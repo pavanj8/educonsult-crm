@@ -25,6 +25,7 @@ from app.auth.email_uniqueness import (
     find_user_by_email,
 )
 from app.auth.master_data_validation import validate_target_master_data
+from app.auth.password_policy import validate_password_strength
 from app.db.database import get_db
 from app.email.password_reset import build_password_reset_url, send_password_reset_email
 from app.email.service import EmailDeliveryError
@@ -41,6 +42,8 @@ from app.schemas.auth import (
     LoginRequest,
     MeResponse,
     RefreshRequest,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     TokenResponse,
 )
 from app.schemas.student import RegisterStudentRequest, RegisterStudentResponse
@@ -52,6 +55,8 @@ _FORGOT_PASSWORD_GENERIC_MESSAGE = (
     "If an account exists for that email, a reset link has been sent."
 )
 _PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
+_INVALID_RESET_TOKEN_DETAIL = "Invalid or expired reset token"
+_PASSWORD_RESET_GENERIC_MESSAGE = "Your password has been reset successfully."
 
 
 def _user_to_authenticated_user(user: User) -> AuthenticatedUser:
@@ -291,6 +296,103 @@ def forgot_password(
             ) from None
 
     return ForgotPasswordResponse(message=_FORGOT_PASSWORD_GENERIC_MESSAGE)
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> ResetPasswordResponse:
+    """Validate a reset token and set the user's new password (E6; J45).
+
+    Companion to ``POST /auth/forgot-password``: the user clicks the link
+    in their reset email and POSTs ``{token, new_password}`` here. The
+    endpoint:
+
+    * Hashes the supplied token with SHA-256 and looks up the matching
+      ``PasswordResetToken`` row by ``token_hash``.
+    * Rejects tokens that don't exist, have already been consumed, or
+      are past their ``expires_at`` -- all with the same generic 400
+      response so the caller cannot probe token state (matches the
+      account-enumeration hygiene of the forgot-password endpoint).
+    * Validates the new password against the platform strong-password
+      policy (Requirements §8) before persisting.
+    * Updates the matched ``User.password_hash`` and stamps the token's
+      ``used_at`` to make it single-use.
+    * Returns 503 if the database is unreachable.
+
+    The token is matched by its SHA-256 hash because the database only
+    ever stores the hash, never the plaintext (see ``PasswordResetToken``).
+    """
+    token_hash = hashlib.sha256(payload.token.encode("utf-8")).hexdigest()
+
+    try:
+        reset_token = (
+            db.query(PasswordResetToken)
+            .filter(PasswordResetToken.token_hash == token_hash)
+            .one_or_none()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    now = datetime.now(timezone.utc)
+
+    if reset_token is None or reset_token.used_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_INVALID_RESET_TOKEN_DETAIL,
+        )
+
+    stored_expires_at = reset_token.expires_at
+    if stored_expires_at.tzinfo is None:
+        stored_expires_at = stored_expires_at.replace(tzinfo=timezone.utc)
+    if stored_expires_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_INVALID_RESET_TOKEN_DETAIL,
+        )
+
+    try:
+        user = db.get(User, reset_token.user_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if user is None or not user.is_active:
+        # The user record was deleted or deactivated after the token was
+        # issued. Treat as an invalid token -- the caller can request a
+        # fresh reset if appropriate.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_INVALID_RESET_TOKEN_DETAIL,
+        )
+
+    try:
+        validate_password_strength(payload.new_password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from None
+
+    user.password_hash = hash_password(payload.new_password)
+    reset_token.used_at = now
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    return ResetPasswordResponse(message=_PASSWORD_RESET_GENERIC_MESSAGE)
 
 
 @router.get("/me", response_model=MeResponse)
