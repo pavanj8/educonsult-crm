@@ -13,6 +13,7 @@ from app.routers.auth import router as auth_router
 from app.routers.branches import router as branches_router
 from app.routers.checklist import router as checklist_router
 from app.routers.master_data import router as master_data_router
+from app.routers.master_data_admin import router as master_data_admin_router
 from app.routers.notifications import router as notifications_router
 from app.routers.staff import router as staff_router
 from app.routers.student_documents import router as student_documents_router
@@ -91,6 +92,11 @@ app.include_router(branches_router, prefix="/branches", tags=["branches"])
 app.include_router(staff_router, prefix="/staff", tags=["staff"])
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
 app.include_router(master_data_router, prefix="/tenants", tags=["master-data"])
+app.include_router(
+    master_data_admin_router,
+    prefix="/master-data/admin",
+    tags=["master-data-admin"],
+)
 
 
 @app.get("/health")
