@@ -12,6 +12,16 @@ from app.seed.catalog import (
     user_by_email,
     users_for_role,
 )
+from app.seed.master_data import (
+    DEFAULT_COUNTRIES,
+    DEFAULT_PROGRAMS,
+    DEFAULT_UNIVERSITIES,
+    DefaultCountry,
+    DefaultMasterDataSeedResult,
+    DefaultProgram,
+    DefaultUniversity,
+    seed_default_master_data_for_tenant,
+)
 from app.seed.runner import (
     SeedResult,
     SeedValidationError,
@@ -22,8 +32,15 @@ from app.seed.runner import (
 )
 
 __all__ = [
+    "DEFAULT_COUNTRIES",
+    "DEFAULT_PROGRAMS",
+    "DEFAULT_UNIVERSITIES",
     "DEMO_PASSWORD",
     "PRIMARY_DEMO_EMAIL",
+    "DefaultCountry",
+    "DefaultMasterDataSeedResult",
+    "DefaultProgram",
+    "DefaultUniversity",
     "DemoBranchRecord",
     "DemoCatalog",
     "DemoTenantRecord",
@@ -33,6 +50,7 @@ __all__ = [
     "build_demo_catalog",
     "demo_user_to_authenticated_user",
     "get_demo_catalog",
+    "seed_default_master_data_for_tenant",
     "seed_demo_data",
     "seed_demo_data_if_empty",
     "user_by_email",
