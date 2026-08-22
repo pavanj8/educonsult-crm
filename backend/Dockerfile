@@ -52,6 +52,11 @@ COPY --chown=app:app app ./app
 COPY --chown=app:app alembic ./alembic
 COPY --chown=app:app alembic.ini ./alembic.ini
 
+# Tiny entrypoint wrapper so uvicorn runs as PID 1 (exec-form). See the file's
+# header for the why; the short version is cleaner SIGTERM forwarding and a
+# proper graceful-shutdown path than `sh -c "uvicorn ..."` would give us.
+COPY --chown=app:app docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
 USER app
 
 EXPOSE 8000
@@ -60,10 +65,10 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl --fail --silent http://localhost:8000/health || exit 1
 
-# Single uvicorn worker per container; scale horizontally by adding replicas.
 # HOST=0.0.0.0 is required so the container accepts traffic on the Docker
-# network. PORT is overridable for compose/k8s; default matches EXPOSE above.
+# bridge network. PORT is overridable for compose/k8s via `-e PORT=...` and
+# is consumed by the entrypoint script; default matches EXPOSE above.
 ENV HOST=0.0.0.0 \
     PORT=8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host ${HOST} --port ${PORT}"]
+ENTRYPOINT ["docker-entrypoint.sh"]
