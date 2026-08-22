@@ -34,3 +34,12 @@ class ForgotPasswordRequest(BaseModel):
 
 class ForgotPasswordResponse(BaseModel):
     message: str = "If an account exists for that email, a reset link has been sent."
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=1)
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str = "Your password has been reset successfully."
