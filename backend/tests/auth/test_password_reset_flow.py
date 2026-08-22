@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
+import pytest
 
 from app.auth.password import verify_password
 from app.models.password_reset_token import PasswordResetToken
@@ -12,11 +13,10 @@ from app.rbac.roles import Role
 from tests.factories.users import make_db_user
 
 
-def _issue_reset_token(client, db_session, user):
-    with patch("app.routers.auth.send_password_reset_email") as send_email:
-        response = client.post(
-            "/auth/forgot-password", json={"email": user.email}
-        )
+def _issue_reset_token(client, db_session, user, send_email):
+    response = client.post(
+        "/auth/forgot-password", json={"email": user.email}
+    )
     assert response.status_code == 200
     token = send_email.call_args.kwargs["reset_url"].split("token=", 1)[1]
     return token
@@ -39,7 +39,7 @@ def _make_reset_token(db_session, user, token, *, expired=False):
     return row
 
 
-def test_password_reset_happy_path_changes_password(client, db_session):
+def test_password_reset_happy_path_changes_password(client, db_session, mock_password_reset_email):
     user = make_db_user(
         db_session,
         Role.STUDENT,
@@ -47,7 +47,7 @@ def test_password_reset_happy_path_changes_password(client, db_session):
         password="Original1!",
     )
 
-    token = _issue_reset_token(client, db_session, user)
+    token = _issue_reset_token(client, db_session, user, mock_password_reset_email)
 
     reset = client.post(
         "/auth/reset-password",
@@ -69,7 +69,7 @@ def test_password_reset_happy_path_changes_password(client, db_session):
     assert "access_token" in login.json()
 
 
-def test_password_reset_rejects_expired_and_invalid_tokens(client, db_session):
+def test_password_reset_rejects_expired_and_invalid_tokens(client, db_session, mock_password_reset_email):
     user = make_db_user(
         db_session,
         Role.STUDENT,
@@ -88,7 +88,7 @@ def test_password_reset_rejects_expired_and_invalid_tokens(client, db_session):
         json={"email": user.email},
     )
     assert forgot.status_code == 200
-    token = send_password_reset_email.call_args.kwargs["reset_url"].split(
+    token = mock_password_reset_email.call_args.kwargs["reset_url"].split(
         "token=", 1
     )[1]
 
@@ -109,7 +109,7 @@ def test_password_reset_rejects_expired_and_invalid_tokens(client, db_session):
     assert verify_password("test-password", refreshed.password_hash)
 
 
-def test_password_reset_token_is_single_use(client, db_session):
+def test_password_reset_token_is_single_use(client, db_session, mock_password_reset_email):
     user = make_db_user(
         db_session,
         Role.STUDENT,
@@ -120,7 +120,7 @@ def test_password_reset_token_is_single_use(client, db_session):
         json={"email": user.email},
     )
     assert forgot.status_code == 200
-    token = send_password_reset_email.call_args.kwargs["reset_url"].split(
+    token = mock_password_reset_email.call_args.kwargs["reset_url"].split(
         "token=", 1
     )[1]
 
@@ -140,3 +140,10 @@ def test_password_reset_token_is_single_use(client, db_session):
     refreshed = db_session.get(User, user.id)
     assert refreshed is not None
     assert verify_password("Replacement1!", refreshed.password_hash)
+
+
+@pytest.fixture()
+def mock_password_reset_email():
+    """Patch ``send_password_reset_email`` so tests don't hit real SMTP."""
+    with patch("app.routers.auth.send_password_reset_email") as mock_send:
+        yield mock_send
