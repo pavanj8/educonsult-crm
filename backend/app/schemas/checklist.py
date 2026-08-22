@@ -1,23 +1,136 @@
-"""Pydantic schemas for the E26 checklist read endpoint (Journey J19).
+"""Pydantic schemas for checklist endpoints (E15 CRUD; E26 read view).
 
-The endpoint returns a merged view: for a given application, each
-checklist template applicable to the application's stage/program is
-returned along with the most recent upload's status (pending /
-approved / rejected). The shape is intentionally flat so the frontend
-can render the checklist view directly without further joins.
+This module owns:
 
-The companion ORM models live in :mod:`app.models.checklist_item_template`
-and :mod:`app.models.student_document`; the merge logic itself lives
-in :mod:`app.routers.checklist`.
+* the *write* schemas for the E15 checklist-template CRUD endpoints
+  (POST / PATCH / GET / DELETE on :class:`ChecklistItemTemplate`
+  rows), and
+* the *read* schemas used by the E26 merged checklist-for-application
+  endpoint (``GET /applications/{application_id}/checklist``).
+
+The two halves are kept in the same module because they describe the
+same domain object (a checklist template) from different angles.
+
+Traceability
+------------
+* Requirements §5 (per-stage/program checklist templates; student
+  uploads against each checklist item).
+* Journey J8 (Owner/Branch Manager defines a document checklist
+  template for a stage/program) — E15 CRUD.
+* Journey J19 (Student views the document checklist for their
+  application) — E26 read.
 """
 
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.application import ApplicationStage as ApplicationStageEnum
 from app.models.student_document import StudentDocumentStatus
+from app.pipeline.stages import PipelineStage
+
+# ---------------------------------------------------------------------------
+# E15 — checklist template CRUD (Journey J8)
+# ---------------------------------------------------------------------------
+
+
+class ChecklistTemplateResponse(BaseModel):
+    """Response shape for a single :class:`ChecklistItemTemplate` row.
+
+    Returned by every E15 CRUD endpoint. ``id`` is the template's
+    primary key (used by the client-side builder as the row identifier);
+    ``tenant_id`` is echoed so the frontend can validate which tenant
+    the row belongs to without a second round-trip.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tenant_id: int
+    stage: PipelineStage
+    program_id: Optional[int]
+    name: str
+    description: Optional[str]
+    required: bool
+    order_index: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChecklistTemplateCreateRequest(BaseModel):
+    """Payload for ``POST /checklist-templates`` (E15; Journey J8).
+
+    Tenant id is taken from the authenticated caller; the body never
+    carries it. ``stage`` is required (a template must target a
+    specific pipeline stage). ``program_id`` is optional: ``None`` (or
+    omitted) means the template applies to *every* program in the
+    tenant. When ``program_id`` is provided it must resolve to a
+    :class:`Program` row in the caller's tenant — the endpoint
+    enforces this and returns 422 on a cross-tenant FK.
+    """
+
+    stage: PipelineStage
+    program_id: Optional[int] = Field(default=None, ge=1)
+    name: str = Field(min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    required: bool = True
+    order_index: Optional[int] = Field(default=None, ge=0)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Name must not be empty")
+        return stripped
+
+    @field_validator("description")
+    @classmethod
+    def strip_description(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+class ChecklistTemplateUpdateRequest(BaseModel):
+    """Payload for ``PATCH /checklist-templates/{template_id}`` (E15; Journey J8).
+
+    All fields are optional; at least one must be provided (the
+    endpoint rejects an empty body with 422). When ``program_id`` is
+    set it must resolve to a program in the caller's tenant.
+    """
+
+    stage: Optional[PipelineStage] = None
+    program_id: Optional[int] = Field(default=None, ge=1)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    required: Optional[bool] = None
+    order_index: Optional[int] = Field(default=None, ge=0)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Name must not be empty")
+        return stripped
+
+    @field_validator("description")
+    @classmethod
+    def strip_description(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+# ---------------------------------------------------------------------------
+# E26 — checklist-for-application merged read view (Journey J19)
+# ---------------------------------------------------------------------------
 
 
 class ChecklistUploadSummary(BaseModel):

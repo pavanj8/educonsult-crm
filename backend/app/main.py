@@ -12,6 +12,7 @@ from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.branches import router as branches_router
 from app.routers.checklist import router as checklist_router
+from app.routers.checklist_templates import router as checklist_templates_router
 from app.routers.master_data import router as master_data_router
 from app.routers.master_data_admin import router as master_data_admin_router
 from app.routers.notifications import router as notifications_router
@@ -85,6 +86,11 @@ app = FastAPI(title="EduConsult CRM", lifespan=lifespan)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(applications_router, prefix="/applications", tags=["applications"])
 app.include_router(checklist_router, prefix="/applications", tags=["checklist"])
+app.include_router(
+    checklist_templates_router,
+    prefix="/checklist-templates",
+    tags=["checklist-templates"],
+)
 app.include_router(student_documents_router, prefix="/applications", tags=["student-documents"])
 app.include_router(verifier_router, prefix="/verifier", tags=["verifier"])
 app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
