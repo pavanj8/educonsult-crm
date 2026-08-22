@@ -18,7 +18,11 @@ from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
-from app.schemas.tenant import TenantCreateRequest, TenantResponse
+from app.schemas.tenant import (
+    TenantBrandingUpdateRequest,
+    TenantCreateRequest,
+    TenantResponse,
+)
 
 router = APIRouter()
 
@@ -156,4 +160,71 @@ def get_tenant(
             detail="Tenant not found",
         )
 
+    return tenant
+
+
+@router.patch("/{tenant_id}/branding", response_model=TenantResponse)
+def update_tenant_branding(
+    tenant_id: int,
+    payload: TenantBrandingUpdateRequest,
+    current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.TENANT_UPDATE))
+    ],
+    db: Session = Depends(get_db),
+) -> Tenant:
+    """Update a tenant's branding (logo, color, currency) (E10; Journey J3).
+
+    Permission gate is ``TENANT_UPDATE``: super admins (platform-wide
+    tenant management) and consultancy owners of the target tenant
+    (own tenant's branding per Requirements §1 white-labeling).
+    Owners from a *different* tenant are rejected by the explicit
+    cross-tenant guard below, not by RBAC, so a tenant's owner can
+    still update their own branding without listing it.
+    """
+    try:
+        tenant = db.get(Tenant, tenant_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+
+    # Block a consultancy owner from editing a tenant they don't belong to.
+    # Super admins bypass the check (their ``tenant_id`` is ``None``).
+    if (
+        current_user.role is not Role.SUPER_ADMIN
+        and current_user.tenant_id is not None
+        and current_user.tenant_id != tenant.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one branding field must be provided",
+        )
+
+    for field, value in update_data.items():
+        setattr(tenant, field, value)
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(tenant)
     return tenant

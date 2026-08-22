@@ -14,6 +14,16 @@ class Tenant(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    # White-labeling fields (E10 tenant branding & profile; Journey J3;
+    # Requirements §1: "Each tenant can upload a logo + set a primary brand color").
+    # ``logo_url`` is nullable so a freshly-created tenant has no logo yet.
+    logo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # ``brand_color`` stores a CSS hex colour in the canonical "#RRGGBB" form.
+    brand_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    # ``currency`` stores an ISO 4217 three-letter uppercase code; the canonical
+    # defaults are validated through ``app.i18n.currency.normalize_currency_code``
+    # by the PATCH /tenants/{id}/branding schema.
+    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

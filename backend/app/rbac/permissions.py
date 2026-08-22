@@ -88,6 +88,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     ),
     Role.CONSULTANCY_OWNER: frozenset(
         {
+            Permission.TENANT_UPDATE,
             Permission.BRANCH_CREATE,
             Permission.BRANCH_READ,
             Permission.BRANCH_UPDATE,
