@@ -1,0 +1,43 @@
+# Keep the build context for the frontend image as small as possible:
+# node_modules is reinstalled inside the image, and tests / Playwright
+# caches / IDE state / coverage are not needed to produce the bundle.
+
+# Build artefacts
+node_modules
+dist
+dist-ssr
+*.local
+
+# Test artefacts
+coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Editor / OS noise
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# VCS / harness metadata that should never end up in the image
+.git
+.gitignore
+.github
+.cursor
+.claude
