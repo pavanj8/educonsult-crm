@@ -31,7 +31,12 @@ export default function AppLayout() {
               className="app-header__logo"
               data-testid="app-header-logo"
               src={logoUrl}
-              alt={`${heading} logo`}
+              // The adjacent <h1> already carries the tenant
+              // name, so the logo is decorative — hide it from
+              // screen readers and avoid announcing the brand
+              // identity twice on every page header.
+              alt=""
+              aria-hidden="true"
               // Tenant controls the logo URL (up to https://), so opt
               // out of the default referrer policy to avoid leaking
               // the user's IP / UA to a third-party image host.

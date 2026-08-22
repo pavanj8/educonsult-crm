@@ -180,6 +180,7 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
     // the GET /tenants/{id} request surfaces a 403. The layout must
     // still render (with the platform-default wordmark) rather than
     // crash the navigation chrome.
+    localStorage.setItem('access_token', 'test-token')
     setupFetchMock(fetchSpy, {
       '/auth/me': {
         ok: true,
@@ -224,6 +225,7 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
   })
 
   it('clears the brand color CSS variable when branding is removed (logout)', async () => {
+    localStorage.setItem('access_token', 'test-token')
     setupFetchMock(fetchSpy, {
       '/auth/me': {
         ok: true,
