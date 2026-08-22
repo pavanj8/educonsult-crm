@@ -204,7 +204,13 @@ jobs:
               --body "Automated implementation by the Dev/Test/Review agent harness. Closes #$ISSUE." \
               --head "$BRANCH" --base main
           }
-          pr_info() { gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,author --jq '.[0] | "\(.number) \(.author.login)"'; }
+          # `.[0] // empty`: with no open PR the array is empty, so emit NOTHING
+          # (not the literal "null null" that `.[0] | ...` stringifies to). Without
+          # this, INFO is non-empty, the `[ -z "$INFO" ]` guard below is false, and
+          # create_pr is never called -- the step silently reports "authored by:
+          # null" and exits 0 while no PR is ever opened (misdiagnosed for weeks as
+          # a GH_PAT scope problem; docs/adr/0026).
+          pr_info() { gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,author --jq '.[0] // empty | "\(.number) \(.author.login)"'; }
 
           INFO=$(pr_info)
           if [ -z "$INFO" ]; then
