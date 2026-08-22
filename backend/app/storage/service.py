@@ -461,10 +461,23 @@ def get_logo_storage() -> LogoStorageService:
     without S3/MinIO — mirroring how ``DOCUMENT_STORAGE=memory`` gives
     a self-contained document store. Unset (or any other value) keeps
     the production S3 backend, so this is a no-op in real deployments.
+
+    As a convenience for the test harness — which historically exports
+    only ``DOCUMENT_STORAGE=memory`` to opt out of S3/MinIO for the
+    whole upload surface in one go — ``DOCUMENT_STORAGE=memory`` is
+    also accepted here: setting either flag selects the in-memory logo
+    backend. ``LOGO_STORAGE`` takes precedence when both are set, so
+    production deployments that need to force the S3 backend for logos
+    while leaving documents in-memory can still do so explicitly.
     """
     global _logo_storage_service
     if _logo_storage_service is None:
-        if os.environ.get("LOGO_STORAGE", "").strip().lower() in {"memory", "in-memory", "inmemory"}:
+        env_flag = (
+            os.environ.get("LOGO_STORAGE")
+            or os.environ.get("DOCUMENT_STORAGE")
+            or ""
+        )
+        if env_flag.strip().lower() in {"memory", "in-memory", "inmemory"}:
             _logo_storage_service = InMemoryLogoStorage()
         else:
             _logo_storage_service = S3LogoStorageService()

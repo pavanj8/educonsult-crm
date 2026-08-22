@@ -336,3 +336,29 @@ def test_get_logo_storage_defaults_to_s3_when_env_var_unset(monkeypatch):
     monkeypatch.setenv("LOGO_STORAGE", "s3")
     reset_logo_storage()
     assert isinstance(get_logo_storage(), S3LogoStorageService)
+
+
+def test_get_logo_storage_falls_back_to_document_storage_memory(monkeypatch):
+    """``DOCUMENT_STORAGE=memory`` also selects the in-memory logo backend,
+    so the harness can opt the whole upload surface out of S3/MinIO with a
+    single env export. ``LOGO_STORAGE`` still takes precedence when both
+    are set, so an explicit value on ``LOGO_STORAGE`` always wins."""
+    monkeypatch.delenv("LOGO_STORAGE", raising=False)
+    monkeypatch.setenv("DOCUMENT_STORAGE", "memory")
+    reset_logo_storage()
+    assert isinstance(get_logo_storage(), InMemoryLogoStorage)
+
+    # Explicit ``LOGO_STORAGE`` (including an explicit "s3" override) wins
+    # over ``DOCUMENT_STORAGE`` — production deployments can pin logos to
+    # S3 even when documents are configured for the in-memory backend.
+    monkeypatch.setenv("LOGO_STORAGE", "s3")
+    monkeypatch.setenv("DOCUMENT_STORAGE", "memory")
+    reset_logo_storage()
+    assert isinstance(get_logo_storage(), S3LogoStorageService)
+
+    # And an explicit ``LOGO_STORAGE=memory`` wins over a non-memory
+    # ``DOCUMENT_STORAGE`` so neither side surprises the other.
+    monkeypatch.setenv("LOGO_STORAGE", "memory")
+    monkeypatch.setenv("DOCUMENT_STORAGE", "s3")
+    reset_logo_storage()
+    assert isinstance(get_logo_storage(), InMemoryLogoStorage)
