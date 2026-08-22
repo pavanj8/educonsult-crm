@@ -311,7 +311,7 @@ describe('MasterDataAdminPage', () => {
     })
 
     await user.type(screen.getByTestId('master-data-country-name'), 'X')
-    await user.type(screen.getByTestId('master-data-country-code'), 'X')
+    await user.type(screen.getByTestId('master-data-country-code'), 'XX')
     await user.click(screen.getByTestId('master-data-country-create-submit'))
 
     await waitFor(() => {
@@ -359,10 +359,9 @@ describe('MasterDataAdminPage', () => {
 
   it('cancels an in-progress country edit', async () => {
     const user = userEvent.setup()
-    setupFetchMock({
+    renderPage({
       user: { id: 50, role: 'consultancy_owner' },
     })
-    render(<MasterDataAdminPage />)
 
     await waitFor(() => {
       expect(screen.getByTestId('master-data-country-edit-1')).toBeInTheDocument()
@@ -683,7 +682,7 @@ describe('MasterDataAdminPage', () => {
     })
 
     await user.type(screen.getByTestId('master-data-country-name'), 'X')
-    await user.type(screen.getByTestId('master-data-country-code'), 'X')
+    await user.type(screen.getByTestId('master-data-country-code'), 'XX')
     await user.click(screen.getByTestId('master-data-country-create-submit'))
 
     await waitFor(() => {
