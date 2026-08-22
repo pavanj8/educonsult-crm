@@ -11,6 +11,15 @@ FastAPI ``Depends``-compatible callable that:
 3. Raises :class:`fastapi.HTTPException` 429 with a ``Retry-After``
    header on a trip, or returns ``None`` to let the request continue.
 
+.. note::
+   This module deliberately does **not** import
+   :mod:`from __future__ import annotations`. The dependency closure
+   uses ``Annotated[str, Depends(key_extractor)]`` and FastAPI
+   inspects that annotation at runtime to wire up the sub-dependency;
+   under PEP 563 lazy annotations the ``Depends`` wrapper would
+   survive as a string instead of being resolved, so the parameter
+   would silently fall back to being treated as a query field.
+
 Layered "per-IP + per-account" usage
 ------------------------------------
 
@@ -48,8 +57,6 @@ The wiring above is owned by issue #96 -- this module only ships the
 factory + default key extractors so that ticket has a clean API to
 build on.
 """
-
-from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Annotated

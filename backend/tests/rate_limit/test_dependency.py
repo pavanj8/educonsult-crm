@@ -44,13 +44,18 @@ def _build_app(
     *,
     per_account_extractor: Callable[..., str] | None = None,
     scope: str = "login",
+    per_account_config: RateLimitConfig | None = None,
 ) -> FastAPI:
     """Build a test app that exercises the rate-limit dependency in isolation."""
     app = FastAPI()
     per_ip_dep = make_rate_limit_dependency(scope, client_ip_key)
     dependencies = [Depends(per_ip_dep)]
     if per_account_extractor is not None:
-        per_account_dep = make_rate_limit_dependency(scope, per_account_extractor)
+        per_account_dep = make_rate_limit_dependency(
+            scope,
+            per_account_extractor,
+            config=per_account_config,
+        )
         dependencies.append(Depends(per_account_dep))
 
     @app.post("/probe", dependencies=dependencies)
@@ -164,7 +169,13 @@ def test_per_account_key_normalised_across_calls() -> None:
     def _per_account(body: _ProbeBody) -> str:
         return body.email
 
-    app = _build_app(per_account_extractor=_per_account)
+    # Use a tight per-account limit so the 4th request (across the
+    # three normalised variants) trips the bucket and proves all three
+    # landed in the same bucket key.
+    app = _build_app(
+        per_account_extractor=_per_account,
+        per_account_config=RateLimitConfig(max_requests=3, window_seconds=60),
+    )
     client = TestClient(app)
 
     for variant in ("a@example.test", "A@Example.test", "  a@EXAMPLE.test  "):
