@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
 import AppLayout from './AppLayout'
@@ -34,6 +34,8 @@ const brandedTenant = {
   updated_at: '2026-01-15T10:00:00Z',
 }
 
+const emptyNotifications = { items: [], unread_count: 0 }
+
 function LayoutHarness({ children }: { children?: ReactNode }) {
   return (
     <AuthProvider>
@@ -54,14 +56,60 @@ function LayoutHarness({ children }: { children?: ReactNode }) {
   )
 }
 
+type JsonValue = unknown
+type MockResponse = { ok: boolean; status: number; json: () => Promise<JsonValue> }
+
+/**
+ * URL-aware fetch mock. ``NotificationBell`` fires its own
+ * ``/notifications`` request on mount, which races with the
+ * ``AuthProvider``'s ``/auth/me`` and the hook's ``/tenants/{id}``
+ * requests; routing by URL keeps the test stable regardless of the
+ * mount order.
+ */
+function setupFetchMock(
+  fetchSpy: ReturnType<typeof vi.spyOn>,
+  routes: Record<string, MockResponse | (() => MockResponse)>,
+): void {
+  fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    for (const [prefix, response] of Object.entries(routes)) {
+      if (url.includes(prefix)) {
+        const value = typeof response === 'function' ? response() : response
+        return {
+          ok: value.ok,
+          status: value.status,
+          json: value.json,
+        } as Response
+      }
+    }
+    throw new Error(`Unexpected fetch in test: ${url}`)
+  })
+}
+
 describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>
+
   beforeEach(() => {
     vi.restoreAllMocks()
     localStorage.clear()
     document.documentElement.removeAttribute('style')
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+    document.documentElement.removeAttribute('style')
   })
 
   it('falls back to the default wordmark when no tenant branding is available', async () => {
+    setupFetchMock(fetchSpy, {
+      '/auth/me': {
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: 'Unauthenticated' }),
+      },
+    })
+
     render(
       <LayoutHarness>
         <div data-testid="fallback-marker" />
@@ -72,46 +120,58 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
       expect(screen.getByTestId('fallback-marker')).toBeInTheDocument()
     })
 
+    const layout = screen.getByTestId('app-layout')
     expect(screen.getByRole('heading', { name: 'EduConsult CRM' })).toBeInTheDocument()
     expect(screen.queryByTestId('app-header-logo')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('app-header-branded')).not.toBeInTheDocument()
+    expect(layout.getAttribute('data-app-header-branded')).toBe('false')
     expect(document.documentElement.style.getPropertyValue('--brand-color')).toBe('')
   })
 
   it('renders the tenant name and logo when branding is available', async () => {
-    localStorage.setItem('access_token', 'test-token')
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
+    setupFetchMock(fetchSpy, {
+      '/auth/me': {
         ok: true,
         status: 200,
         json: async () => superAdminUser,
-      })
-      .mockResolvedValueOnce({
+      },
+      '/tenants/7': {
         ok: true,
         status: 200,
         json: async () => brandedTenant,
-      })
-      // The notification bell fires its own requests; respond with an
-      // empty queue so the layout settles deterministically.
-      .mockResolvedValue({
+      },
+      '/notifications': {
         ok: true,
         status: 200,
-        json: async () => ({ items: [], unread_count: 0 }),
-      }) as typeof fetch
+        json: async () => emptyNotifications,
+      },
+    })
 
     render(<LayoutHarness />)
 
+    // DEBUG
+    await new Promise((r) => setTimeout(r, 500))
+    console.log('DEBUG calls:', fetchSpy.mock.calls.map((c) => c[0]))
+    console.log('DEBUG brand-color var:', document.documentElement.style.getPropertyValue('--brand-color'))
+
+    // The CSS-variable side-effect on ``document.documentElement`` is
+    // the deterministic signal that the provider has finished
+    // loading. Wait for it before asserting on rendered nodes.
     await waitFor(() => {
-      expect(screen.getByTestId('app-header-branded')).toBeInTheDocument()
+      expect(
+        document.documentElement.style.getPropertyValue('--brand-color'),
+      ).toBe('#1A2B3C')
     })
 
+    const layout = screen.getByTestId('app-layout')
+    expect(layout.getAttribute('data-app-header-branded')).toBe('true')
     expect(
       screen.getByRole('heading', { name: 'Apex EduConsult' }),
     ).toBeInTheDocument()
     const logo = screen.getByTestId('app-header-logo')
     expect(logo).toHaveAttribute('src', 'https://cdn.example.test/apex/logo.png')
     expect(logo).toHaveAttribute('alt', 'Apex EduConsult logo')
+    expect(logo).toHaveAttribute('referrerPolicy', 'no-referrer')
+    expect(logo).toHaveAttribute('loading', 'lazy')
 
     expect(document.documentElement.style.getPropertyValue('--brand-color')).toBe('#1A2B3C')
     expect(
@@ -124,53 +184,66 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
     // the GET /tenants/{id} request surfaces a 403. The layout must
     // still render (with the platform-default wordmark) rather than
     // crash the navigation chrome.
-    localStorage.setItem('access_token', 'test-token')
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
+    setupFetchMock(fetchSpy, {
+      '/auth/me': {
         ok: true,
         status: 200,
         json: async () => ownerUser,
-      })
-      .mockResolvedValueOnce({
+      },
+      '/tenants/7': {
         ok: false,
         status: 403,
         json: async () => ({ detail: 'Insufficient permissions' }),
-      })
-      .mockResolvedValue({
+      },
+      '/notifications': {
         ok: true,
         status: 200,
-        json: async () => ({ items: [], unread_count: 0 }),
-      }) as typeof fetch
+        json: async () => emptyNotifications,
+      },
+    })
 
     render(<LayoutHarness />)
+
+    // Wait for the branding fetch to fire and settle.
+    await waitFor(() => {
+      expect(
+        fetchSpy.mock.calls.some(([url]) =>
+          typeof url === 'string' && url.includes('/tenants/7'),
+        ),
+      ).toBe(true)
+    })
 
     await waitFor(() => {
       expect(screen.getByTestId('app-header')).toBeInTheDocument()
     })
 
+    const layout = screen.getByTestId('app-layout')
     // No branding applied -> default wordmark, no logo, no branded
-    // chip, no CSS variable set.
+    // marker, no CSS variable set.
     expect(screen.getByRole('heading', { name: 'EduConsult CRM' })).toBeInTheDocument()
     expect(screen.queryByTestId('app-header-logo')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('app-header-branded')).not.toBeInTheDocument()
+    expect(layout.getAttribute('data-app-header-branded')).toBe('false')
     expect(document.documentElement.style.getPropertyValue('--brand-color')).toBe('')
   })
 
   it('clears the brand color CSS variable when branding is removed (logout)', async () => {
-    localStorage.setItem('access_token', 'test-token')
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
+    setupFetchMock(fetchSpy, {
+      '/auth/me': {
         ok: true,
         status: 200,
         json: async () => superAdminUser,
-      })
-      .mockResolvedValueOnce({
+      },
+      '/tenants/7': {
         ok: true,
         status: 200,
         json: async () => brandedTenant,
-      }) as typeof fetch
+      },
+      '/notifications': {
+        ok: true,
+        status: 200,
+        json: async () => emptyNotifications,
+      },
+    })
 
     const { unmount } = render(<LayoutHarness />)
 

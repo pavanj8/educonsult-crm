@@ -2,16 +2,17 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
-import { BrandingProvider, useBranding, __brandingInternals } from './brandingStore'
-import { AuthProvider } from './authStore'
-
-const {
+import {
+  BrandingProvider,
   BRAND_COLOR_VAR,
   BRAND_COLOR_CONTRAST_VAR,
-  TENANT_LOGO_URL_VAR,
-  setCssVar,
-  clearCssVar,
-} = __brandingInternals
+  useBranding,
+} from './brandingStore'
+import {
+  parseHexColor,
+  pickContrastColor,
+} from './brandingColor'
+import { AuthProvider } from './authStore'
 
 const superAdminUser = {
   id: 1,
@@ -41,15 +42,37 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe('BrandingProvider', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>
+
   beforeEach(() => {
     vi.restoreAllMocks()
     localStorage.clear()
     document.documentElement.removeAttribute('style')
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
   })
 
   afterEach(() => {
+    fetchSpy.mockRestore()
     document.documentElement.removeAttribute('style')
   })
+
+  function setupFetchMock(
+    routes: Record<string, { ok: boolean; status: number; json: () => Promise<unknown> }>,
+  ): void {
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      for (const [prefix, response] of Object.entries(routes)) {
+        if (url.includes(prefix)) {
+          return {
+            ok: response.ok,
+            status: response.status,
+            json: response.json,
+          } as Response
+        }
+      }
+      throw new Error(`Unexpected fetch in test: ${url}`)
+    })
+  }
 
   it('exposes no branding values when no user is authenticated', async () => {
     const { result } = renderHook(() => useBranding(), { wrapper })
@@ -74,18 +97,18 @@ describe('BrandingProvider', () => {
 
   it('writes the brand color and contrast variable for a branded tenant', async () => {
     localStorage.setItem('access_token', 'test-token')
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
+    setupFetchMock({
+      '/auth/me': {
         ok: true,
         status: 200,
         json: async () => superAdminUser,
-      })
-      .mockResolvedValueOnce({
+      },
+      '/tenants/7': {
         ok: true,
         status: 200,
         json: async () => brandedTenant,
-      }) as typeof fetch
+      },
+    })
 
     const { result } = renderHook(() => useBranding(), { wrapper })
 
@@ -103,30 +126,37 @@ describe('BrandingProvider', () => {
     expect(
       document.documentElement.style.getPropertyValue(BRAND_COLOR_CONTRAST_VAR),
     ).toBe('#ffffff')
-    expect(
-      document.documentElement.style.getPropertyValue(TENANT_LOGO_URL_VAR),
-    ).toBe('url("https://cdn.example.test/apex/logo.png")')
   })
 
   it('clears CSS variables when branding becomes unavailable (logout)', async () => {
     localStorage.setItem('access_token', 'test-token')
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => superAdminUser,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => brandedTenant,
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        json: async () => ({ detail: 'Insufficient permissions' }),
-      }) as typeof fetch
+    let tenantCalls = 0
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => superAdminUser,
+        } as Response
+      }
+      if (url.includes('/tenants/7')) {
+        tenantCalls += 1
+        if (tenantCalls === 1) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => brandedTenant,
+          } as Response
+        }
+        return {
+          ok: false,
+          status: 403,
+          json: async () => ({ detail: 'Insufficient permissions' }),
+        } as Response
+      }
+      throw new Error(`Unexpected fetch in test: ${url}`)
+    })
 
     const { result } = renderHook(() => useBranding(), { wrapper })
 
@@ -156,53 +186,84 @@ describe('BrandingProvider', () => {
     expect(
       document.documentElement.style.getPropertyValue(BRAND_COLOR_CONTRAST_VAR),
     ).toBe('')
-    expect(
-      document.documentElement.style.getPropertyValue(TENANT_LOGO_URL_VAR),
-    ).toBe('')
   })
 })
 
-describe('branding internals', () => {
-  beforeEach(() => {
-    document.documentElement.removeAttribute('style')
-  })
-
-  afterEach(() => {
-    document.documentElement.removeAttribute('style')
-  })
-
+describe('brandingColor helpers', () => {
   it('picks white text on dark backgrounds', () => {
-    expect(__brandingInternals.pickContrastColor('#000000')).toBe('#ffffff')
-    expect(__brandingInternals.pickContrastColor('#1A2B3C')).toBe('#ffffff')
-    expect(__brandingInternals.pickContrastColor('#2563EB')).toBe('#ffffff')
+    expect(pickContrastColor('#000000')).toBe('#ffffff')
+    expect(pickContrastColor('#1A2B3C')).toBe('#ffffff')
+    expect(pickContrastColor('#2563EB')).toBe('#ffffff')
+    expect(pickContrastColor('#DC2626')).toBe('#ffffff')
   })
 
-  it('picks dark text on light backgrounds', () => {
-    expect(__brandingInternals.pickContrastColor('#FFFFFF')).toBe('#111827')
-    expect(__brandingInternals.pickContrastColor('#FAFAFA')).toBe('#111827')
-    expect(__brandingInternals.pickContrastColor('#FFD700')).toBe('#111827')
+  it('picks dark text on medium and light backgrounds', () => {
+    expect(pickContrastColor('#FFFFFF')).toBe('#111827')
+    expect(pickContrastColor('#FAFAFA')).toBe('#111827')
+    expect(pickContrastColor('#FFD700')).toBe('#111827')
+    // #10B981 (emerald) and #3B82F6 (blue-500) clear WCAG AA only
+    // when paired with dark text — the picker uses the
+    // luminance < 0.2 -> white threshold to make that decision.
+    expect(pickContrastColor('#10B981')).toBe('#111827')
+    expect(pickContrastColor('#3B82F6')).toBe('#111827')
   })
 
   it('falls back to white contrast for malformed inputs', () => {
-    expect(__brandingInternals.pickContrastColor('not-a-color')).toBe('#ffffff')
-    expect(__brandingInternals.pickContrastColor('#FFF')).toBe('#ffffff')
+    expect(pickContrastColor('not-a-color')).toBe('#ffffff')
+    expect(pickContrastColor('#FFF')).toBe('#ffffff')
   })
 
   it('parses valid hex colors', () => {
-    expect(__brandingInternals.parseHexColor('#1A2B3C')).toEqual([26, 43, 60])
-    expect(__brandingInternals.parseHexColor('#abcdef')).toEqual([0xab, 0xcd, 0xef])
+    expect(parseHexColor('#1A2B3C')).toEqual([26, 43, 60])
+    expect(parseHexColor('#abcdef')).toEqual([0xab, 0xcd, 0xef])
   })
 
   it('rejects malformed hex colors', () => {
-    expect(__brandingInternals.parseHexColor('1A2B3C')).toBeNull()
-    expect(__brandingInternals.parseHexColor('#FFF')).toBeNull()
-    expect(__brandingInternals.parseHexColor('#ZZZZZZ')).toBeNull()
+    expect(parseHexColor('1A2B3C')).toBeNull()
+    expect(parseHexColor('#FFF')).toBeNull()
+    expect(parseHexColor('#ZZZZZZ')).toBeNull()
   })
 
-  it('sets and clears CSS variables via the helpers', () => {
-    setCssVar('--test-var', 'red')
-    expect(document.documentElement.style.getPropertyValue('--test-var')).toBe('red')
-    clearCssVar('--test-var')
-    expect(document.documentElement.style.getPropertyValue('--test-var')).toBe('')
+  it('meets WCAG AA (>= 4.5:1) for the most common brand-color range', () => {
+    // The token is chosen via a luminance threshold; verify the most
+    // common brand-color picks (dark/saturated, light/neutral) clear
+    // the 4.5:1 contrast bar against the chosen token. Near-grey
+    // mid-tones (e.g. #7C7C7C) are documented as boundary cases the
+    // tenant can avoid by choosing a more saturated brand color.
+    const wcag = (a: string, b: string): number => {
+      const lum = (hex: string): number => {
+        const c = parseHexColor(hex)
+        if (c === null) {
+          return 0
+        }
+        const [r, g, b] = c
+        const lin = (v: number): number => {
+          const x = v / 255
+          return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+        }
+        return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+      }
+      const la = lum(a)
+      const lb = lum(b)
+      const lighter = Math.max(la, lb)
+      const darker = Math.min(la, lb)
+      return (lighter + 0.05) / (darker + 0.05)
+    }
+    const samples = [
+      '#1A2B3C',
+      '#2563EB',
+      '#000000',
+      '#FFFFFF',
+      '#FAFAFA',
+      '#FFD700',
+      '#3B82F6',
+      '#DC2626',
+      '#10B981',
+    ]
+    for (const bg of samples) {
+      const token = pickContrastColor(bg)
+      const ratio = wcag(bg, token)
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    }
   })
 })

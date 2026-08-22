@@ -15,8 +15,15 @@ export default function AppLayout() {
   const showLogo = logoUrl !== null
   const heading = tenantName ?? 'EduConsult CRM'
 
+  // ``data-app-header-branded`` mirrors the brand-color side-effect
+  // for tests + ops so the provider's mounted state is observable
+  // without rendering a user-visible chip in the chrome.
   return (
-    <div className="app-layout" data-testid="app-layout">
+    <div
+      className="app-layout"
+      data-testid="app-layout"
+      data-app-header-branded={brandColor !== null ? 'true' : 'false'}
+    >
       <header className="app-header" data-testid="app-header">
         <div className="app-header__brand">
           {showLogo ? (
@@ -25,6 +32,11 @@ export default function AppLayout() {
               data-testid="app-header-logo"
               src={logoUrl}
               alt={`${heading} logo`}
+              // Tenant controls the logo URL (up to https://), so opt
+              // out of the default referrer policy to avoid leaking
+              // the user's IP / UA to a third-party image host.
+              referrerPolicy="no-referrer"
+              loading="lazy"
             />
           ) : null}
           <h1>{heading}</h1>
@@ -72,13 +84,6 @@ export default function AppLayout() {
                 My applications
               </Link>
             </nav>
-          ) : null}
-          {/* Indicator that survives even when no branding is applied;
-              used by tests + ops to confirm the provider is mounted. */}
-          {brandColor !== null ? (
-            <span className="app-header__branded" data-testid="app-header-branded">
-              Branded
-            </span>
           ) : null}
         </div>
         <NotificationBell />

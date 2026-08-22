@@ -10,21 +10,14 @@
    * ``--brand-color`` and ``--brand-color-contrast`` are written at
    * runtime by BrandingProvider (:file:`frontend/src/store/brandingStore.tsx`)
    * whenever the authenticated user is associated with a tenant that
-   * has supplied a branding profile. They drive the header background,
-   * nav-link color, focus rings, and logo block of the app shell;
-   * platform-default values keep the app usable for users without
-   * tenant branding (and the login / public pages which intentionally
-   * ignore the variables).
-   *
-   * ``--tenant-logo-url`` mirrors ``tenant.logo_url`` so the
-   * ``app-header__logo`` block can reference it via ``background-image``
-   * when JS-only rendering is needed; the actual <img> render uses
-   * the React-supplied ``src`` instead (CSS variable lives for any
-   * future CSS-only background use, e.g. a watermark).
+   * has supplied a branding profile. The defaults below mirror the
+   * pre-E10 platform chrome (a white header with dark text) so the
+   * unauthenticated / unbranded renders look exactly the same as
+   * before this task. The provider overwrites both variables when a
+   * tenant profile is available and clears them on unmount / logout.
    */
-  --brand-color: #2563eb;
-  --brand-color-contrast: #ffffff;
-  --tenant-logo-url: none;
+  --brand-color: #ffffff;
+  --brand-color-contrast: #1a1a1a;
 }
 
 * {
@@ -79,9 +72,10 @@ body {
   justify-content: space-between;
   gap: 1rem;
   /* E10 / Journey J3: brand color drives the header background.
-   * The ``background-color`` falls back to the default blue so
-   * platforms / unauthenticated renders keep using the original
-   * chrome; BrandingProvider sets --brand-color for tenant users.
+   * The default ``background-color`` mirrors the pre-E10 chrome (a
+   * white header). BrandingProvider writes ``--brand-color`` /
+   * ``--brand-color-contrast`` once a tenant profile is loaded; the
+   * variables take effect for every authenticated tenant render.
    */
   background-color: var(--brand-color);
   color: var(--brand-color-contrast);
@@ -98,10 +92,11 @@ body {
   font-size: 1.25rem;
   /* Explicitly set color even when brand-color is in effect so the
    * tenant name (or default ``EduConsult CRM``) remains readable on
-   * the chosen background. The variable is safe to fall back on so a
-   * missing brand-color leaves the default #1a1a1a.
+   * the chosen background. The default mirrors the pre-E10 text
+   * color (near-black on a white header); BrandingProvider overwrites
+   * this with the contrast token it computes for the brand color.
    */
-  color: var(--brand-color-contrast, #1a1a1a);
+  color: var(--brand-color-contrast);
 }
 
 .app-header__logo {
@@ -110,19 +105,6 @@ body {
   max-width: 8rem;
   object-fit: contain;
   display: block;
-}
-
-.app-header__branded {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.18);
-  color: var(--brand-color-contrast, #ffffff);
 }
 
 .app-header__nav {
@@ -134,14 +116,14 @@ body {
 .app-header__nav a {
   font-size: 0.875rem;
   font-weight: 500;
-  /* Pick a color that stays readable on both default and branded
-   * backgrounds. When a brand color is set, ``--brand-color-contrast``
-   * resolves to either white or near-black based on the brand color
-   * luminance; the explicit fallback below mirrors the
-   * platform default to keep unauthenticated / unbranded renders
-   * looking exactly the same as before this task.
+  /* Brand color drives the nav-link color. The default keeps the
+   * pre-E10 platform look (a near-black link on a white header).
+   * BrandingProvider sets ``--brand-color-contrast`` to either white
+   * or near-black based on the brand color luminance; the explicit
+   * contrast value flows through to this selector without an
+   * intermediate fallback.
    */
-  color: var(--brand-color-contrast, #2563eb);
+  color: var(--brand-color-contrast);
   text-decoration: none;
 }
 
@@ -150,7 +132,7 @@ body {
 }
 
 .app-header__nav a:focus-visible {
-  outline: 2px solid var(--brand-color-contrast, #2563eb);
+  outline: 2px solid var(--brand-color-contrast);
   outline-offset: 2px;
 }
 
