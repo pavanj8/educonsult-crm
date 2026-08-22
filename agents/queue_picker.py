@@ -16,7 +16,10 @@ dependencies aren't merged yet:
   4. issue number as the final tiebreak.
 
 CLI: `python agents/queue_picker.py [<repo>]` prints the next issue number (or
-nothing). It shells out to `gh` for the open `task,phase:mvp` issues.
+nothing). It shells out to `gh` for the open `task,phase:<phase>` issues, where
+<phase> is `queue.phase` from harness.config.json (env: HARNESS_QUEUE_PHASE),
+defaulting to `mvp`. That knob is how the harness advances to the next phase
+once a phase's backlog is complete (ADR-0024).
 """
 from __future__ import annotations
 
@@ -80,17 +83,30 @@ def eligible(issues: list[dict], max_iter: int = MAX_ITERATIONS) -> list[dict]:
     )
 
 
-def _open_tasks(repo: str) -> list[dict]:
+def _phase() -> str:
+    """Phase label to filter on, from HARNESS_QUEUE_PHASE or harness.config.json."""
+    if os.environ.get("HARNESS_QUEUE_PHASE"):
+        return os.environ["HARNESS_QUEUE_PHASE"].strip()
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import harness_config
+        return harness_config.queue_phase()
+    except Exception:
+        return "mvp"
+
+
+def _open_tasks(repo: str, phase: str | None = None) -> list[dict]:
+    phase = phase or _phase()
     out = subprocess.run(
-        ["gh", "issue", "list", "-R", repo, "--label", "task,phase:mvp",
+        ["gh", "issue", "list", "-R", repo, "--label", f"task,phase:{phase}",
          "--state", "open", "--limit", "300", "--json", "number,labels,title"],
         capture_output=True, text=True,
     )
     return json.loads(out.stdout or "[]")
 
 
-def next_issue(repo: str, max_iter: int = MAX_ITERATIONS) -> int | None:
-    picks = eligible(_open_tasks(repo), max_iter)
+def next_issue(repo: str, max_iter: int = MAX_ITERATIONS, phase: str | None = None) -> int | None:
+    picks = eligible(_open_tasks(repo, phase), max_iter)
     return picks[0]["number"] if picks else None
 
 
