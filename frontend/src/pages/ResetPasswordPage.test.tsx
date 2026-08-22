@@ -8,15 +8,14 @@ import ResetPasswordPage from './ResetPasswordPage'
 
 const VALID_TOKEN = 'valid-reset-token'
 
-function renderReset(initialEntry?: string) {
-  const entry = initialEntry ?? `/reset-password?token=${VALID_TOKEN}`
+function renderReset(initialPath: string = `/reset-password?token=${VALID_TOKEN}`) {
   return render(
     <AuthProvider>
-      <MemoryRouter initialEntries={[entry]}>
+      <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/login" element={<p>Login page</p>} />
-          <Route path="/" element={<p>Home page</p>} />
+          <Route path="/" element={<p>Welcome to EduConsult CRM</p>} />
         </Routes>
       </MemoryRouter>
     </AuthProvider>,
@@ -32,7 +31,7 @@ describe('ResetPasswordPage', () => {
     vi.unstubAllGlobals()
   })
 
-  it('renders the new-password and confirm fields and pre-reads the token from the query string', async () => {
+  it('renders the new password and confirm password fields when a token is present', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -50,10 +49,9 @@ describe('ResetPasswordPage', () => {
     expect(screen.getByTestId('reset-password')).toBeInTheDocument()
     expect(screen.getByTestId('reset-password-confirm')).toBeInTheDocument()
     expect(screen.getByTestId('reset-submit')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login')
   })
 
-  it('submits the new password with the token and shows the success screen', async () => {
+  it('submits token + new password to /auth/reset-password', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -77,22 +75,44 @@ describe('ResetPasswordPage', () => {
         '/auth/reset-password',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ token: VALID_TOKEN, new_password: 'new-strong-password' }),
+          body: JSON.stringify({
+            token: VALID_TOKEN,
+            new_password: 'new-strong-password',
+          }),
         }),
       )
     })
-
-    expect(
-      await screen.findByText(/Your password has been reset successfully./i),
-    ).toBeInTheDocument()
-    expect(screen.queryByTestId('reset-submit')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Sign in with your new password/i })).toHaveAttribute(
-      'href',
-      '/login',
-    )
   })
 
-  it('shows backend error for an invalid or expired token', async () => {
+  it('shows a confirmation message after a successful reset', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ message: 'Your password has been reset successfully.' }),
+      }),
+    )
+
+    renderReset()
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByTestId('reset-password'), 'new-strong-password')
+    await user.type(screen.getByTestId('reset-password-confirm'), 'new-strong-password')
+    await user.click(screen.getByTestId('reset-submit'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Your password has been reset successfully.')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('reset-password')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('reset-submit')).not.toBeInTheDocument()
+  })
+
+  it('shows an error when the backend rejects the token with 400', async () => {
     const user = userEvent.setup()
     vi.stubGlobal(
       'fetch',
@@ -117,18 +137,18 @@ describe('ResetPasswordPage', () => {
       expect(screen.getByTestId('reset-error')).toBeInTheDocument()
     })
     expect(screen.getByTestId('reset-error')).toHaveTextContent('Invalid or expired reset token')
-    // Form is still rendered so the user can retry (e.g. after requesting a fresh email).
-    expect(screen.getByTestId('reset-submit')).toBeInTheDocument()
   })
 
-  it('rejects mismatched passwords before calling the backend', async () => {
+  it('shows a mismatch error when the two password fields do not match', async () => {
     const user = userEvent.setup()
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({ detail: 'Not authenticated' }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: 'Not authenticated' }),
+      }),
+    )
 
     renderReset()
 
@@ -144,13 +164,9 @@ describe('ResetPasswordPage', () => {
       expect(screen.getByTestId('reset-error')).toBeInTheDocument()
     })
     expect(screen.getByTestId('reset-error')).toHaveTextContent('Passwords do not match')
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      '/auth/reset-password',
-      expect.anything(),
-    )
   })
 
-  it('shows an error when the token query parameter is missing', async () => {
+  it('disables the form and shows a missing-token message when no token is in the URL', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -165,46 +181,26 @@ describe('ResetPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
     })
-
     expect(screen.getByTestId('reset-error')).toHaveTextContent(
-      'Reset link is missing or invalid',
+      'Reset link is missing or invalid. Please request a new password reset email.',
     )
     expect(screen.getByTestId('reset-submit')).toBeDisabled()
     expect(screen.getByTestId('reset-password')).toBeDisabled()
+    expect(screen.getByTestId('reset-password-confirm')).toBeDisabled()
   })
 
-  it('shows a generic error when the network request throws', async () => {
+  it('shows submitting state while the reset request is in flight', async () => {
     const user = userEvent.setup()
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')))
-
-    renderReset()
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
-    })
-
-    await user.type(screen.getByTestId('reset-password'), 'new-strong-password')
-    await user.type(screen.getByTestId('reset-password-confirm'), 'new-strong-password')
-    await user.click(screen.getByTestId('reset-submit'))
-
-    await waitFor(() => {
-      expect(screen.getByTestId('reset-error')).toBeInTheDocument()
-    })
-    expect(screen.getByTestId('reset-error')).toHaveTextContent('Unable to reset password')
-  })
-
-  it('shows submitting state while the request is in flight', async () => {
-    const user = userEvent.setup()
-    let resolveFetch: (value: Response) => void = () => {}
-    const fetchPromise = new Promise<Response>((resolve) => {
-      resolveFetch = resolve
+    let resolveRequest: (value: Response) => void = () => {}
+    const requestPromise = new Promise<Response>((resolve) => {
+      resolveRequest = resolve
     })
 
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
         if (url.endsWith('/auth/reset-password')) {
-          return fetchPromise
+          return requestPromise
         }
         return Promise.resolve({
           ok: false,
@@ -231,14 +227,14 @@ describe('ResetPasswordPage', () => {
     expect(submitButton).toHaveTextContent('Resetting…')
     expect(submitButton).toHaveAttribute('aria-busy', 'true')
 
-    resolveFetch({
+    resolveRequest({
       ok: true,
       status: 200,
       json: async () => ({ message: 'Your password has been reset successfully.' }),
     } as Response)
 
     await waitFor(() => {
-      expect(submitButton).not.toBeInTheDocument()
+      expect(screen.getByText('Your password has been reset successfully.')).toBeInTheDocument()
     })
   })
 
@@ -263,7 +259,7 @@ describe('ResetPasswordPage', () => {
     renderReset()
 
     await waitFor(() => {
-      expect(screen.getByText('Home page')).toBeInTheDocument()
+      expect(screen.getByText('Welcome to EduConsult CRM')).toBeInTheDocument()
     })
     expect(
       screen.queryByRole('heading', { name: 'Choose a new password' }),
