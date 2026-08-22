@@ -107,9 +107,13 @@ def _pending_document(
     *,
     tenant_id: int,
     application_id: int,
-    student_id: int,
+    student_id: int | None,
     filename: str = "transcript.pdf",
 ) -> StudentDocument:
+    """Seed a pending ``StudentDocument`` row (mirrors the helper in tests/checklist/helpers.py)."""
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
     document = StudentDocument(
         tenant_id=tenant_id,
         application_id=application_id,
@@ -119,6 +123,9 @@ def _pending_document(
         size_bytes=2048,
         storage_path=f"tenants/{tenant_id}/applications/{application_id}/{filename}",
         uploaded_by_user_id=student_id,
+        uploaded_at=now,
+        created_at=now,
+        updated_at=now,
     )
     db_session.add(document)
     db_session.commit()
@@ -221,19 +228,28 @@ def test_notify_application_stage_advanced_targets_student(
 def test_notify_application_stage_advanced_returns_none_without_student(
     db_session, tenant, branch, counselor
 ):
-    """No recipient -> no row (no orphaned notifications)."""
-    application = seed_application(
-        db_session,
+    """No recipient -> no row (no orphaned notifications).
+
+    The ``Application.student_id`` column is ``NOT NULL`` at the DB layer
+    (E18 model contract), so a *real* application always has a student.
+    We therefore drive the defensive ``student_id is None`` branch by
+    constructing an in-memory ``Application`` whose ``student_id`` is
+    not flushed — the service hook short-circuits before any DB write.
+    """
+    detached = Application(
         tenant_id=tenant.id,
         branch_id=branch.id,
         student_id=None,
         assigned_counselor_id=counselor.id,
+        university_id=1,
+        program_id=1,
+        stage=PipelineStage.REGISTERED,
     )
 
     assert (
         notify_application_stage_advanced(
             db_session,
-            application=application,
+            application=detached,
             to_stage=PipelineStage.COUNSELING,
             changed_by_user_id=None,
         )
@@ -343,24 +359,39 @@ def test_notify_document_review_outcome_rejects_unknown_value(
 def test_notify_document_review_outcome_returns_none_without_uploader(
     db_session, tenant, branch
 ):
-    """A document with no recorded uploader produces no notification row."""
+    """A document with no recorded uploader produces no notification row.
+
+    The ``StudentDocument.uploaded_by_user_id`` column is ``NOT NULL``
+    at the DB layer (E27 upload contract), so a real document row
+    always has an uploader. We therefore drive the defensive
+    ``uploaded_by_user_id is None`` branch by constructing an
+    in-memory ``StudentDocument`` not flushed to the DB — the service
+    hook short-circuits before any DB write.
+    """
+    from datetime import datetime, timezone
+
     application = seed_application(
         db_session,
         tenant_id=tenant.id,
         branch_id=branch.id,
         student_id=None,
     )
-    document = _pending_document(
-        db_session,
+    detached = StudentDocument(
         tenant_id=tenant.id,
         application_id=application.id,
-        student_id=None,
+        status=StudentDocumentStatus.PENDING,
+        original_filename="orphan.pdf",
+        content_type="application/pdf",
+        size_bytes=2048,
+        storage_path=f"tenants/{tenant.id}/applications/{application.id}/orphan.pdf",
+        uploaded_by_user_id=None,
+        uploaded_at=datetime.now(timezone.utc),
     )
 
     assert (
         notify_document_review_outcome(
             db_session,
-            document=document,
+            document=detached,
             outcome="approved",
         )
         is None

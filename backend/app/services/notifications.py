@@ -171,6 +171,9 @@ def notify_document_review_outcome(
     (e.g. a cybernetically-deleted uploader — should not happen for
     a live document, but is a safe no-op here).
     """
+    if document.uploaded_by_user_id is None:
+        return None
+
     if outcome == "approved":
         event_type = EVENT_DOCUMENT_APPROVED
         title = "Document approved"
