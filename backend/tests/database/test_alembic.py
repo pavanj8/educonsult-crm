@@ -159,6 +159,19 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "created_at",
             "updated_at",
         }
+        tenant_columns = {
+            column["name"] for column in inspect(connection).get_columns("tenants")
+        }
+        assert tenant_columns == {
+            "id",
+            "name",
+            "slug",
+            "logo_url",
+            "brand_color",
+            "currency",
+            "created_at",
+            "updated_at",
+        }
         password_reset_token_columns = {
             column["name"]
             for column in inspect(connection).get_columns("password_reset_tokens")

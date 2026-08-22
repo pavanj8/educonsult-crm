@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 """Pydantic schemas for tenant management endpoints (E8; Journey J1; E10 branding)."""
+=======
+"""Pydantic schemas for tenant management endpoints (E8; Journey J1; E10 task #109)."""
+>>>>>>> origin/main
 
 import re
 from datetime import datetime
@@ -10,11 +14,15 @@ from app.i18n.currency import InvalidCurrencyCodeError, normalize_currency_code
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+<<<<<<< HEAD
 # Canonical CSS hex colour: leading "#", exactly six lowercase or uppercase hex digits.
 _BRAND_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 # Permissive logo-URL shape; stricter URL/HTTP scheme validation is left to the
 # logo-upload endpoint (E10 ticket #111) which knows the storage backend.
 _LOGO_URL_PATTERN = re.compile(r"^https?://.+", re.IGNORECASE)
+=======
+_BRAND_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+>>>>>>> origin/main
 
 
 class TenantCreateRequest(BaseModel):
@@ -61,7 +69,11 @@ class TenantResponse(BaseModel):
     slug: str
     logo_url: str | None = None
     brand_color: str | None = None
+<<<<<<< HEAD
     currency: str | None = None
+=======
+    currency: str
+>>>>>>> origin/main
     created_at: datetime
     updated_at: datetime
 
