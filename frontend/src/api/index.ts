@@ -1,5 +1,11 @@
 export { login, refresh, fetchMe, authErrorMessage } from './auth'
-export { fetchApplicationChecklist } from './checklist'
+export {
+  createAdminChecklistItemTemplate,
+  deleteAdminChecklistItemTemplate,
+  fetchAdminChecklistItemTemplates,
+  fetchApplicationChecklist,
+  updateAdminChecklistItemTemplate,
+} from './checklist'
 export { fetchCountries, fetchPrograms, fetchUniversities } from './masterData'
 export { registerStudent } from './students'
 export {

@@ -405,6 +405,95 @@ describe('AppRouter routes', () => {
     expect(screen.queryByRole('link', { name: 'Master data' })).not.toBeInTheDocument()
   })
 
+  it('renders checklist templates page for consultancy owner users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockConsultancyOwner,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      }) as typeof fetch
+
+    renderAppAt('/checklist-templates')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('checklist-templates-page')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Checklist templates' })).toBeInTheDocument()
+  })
+
+  it('renders checklist templates page for branch manager users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockBranchManager,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      }) as typeof fetch
+
+    renderAppAt('/checklist-templates')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('checklist-templates-page')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Checklist templates' })).toBeInTheDocument()
+  })
+
+  it('denies checklist templates page to counselor users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockUser,
+    }) as typeof fetch
+
+    renderAppAt('/checklist-templates')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('access-denied')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('checklist-templates-page')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Checklist templates' })).not.toBeInTheDocument()
+  })
+
   it('renders student dashboard for student users', async () => {
     localStorage.setItem('access_token', 'stored-access-token')
     localStorage.setItem('refresh_token', 'stored-refresh-token')

@@ -19,3 +19,6 @@ export const COUNSELOR_DASHBOARD_PATH = '/my-applications'
 
 /** Master-data admin UI (E14; Journey J7). */
 export const MASTER_DATA_ADMIN_PATH = '/master-data'
+
+/** Checklist template builder UI (E15; Journey J8). */
+export const CHECKLIST_TEMPLATES_PATH = '/checklist-templates'

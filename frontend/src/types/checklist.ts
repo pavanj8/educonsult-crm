@@ -1,4 +1,4 @@
-/** Checklist types aligned with backend E26 schemas (Journey J19).
+/** Checklist types aligned with backend E15/E26 schemas (Journey J8/J19).
 
 The backend ``GET /applications/{application_id}/checklist`` endpoint
 (E26; sibling issue #172) returns the merged view of a stage/program
@@ -7,6 +7,12 @@ upload against each template, with a flat shape the frontend can
 render directly without further joins. These types mirror that
 response exactly; keep field names in sync with
 ``backend/app/schemas/checklist.py`` (Requirements §5; ADR-0012).
+
+E15 (Document Checklist Template Management) adds the
+:class:`ChecklistItemTemplate` CRUD endpoints
+(``/checklist-templates/admin/...``); the request/response shapes for
+those endpoints are mirrored below so the template builder UI can
+manage the definitions the J19 read endpoint serves.
 */
 
 import type { PipelineStage } from './application'
@@ -59,4 +65,55 @@ export interface ChecklistUpload {
 export interface ChecklistResponse {
   applicationId: number
   items: ChecklistItem[]
+}
+
+/* ------------------------------------------------------------------ *
+ * E15 — Checklist template CRUD types (Journey J8; sibling #132/#134).
+ *
+ * The backend CRUD endpoints are mounted under
+ * ``/checklist-templates/admin/templates``. The ``program_id`` field
+ * is nullable: ``null`` means "applies to every program" (the common
+ * case for documents like "passport" or "transcripts"). ``order_index``
+ * is also nullable; the backend uses NULL to mean "append at the end".
+ * ------------------------------------------------------------------ */
+
+/**
+ * Full :class:`ChecklistItemTemplate` row as returned by the E15 admin
+ * CRUD endpoints (Journey J8). The shape mirrors the backend
+ * ``ChecklistItemTemplateResponse`` schema and the ORM model in
+ * :mod:`backend.app.models.checklist_item_template`.
+ */
+export interface ChecklistItemTemplate {
+  id: number
+  tenant_id: number
+  stage: PipelineStage
+  /** ``null`` means the template applies to every program in the tenant. */
+  program_id: number | null
+  name: string
+  description: string | null
+  required: boolean
+  /** ``null`` means "append at the end"; the API sorts NULLs last. */
+  order_index: number | null
+}
+
+/** Payload for ``POST /checklist-templates/admin/templates`` (J8). */
+export interface ChecklistItemTemplateCreateRequest {
+  stage: PipelineStage
+  /** Omit or ``null`` to apply the template to every program. */
+  program_id?: number | null
+  name: string
+  description?: string | null
+  required?: boolean
+  /** Omit or ``null`` to append at the end of the stage's checklist. */
+  order_index?: number | null
+}
+
+/** Payload for ``PATCH /checklist-templates/admin/templates/{id}`` (J8). */
+export interface ChecklistItemTemplateUpdateRequest {
+  stage?: PipelineStage
+  program_id?: number | null
+  name?: string
+  description?: string | null
+  required?: boolean
+  order_index?: number | null
 }
