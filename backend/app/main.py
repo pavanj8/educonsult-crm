@@ -13,6 +13,7 @@ from app.routers.auth import router as auth_router
 from app.routers.branches import router as branches_router
 from app.routers.checklist import router as checklist_router
 from app.routers.master_data import router as master_data_router
+from app.routers.notifications import router as notifications_router
 from app.routers.staff import router as staff_router
 from app.routers.student_documents import router as student_documents_router
 from app.routers.tenants import router as tenants_router
@@ -85,6 +86,7 @@ app.include_router(applications_router, prefix="/applications", tags=["applicati
 app.include_router(checklist_router, prefix="/applications", tags=["checklist"])
 app.include_router(student_documents_router, prefix="/applications", tags=["student-documents"])
 app.include_router(verifier_router, prefix="/verifier", tags=["verifier"])
+app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 app.include_router(branches_router, prefix="/branches", tags=["branches"])
 app.include_router(staff_router, prefix="/staff", tags=["staff"])
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])

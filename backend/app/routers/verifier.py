@@ -25,6 +25,10 @@ from app.schemas.verifier import (
     RejectDocumentRequest,
     RejectDocumentResponse,
 )
+from app.services.notifications import (
+    notify_document_approved,
+    notify_document_rejected,
+)
 
 router = APIRouter()
 
@@ -228,6 +232,10 @@ def approve_document(
     document.verified_at = _utc_now()
     document.approval_comment = comment
 
+    application = db.get(Application, document.application_id)
+    if application is not None:
+        notify_document_approved(db, document=document, application=application, comment=comment)
+
     try:
         db.commit()
     except OperationalError:
@@ -285,6 +293,10 @@ def reject_document(
     document.verified_by_user_id = current_user.id
     document.verified_at = _utc_now()
     document.rejection_reason = payload.comment
+
+    application = db.get(Application, document.application_id)
+    if application is not None:
+        notify_document_rejected(db, document=document, application=application, comment=payload.comment)
 
     try:
         db.commit()
