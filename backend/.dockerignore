@@ -1,0 +1,30 @@
+# Keep the backend production image lean — never copy these into the build
+# context passed to `docker build`.
+
+# Tests + local development artefacts
+tests/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python bytecode / virtualenvs
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor / VCS noise
+.git/
+.gitignore
+.gitattributes
+.dockerignore
+Dockerfile
+.idea/
+.vscode/
+.DS_Store
+
+# Build output for any future in-image bundlers
+dist/
+build/
