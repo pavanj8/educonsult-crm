@@ -63,19 +63,22 @@ def test_send_password_reset_email_delegates_to_smtp():
 
 
 def test_build_password_reset_url_targets_frontend_reset_page(monkeypatch):
-    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com/")
+    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com")
 
     url = build_password_reset_url(token="abc123")
 
     assert url == "https://app.example.com/reset-password?token=abc123"
 
 
-def test_build_password_reset_url_strips_trailing_slash_from_base(monkeypatch):
-    # Trailing slashes in APP_BASE_URL must not produce a doubled slash
-    # in the path, otherwise the frontend router would receive a
-    # malformed path.
-    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com/")
+def test_build_password_reset_url_strips_multiple_trailing_slashes(monkeypatch):
+    # APP_BASE_URL is operator-provided and frequently ends with extra
+    # trailing slashes (e.g. copied from a browser address bar). Every
+    # extra slash must collapse to a single one between host and path,
+    # otherwise the frontend router receives a malformed URL.
+    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com////")
 
     url = build_password_reset_url(token="abc123")
 
+    assert url == "https://app.example.com/reset-password?token=abc123"
+    # Specifically: no doubled slash between host and reset-password path.
     assert "//reset-password" not in url.replace("https://", "", 1)
