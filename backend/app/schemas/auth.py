@@ -26,3 +26,11 @@ class MeResponse(BaseModel):
     role: Role
     tenant_id: int | None
     branch_id: int | None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=1)
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str = "If an account exists for that email, a reset link has been sent."

@@ -1,5 +1,8 @@
 """Authentication routes (E5; Journey J44)."""
 
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,21 +19,39 @@ from app.auth import (
     verify_password,
     verify_refresh_token,
 )
-from app.auth.email_uniqueness import DUPLICATE_EMAIL_DETAIL, ensure_email_available
+from app.auth.email_uniqueness import (
+    DUPLICATE_EMAIL_DETAIL,
+    ensure_email_available,
+    find_user_by_email,
+)
 from app.auth.master_data_validation import validate_target_master_data
 from app.db.database import get_db
+from app.email.password_reset import build_password_reset_url, send_password_reset_email
+from app.email.service import EmailDeliveryError
 from app.models.branch import Branch
+from app.models.password_reset_token import PasswordResetToken
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.rbac.dependencies import get_current_user
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
-from app.schemas.auth import LoginRequest, MeResponse, RefreshRequest, TokenResponse
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    LoginRequest,
+    MeResponse,
+    RefreshRequest,
+    TokenResponse,
+)
 from app.schemas.student import RegisterStudentRequest, RegisterStudentResponse
 
 router = APIRouter()
 
 _DB_UNAVAILABLE_DETAIL = "Authentication service is temporarily unavailable"
+_FORGOT_PASSWORD_GENERIC_MESSAGE = (
+    "If an account exists for that email, a reset link has been sent."
+)
+_PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
 
 
 def _user_to_authenticated_user(user: User) -> AuthenticatedUser:
@@ -213,6 +234,63 @@ def register_student(
         refresh_token=create_refresh_token(authenticated_user),
         created_at=student_user.created_at,
     )
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+) -> ForgotPasswordResponse:
+    """Issue a single-use password-reset token and email the reset link (E6; J45).
+
+    Always returns the same generic response so callers cannot use the
+    endpoint to enumerate which email addresses are registered (a basic
+    account-enumeration defense). If no user matches the address, or
+    the account is deactivated, the response is still 200 with the
+    generic message and no email is sent.
+    """
+    try:
+        user = find_user_by_email(db, payload.email)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if user is not None and user.is_active and user.tenant_id is not None:
+        token_plain = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(token_plain.encode("utf-8")).hexdigest()
+        now = datetime.now(timezone.utc)
+        reset_token = PasswordResetToken(
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=now + _PASSWORD_RESET_TOKEN_TTL,
+        )
+        db.add(reset_token)
+        try:
+            db.commit()
+        except OperationalError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=_DB_UNAVAILABLE_DETAIL,
+            ) from None
+
+        reset_url = build_password_reset_url(token=token_plain)
+        try:
+            send_password_reset_email(to_email=user.email, reset_url=reset_url)
+        except EmailDeliveryError:
+            # The token row is already saved; rolling it back here would
+            # let a user retry until the SMTP issue clears, but the
+            # generic 200 response is the safer contract. We surface a
+            # 503 instead so the caller knows delivery failed.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to send password reset email",
+            ) from None
+
+    return ForgotPasswordResponse(message=_FORGOT_PASSWORD_GENERIC_MESSAGE)
 
 
 @router.get("/me", response_model=MeResponse)
