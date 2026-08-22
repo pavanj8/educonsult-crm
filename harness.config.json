@@ -19,6 +19,9 @@
   "execution": {
     "mode": "github"
   },
+  "queue": {
+    "phase": "phase-2"
+  },
   "models": {
     "dev": "MiniMax-M3",
     "verify": "MiniMax-M3",

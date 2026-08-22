@@ -30,6 +30,10 @@ _DEFAULTS: dict = {
     # Where the Dev/Test/Review/Planner agents run: "github" (GitHub Actions
     # runners, the default) or "local" (this machine, via agents/run_local.py).
     "execution": {"mode": "github"},
+    # Which delivery phase the queue picker draws from. The picker only queues
+    # open `task,phase:<phase>` issues, so this is how you advance the harness
+    # from one phase to the next once a phase's backlog is complete (ADR-0024).
+    "queue": {"phase": "mvp"},
     # LLM is provider-agnostic (docs/adr/0031): pick `provider`, and each provider
     # declares its API shape ("anthropic" Messages API or "openai" Chat Completions),
     # its base_url, and which env var holds the key. Point at MiniMax, Anthropic
@@ -79,6 +83,14 @@ def project_name() -> str:
 def execution_mode() -> str:
     """"github" (Actions runners) or "local" (this machine)."""
     return (os.environ.get("HARNESS_EXECUTION_MODE") or CONFIG["execution"].get("mode") or "github").strip()
+
+
+def queue_phase() -> str:
+    """The phase label the picker filters on (mvp | phase-2 | phase-3).
+
+    HARNESS_QUEUE_PHASE overrides the config for a one-off run.
+    """
+    return (os.environ.get("HARNESS_QUEUE_PHASE") or CONFIG["queue"].get("phase") or "mvp").strip()
 
 
 def active_provider() -> dict:

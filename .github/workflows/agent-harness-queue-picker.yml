@@ -82,5 +82,5 @@ jobs:
             gh issue edit "$NEXT" -R ${{ github.repository }} --add-label "agent:ready-for-dev"
             gh workflow run agent-harness.yml -R ${{ github.repository }} --ref main -f issue_number="$NEXT"
           else
-            echo "No eligible open phase:mvp task issues remain -- nothing to queue."
+            echo "No eligible open task issues remain for the configured phase (queue.phase) -- nothing to queue."
           fi
