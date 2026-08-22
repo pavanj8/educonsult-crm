@@ -61,6 +61,7 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
         assert "checklist_item_templates" in table_names
         assert "student_documents" in table_names
         assert "notifications" in table_names
+        assert "password_reset_tokens" in table_names
         user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
         assert "is_active" in user_columns
         assert "name" in user_columns
@@ -155,6 +156,20 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "message",
             "read_at",
             "application_id",
+            "created_at",
+            "updated_at",
+        }
+        password_reset_token_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("password_reset_tokens")
+        }
+        assert password_reset_token_columns == {
+            "id",
+            "tenant_id",
+            "user_id",
+            "token_hash",
+            "expires_at",
+            "used_at",
             "created_at",
             "updated_at",
         }
