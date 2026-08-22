@@ -13,9 +13,9 @@ Public surface:
 * :class:`RateLimiter` -- thread-safe, in-memory token-bucket registry.
   Exposes :meth:`check` (consume one slot) and :meth:`reset` (clear all
   state; used by tests).
-* :func:`rate_limit_dependency` -- FastAPI dependency factory. Build a
-  dependency with :func:`make_rate_limit_dependency` so the dependency
-  closure can carry its own scope/limit/window without global state.
+* :func:`make_rate_limit_dependency` -- FastAPI dependency factory. The
+  factory builds a per-scope dependency closure that carries its own
+  scope/limit/window without global state.
 
 Storage note: the bucket registry is **process-local and in-memory**.
 That is deliberate -- single-process deployment matches E1's Docker

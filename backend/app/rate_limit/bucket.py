@@ -1,7 +1,7 @@
 """Thread-safe in-memory token-bucket rate limiter (E7; Journey J46).
 
-Backs :func:`app.rate_limit.dependency.rate_limit_dependency` and is the
-*only* stateful component in this package. Designed for:
+Backs :func:`app.rate_limit.dependency.make_rate_limit_dependency` and is
+the *only* stateful component in this package. Designed for:
 
 * **Single-process deployment** -- one backend container, matching E1's
   Docker Compose layout. No Redis / external store.
