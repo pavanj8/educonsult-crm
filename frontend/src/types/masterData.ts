@@ -20,3 +20,35 @@ export type Program = {
   university_id: number
   name: string
 }
+
+/** Admin CRUD request payloads (E14 master-data admin endpoints; Journey J7). */
+
+export type CountryCreateRequest = {
+  name: string
+  code: string
+}
+
+export type CountryUpdateRequest = {
+  name?: string
+  code?: string
+}
+
+export type UniversityCreateRequest = {
+  country_id: number
+  name: string
+}
+
+export type UniversityUpdateRequest = {
+  country_id?: number
+  name?: string
+}
+
+export type ProgramCreateRequest = {
+  university_id: number
+  name: string
+}
+
+export type ProgramUpdateRequest = {
+  university_id?: number
+  name?: string
+}

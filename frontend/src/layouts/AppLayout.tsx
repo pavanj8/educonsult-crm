@@ -1,6 +1,7 @@
 import { Link, Outlet } from 'react-router-dom'
 
 import NotificationBell from '../components/notifications/NotificationBell'
+import { MASTER_DATA_ADMIN_PATH } from '../routes/paths'
 import { useAuth } from '../store/authStore'
 import { useBranding } from '../store/brandingStore'
 
@@ -60,12 +61,18 @@ export default function AppLayout() {
               <Link to="/staff" data-testid="nav-staff">
                 Staff
               </Link>
+              <Link to={MASTER_DATA_ADMIN_PATH} data-testid="nav-master-data">
+                Master data
+              </Link>
             </nav>
           ) : null}
           {user?.role === 'branch_manager' ? (
             <nav className="app-header__nav" aria-label="Main">
               <Link to="/staff" data-testid="nav-staff">
                 Staff
+              </Link>
+              <Link to={MASTER_DATA_ADMIN_PATH} data-testid="nav-master-data">
+                Master data
               </Link>
             </nav>
           ) : null}

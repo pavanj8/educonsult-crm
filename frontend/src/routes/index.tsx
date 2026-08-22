@@ -5,6 +5,7 @@ import BranchesPage from '../pages/BranchesPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
+import MasterDataAdminPage from '../pages/MasterDataAdminPage'
 import RegisterStudentPage from '../pages/RegisterStudentPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
@@ -15,6 +16,7 @@ import VerifierDashboardPage from '../pages/VerifierDashboardPage'
 import CounselorDashboardPage from '../pages/CounselorDashboardPage'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
 import CounselorRoute from './CounselorRoute'
+import MasterDataAdminRoute from './MasterDataAdminRoute'
 import ProtectedRoute, { LOGIN_PATH } from './ProtectedRoute'
 import StaffManagerRoute from './StaffManagerRoute'
 import StudentRoute from './StudentRoute'
@@ -23,6 +25,7 @@ import VerifierRoute from './VerifierRoute'
 import {
   COUNSELOR_DASHBOARD_PATH,
   FORGOT_PASSWORD_PATH,
+  MASTER_DATA_ADMIN_PATH,
   REGISTER_PATH,
   RESET_PASSWORD_PATH,
   STUDENT_DASHBOARD_PATH,
@@ -47,6 +50,12 @@ export function AppRoutes() {
           </Route>
           <Route element={<StaffManagerRoute />}>
             <Route path="staff" element={<StaffPage />} />
+          </Route>
+          <Route element={<MasterDataAdminRoute />}>
+            <Route
+              path={MASTER_DATA_ADMIN_PATH.slice(1)}
+              element={<MasterDataAdminPage />}
+            />
           </Route>
           <Route element={<StudentRoute />}>
             <Route path={STUDENT_DASHBOARD_PATH.slice(1)} element={<StudentDashboardPage />} />
