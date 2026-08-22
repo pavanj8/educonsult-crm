@@ -49,6 +49,8 @@ from app.storage.service import (
 from app.storage.validation import (
     ALLOWED_CONTENT_TYPES,
     ALLOWED_EXTENSIONS,
+    ALLOWED_LOGO_CONTENT_TYPES,
+    ALLOWED_LOGO_EXTENSIONS,
     FILE_TOO_LARGE_DETAIL,
     FILE_TYPE_NOT_ALLOWED_DETAIL,
     LOGO_FILE_TOO_LARGE_DETAIL,
@@ -66,6 +68,8 @@ from app.storage.validation import (
 __all__ = [
     "ALLOWED_CONTENT_TYPES",
     "ALLOWED_EXTENSIONS",
+    "ALLOWED_LOGO_CONTENT_TYPES",
+    "ALLOWED_LOGO_EXTENSIONS",
     "ChecklistCompletenessItem",
     "ChecklistCompletenessSummary",
     "ChecklistCompletenessUpload",

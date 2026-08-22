@@ -322,10 +322,15 @@ async def upload_tenant_logo(
       / currency); the frontend settings page is #112 and the
       frontend theming is #113.
     """
-    if file is None or not file.filename:
+    if file is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing 'file' form field",
+        )
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is missing a filename",
         )
 
     tenant = _load_tenant_for_logo_upload(tenant_id, current_user, db)
@@ -337,7 +342,12 @@ async def upload_tenant_logo(
             detail="Uploaded logo is empty",
         )
 
-    content_type = file.content_type or "application/octet-stream"
+    content_type = file.content_type
+    if not content_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is missing a Content-Type header",
+        )
     original_filename = file.filename
 
     # E10 / Journey J3 — logo size cap and type allow-list enforced
