@@ -53,9 +53,11 @@ Typical usage:
         ],
     )
 
-The wiring above is owned by issue #96 -- this module only ships the
-factory + default key extractors so that ticket has a clean API to
-build on.
+The wiring above lives in ``backend/app/routers/auth.py`` (this
+issue): the dependency factory plus the per-IP and per-account key
+extractors are the reusable pieces; the auth router is what actually
+attaches them to ``/auth/login``, ``/auth/register-student``, and
+``/auth/forgot-password``.
 """
 
 from collections.abc import Callable

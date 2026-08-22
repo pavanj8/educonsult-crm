@@ -1,9 +1,11 @@
 """Rate-limiting primitives for the backend (E7; Journey J46).
 
 This package implements the per-IP + per-account rate-limiting
-infrastructure referenced by issue #95. Issue #96 is responsible for
-*applying* this dependency to specific endpoints (login, signup,
-forgot-password); this issue only ships the reusable pieces.
+infrastructure referenced by issue #95. The dependency factory and
+key extractors defined here are attached to the public auth routes
+(``/auth/login``, ``/auth/register-student``, ``/auth/forgot-password``)
+in ``backend/app/routers/auth.py`` -- the *reusable* pieces live here
+so any future endpoint can adopt the same pattern with a one-liner.
 
 Public surface:
 

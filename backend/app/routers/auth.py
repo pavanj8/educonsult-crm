@@ -33,6 +33,7 @@ from app.models.branch import Branch
 from app.models.password_reset_token import PasswordResetToken
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.rate_limit import client_ip_key, make_rate_limit_dependency
 from app.rbac.dependencies import get_current_user
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
@@ -68,7 +69,34 @@ def _user_to_authenticated_user(user: User) -> AuthenticatedUser:
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+# --- Rate-limit key extractors (E7; Journey J46) ---------------------------------
+# Each public auth route below is rate-limited on at least one dimension via
+# :func:`make_rate_limit_dependency`. /auth/login uses BOTH a per-IP and a
+# per-account extractor so a distributed brute force against one account still
+# trips the per-account bucket even when the per-IP bucket would not (e.g. a
+# botnet). The other two routes (register-student, forgot-password) use the
+# per-IP key only -- account enumeration is mitigated by their 404 / generic
+# 200 responses, but we still want to throttle the upstream traffic.
+
+
+def _login_email_key(payload: LoginRequest) -> str:
+    """Per-account key extractor for /auth/login (normalised email)."""
+    return payload.email.strip().lower()
+
+
+# Per-IP and per-account dependencies for /auth/login. Both must allow for the
+# request to proceed -- AND semantics described in ``app.rate_limit.dependency``.
+_LOGIN_RATE_LIMIT_DEPS = [
+    Depends(make_rate_limit_dependency("login", client_ip_key)),
+    Depends(make_rate_limit_dependency("login", _login_email_key)),
+]
+
+
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=_LOGIN_RATE_LIMIT_DEPS,
+)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """Authenticate with email and password; return JWT access and refresh tokens."""
     normalized_email = payload.email.strip().lower()
@@ -150,6 +178,7 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     "/register-student",
     response_model=RegisterStudentResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(make_rate_limit_dependency("signup", client_ip_key))],
 )
 def register_student(
     payload: RegisterStudentRequest,
@@ -241,7 +270,11 @@ def register_student(
     )
 
 
-@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    dependencies=[Depends(make_rate_limit_dependency("forgot_password", client_ip_key))],
+)
 def forgot_password(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),

@@ -12,6 +12,7 @@ import app.models  # noqa: F401 — register ORM models with Base.metadata
 from app.db.database import get_db
 from app.main import app
 from app.models.base import Base
+from app.rate_limit import RateLimiter, set_default_rate_limiter
 from app.rbac.dependencies import get_current_user
 from app.rbac.user import AuthenticatedUser
 
@@ -36,6 +37,22 @@ def _restore_database_module_after_reload() -> Generator[None, None, None]:
     yield
     for name, obj in _ORIGINAL_DB_ATTRS.items():
         setattr(_database_module, name, obj)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> Generator[None, None, None]:
+    """Each test sees a fresh rate-limit bucket registry.
+
+    The auth router (login / register-student / forgot-password) shares a
+    process-wide :class:`RateLimiter` instance. Without resetting it,
+    any test that fires more than the per-scope limit in a single process
+    lifetime would start tripping 429s and masking the real assertion.
+    The very-few rate-limit tests that need a *populated* registry opt
+    in by replacing the singleton again inside their own body.
+    """
+    set_default_rate_limiter(RateLimiter())
+    yield
+    set_default_rate_limiter(None)
 
 
 def make_auth_headers(access_token: str = "test-access-token") -> dict[str, str]:
