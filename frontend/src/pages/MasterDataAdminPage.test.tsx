@@ -287,7 +287,7 @@ describe('MasterDataAdminPage', () => {
       return method === 'POST'
     })
     expect(postCalls).toHaveLength(1)
-    const body = JSON.parse(String(postCalls[0]![1] as RequestInit).body)
+    const body = JSON.parse(String((postCalls[0]![1] as RequestInit).body))
     expect(body).toEqual({ name: 'Australia', code: 'AU' })
   })
 
@@ -487,7 +487,7 @@ describe('MasterDataAdminPage', () => {
       return method === 'POST'
     })
     expect(postCalls).toHaveLength(1)
-    const body = JSON.parse(String(postCalls[0]![1] as RequestInit).body)
+    const body = JSON.parse(String((postCalls[0]![1] as RequestInit).body))
     expect(body).toEqual({ country_id: 1, name: 'University of British Columbia' })
   })
 
@@ -559,7 +559,7 @@ describe('MasterDataAdminPage', () => {
       return method === 'POST'
     })
     expect(postCalls).toHaveLength(1)
-    const body = JSON.parse(String(postCalls[0]![1] as RequestInit).body)
+    const body = JSON.parse(String((postCalls[0]![1] as RequestInit).body))
     expect(body).toEqual({ university_id: 10, name: 'Master of Data Science' })
   })
 

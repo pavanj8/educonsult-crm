@@ -57,7 +57,7 @@ describe('useMasterDataAdmin', () => {
     expect(result.current.universities).toEqual(mockUniversities)
     expect(result.current.programs).toEqual(mockPrograms)
 
-    const urls = fetchSpy.mock.calls.map((call) => String(call[0]))
+    const urls = fetchSpy.mock.calls.map((call: unknown[]) => String(call[0]))
     expect(urls).toContain('/master-data/admin/countries')
     expect(urls).toContain('/master-data/admin/universities')
     expect(urls).toContain('/master-data/admin/programs')
@@ -99,7 +99,7 @@ describe('useMasterDataAdmin', () => {
       expect(result.current.createError).toBe('Country name is required')
     })
 
-    const postCall = fetchSpy.mock.calls.find((call) => {
+    const postCall = fetchSpy.mock.calls.find((call: unknown[]) => {
       const [url, init] = call
       return (
         typeof url === 'string' &&
@@ -135,7 +135,7 @@ describe('useMasterDataAdmin', () => {
       expect(result.current.updateError).toBe('Country not found')
     })
 
-    const patchCall = fetchSpy.mock.calls.find((call) => {
+    const patchCall = fetchSpy.mock.calls.find((call: unknown[]) => {
       const [url, init] = call
       return (
         typeof url === 'string' &&
@@ -169,7 +169,7 @@ describe('useMasterDataAdmin', () => {
       expect(result.current.deleteError).toBe('Country is in use')
     })
 
-    const deleteCall = fetchSpy.mock.calls.find((call) => {
+    const deleteCall = fetchSpy.mock.calls.find((call: unknown[]) => {
       const [url, init] = call
       return (
         typeof url === 'string' &&
