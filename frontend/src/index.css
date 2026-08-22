@@ -4,6 +4,20 @@
   font-weight: 400;
   color: #1a1a1a;
   background-color: #ffffff;
+
+  /* E10 / Journey J3 — app shell theming.
+   *
+   * ``--brand-color`` and ``--brand-color-contrast`` are written at
+   * runtime by BrandingProvider (:file:`frontend/src/store/brandingStore.tsx`)
+   * whenever the authenticated user is associated with a tenant that
+   * has supplied a branding profile. The defaults below mirror the
+   * pre-E10 platform chrome (a white header with dark text) so the
+   * unauthenticated / unbranded renders look exactly the same as
+   * before this task. The provider overwrites both variables when a
+   * tenant profile is available and clears them on unmount / logout.
+   */
+  --brand-color: #ffffff;
+  --brand-color-contrast: #1a1a1a;
 }
 
 * {
@@ -57,6 +71,14 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  /* E10 / Journey J3: brand color drives the header background.
+   * The default ``background-color`` mirrors the pre-E10 chrome (a
+   * white header). BrandingProvider writes ``--brand-color`` /
+   * ``--brand-color-contrast`` once a tenant profile is loaded; the
+   * variables take effect for every authenticated tenant render.
+   */
+  background-color: var(--brand-color);
+  color: var(--brand-color-contrast);
 }
 
 .app-header__brand {
@@ -68,6 +90,21 @@ body {
 .app-header h1 {
   margin: 0;
   font-size: 1.25rem;
+  /* Explicitly set color even when brand-color is in effect so the
+   * tenant name (or default ``EduConsult CRM``) remains readable on
+   * the chosen background. The default mirrors the pre-E10 text
+   * color (near-black on a white header); BrandingProvider overwrites
+   * this with the contrast token it computes for the brand color.
+   */
+  color: var(--brand-color-contrast);
+}
+
+.app-header__logo {
+  height: 2rem;
+  width: auto;
+  max-width: 8rem;
+  object-fit: contain;
+  display: block;
 }
 
 .app-header__nav {
@@ -79,7 +116,14 @@ body {
 .app-header__nav a {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #2563eb;
+  /* Brand color drives the nav-link color. The default keeps the
+   * pre-E10 platform look (a near-black link on a white header).
+   * BrandingProvider sets ``--brand-color-contrast`` to either white
+   * or near-black based on the brand color luminance; the explicit
+   * contrast value flows through to this selector without an
+   * intermediate fallback.
+   */
+  color: var(--brand-color-contrast);
   text-decoration: none;
 }
 
@@ -88,7 +132,7 @@ body {
 }
 
 .app-header__nav a:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--brand-color-contrast);
   outline-offset: 2px;
 }
 

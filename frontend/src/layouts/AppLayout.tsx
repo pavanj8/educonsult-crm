@@ -2,15 +2,49 @@ import { Link, Outlet } from 'react-router-dom'
 
 import NotificationBell from '../components/notifications/NotificationBell'
 import { useAuth } from '../store/authStore'
+import { useBranding } from '../store/brandingStore'
 
 export default function AppLayout() {
   const { user } = useAuth()
+  const { brandColor, logoUrl, tenantName } = useBranding()
 
+  // When the tenant has uploaded a logo, show it next to (or instead of)
+  // the platform wordmark so the chrome carries the tenant identity.
+  // The header still falls back to the platform wordmark when no logo
+  // has been uploaded yet so the app remains usable.
+  const showLogo = logoUrl !== null
+  const heading = tenantName ?? 'EduConsult CRM'
+
+  // ``data-app-header-branded`` mirrors the brand-color side-effect
+  // for tests + ops so the provider's mounted state is observable
+  // without rendering a user-visible chip in the chrome.
   return (
-    <div className="app-layout">
-      <header className="app-header">
+    <div
+      className="app-layout"
+      data-testid="app-layout"
+      data-app-header-branded={brandColor !== null ? 'true' : 'false'}
+    >
+      <header className="app-header" data-testid="app-header">
         <div className="app-header__brand">
-          <h1>EduConsult CRM</h1>
+          {showLogo ? (
+            <img
+              className="app-header__logo"
+              data-testid="app-header-logo"
+              src={logoUrl}
+              // The adjacent <h1> already carries the tenant
+              // name, so the logo is decorative — hide it from
+              // screen readers and avoid announcing the brand
+              // identity twice on every page header.
+              alt=""
+              aria-hidden="true"
+              // Tenant controls the logo URL (up to https://), so opt
+              // out of the default referrer policy to avoid leaking
+              // the user's IP / UA to a third-party image host.
+              referrerPolicy="no-referrer"
+              loading="lazy"
+            />
+          ) : null}
+          <h1>{heading}</h1>
           {user?.role === 'super_admin' ? (
             <nav className="app-header__nav" aria-label="Main">
               <Link to="/tenants" data-testid="nav-tenants">
