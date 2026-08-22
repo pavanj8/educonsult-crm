@@ -1,4 +1,4 @@
-"""Pydantic schemas for tenant management endpoints (E8; Journey J1)."""
+"""Pydantic schemas for tenant management endpoints (E8; Journey J1; E10 task #109)."""
 
 import re
 from datetime import datetime
@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_BRAND_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 
 class TenantCreateRequest(BaseModel):
@@ -51,5 +52,8 @@ class TenantResponse(BaseModel):
     id: int
     name: str
     slug: str
+    logo_url: str | None = None
+    brand_color: str | None = None
+    currency: str
     created_at: datetime
     updated_at: datetime
