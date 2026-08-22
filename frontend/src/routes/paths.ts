@@ -2,6 +2,12 @@
 
 export const REGISTER_PATH = '/register'
 
+/** Password-reset request page (E6; Journey J45). */
+export const FORGOT_PASSWORD_PATH = '/forgot-password'
+
+/** Password-reset confirmation page (E6; Journey J45). */
+export const RESET_PASSWORD_PATH = '/reset-password'
+
 /** Student dashboard route (E18; Journey J11). */
 export const STUDENT_DASHBOARD_PATH = '/dashboard'
 

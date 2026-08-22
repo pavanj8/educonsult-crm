@@ -2,10 +2,12 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import AppLayout from '../layouts/AppLayout'
 import BranchesPage from '../pages/BranchesPage'
+import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import RegisterStudentPage from '../pages/RegisterStudentPage'
 import NotFoundPage from '../pages/NotFoundPage'
+import ResetPasswordPage from '../pages/ResetPasswordPage'
 import StaffPage from '../pages/StaffPage'
 import StudentDashboardPage from '../pages/StudentDashboardPage'
 import TenantsPage from '../pages/TenantsPage'
@@ -20,7 +22,9 @@ import SuperAdminRoute from './SuperAdminRoute'
 import VerifierRoute from './VerifierRoute'
 import {
   COUNSELOR_DASHBOARD_PATH,
+  FORGOT_PASSWORD_PATH,
   REGISTER_PATH,
+  RESET_PASSWORD_PATH,
   STUDENT_DASHBOARD_PATH,
   VERIFIER_DASHBOARD_PATH,
 } from './paths'
@@ -30,6 +34,8 @@ export function AppRoutes() {
     <Routes>
       <Route path={LOGIN_PATH} element={<LoginPage />} />
       <Route path={REGISTER_PATH} element={<RegisterStudentPage />} />
+      <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPasswordPage />} />
+      <Route path={RESET_PASSWORD_PATH} element={<ResetPasswordPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
