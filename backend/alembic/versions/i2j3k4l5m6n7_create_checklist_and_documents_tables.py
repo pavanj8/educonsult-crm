@@ -7,7 +7,18 @@ Create Date: 2026-08-22 01:00:00.000000
 Adds the two tables that back the E26
 ``GET /applications/{application_id}/checklist`` endpoint ("merges
 template + upload status", Journey J19) and the E27 student document
-upload flow (Journey J20):
+upload flow (Journey J20).
+
+The ``checklist_item_templates`` table is also the persisted shape
+delivered for E15 issue #131 ("Backend: ChecklistItemTemplate model +
+migration (stage, program, required flag)", Journey J8: "Owner/Branch
+Manager defines a document checklist template for a stage/program"). The
+CRUD API over this table lands in the sibling E15 ticket #132. The
+columns ``stage``, ``program_id``, and ``required`` are the three fields
+named in #131's title; the additional ``name``, ``description``, and
+``order_index`` columns round out the shape required by the J19
+checklist view and are exercised by the E15 unit tests in
+``tests/models/test_checklist_item_template.py``.
 
 * ``checklist_item_templates`` — the per-stage/per-program *template*
   half. Defines which documents are required at which pipeline stage
