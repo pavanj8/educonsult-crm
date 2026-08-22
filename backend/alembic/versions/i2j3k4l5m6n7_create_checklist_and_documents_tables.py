@@ -47,9 +47,9 @@ works on SQLite (which forbids ALTER TABLE + ADD CONSTRAINT).
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "i2j3k4l5m6n7"
