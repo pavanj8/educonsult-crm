@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createTenant, fetchTenants } from './tenants'
+import { createTenant, fetchTenant, fetchTenants } from './tenants'
 
 const mockTenant = {
   id: 1,
@@ -80,6 +80,46 @@ describe('tenants API client', () => {
     ).rejects.toMatchObject({
       message: 'A tenant with this slug already exists',
       status: 409,
+    })
+  })
+
+  it('fetchTenant sends bearer token from storage and returns the tenant', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const brandedTenant = {
+      ...mockTenant,
+      logo_url: 'https://cdn.example.test/apex/logo.png',
+      brand_color: '#1A2B3C',
+      currency: 'USD',
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => brandedTenant,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const result = await fetchTenant(1)
+
+    expect(result).toEqual(brandedTenant)
+    expect(fetchMock).toHaveBeenCalledWith('/tenants/1', {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer stored-access-token',
+      },
+    })
+  })
+
+  it('fetchTenant surfaces backend error detail on failure', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ detail: 'Tenant not found' }),
+    }) as typeof fetch
+
+    await expect(fetchTenant(999)).rejects.toMatchObject({
+      message: 'Tenant not found',
+      status: 404,
     })
   })
 })
