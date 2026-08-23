@@ -103,3 +103,24 @@ class RegisterStudentResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     created_at: datetime
+
+
+class StaffCreateStudentRequest(RegisterStudentRequest):
+    """Fields accepted when a staff member creates a student record."""
+
+
+class StaffCreateStudentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    role: Role
+    tenant_id: int
+    branch_id: int
+    name: str
+    phone: str
+    date_of_birth: date
+    target_country_id: int | None
+    target_university_id: int | None
+    target_program_id: int | None
+    created_at: datetime
