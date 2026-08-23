@@ -23,6 +23,9 @@ export const RECEPTIONIST_INTAKE_PATH = '/receptionist/intake'
 /** Master-data admin UI (E14; Journey J7). */
 export const MASTER_DATA_ADMIN_PATH = '/master-data'
 
+/** Checklist template builder UI (E15; Journey J8). */
+export const CHECKLIST_TEMPLATES_PATH = '/checklist-templates'
+
 /**
  * Tenant branding settings route (E10; Journey J3; frontend ticket #112).
  * Consultancy owners edit their tenant's logo, brand color, and display

@@ -2,6 +2,9 @@ export type { Application, PipelineStage } from './application'
 export type { AuthUser, LoginCredentials, TokenResponse, UserRole } from './auth'
 export type {
   ChecklistItem,
+  ChecklistItemTemplate,
+  ChecklistItemTemplateCreateRequest,
+  ChecklistItemTemplateUpdateRequest,
   ChecklistResponse,
   ChecklistUpload,
   DocumentUploadStatus,

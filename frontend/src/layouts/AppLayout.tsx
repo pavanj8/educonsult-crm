@@ -1,7 +1,11 @@
 import { Link, Outlet } from 'react-router-dom'
 
 import NotificationBell from '../components/notifications/NotificationBell'
-import { MASTER_DATA_ADMIN_PATH, TENANT_BRANDING_PATH } from '../routes/paths'
+import {
+  CHECKLIST_TEMPLATES_PATH,
+  MASTER_DATA_ADMIN_PATH,
+  TENANT_BRANDING_PATH,
+} from '../routes/paths'
 import { useAuth } from '../store/authStore'
 import { useBranding } from '../store/brandingStore'
 
@@ -67,6 +71,12 @@ export default function AppLayout() {
               <Link to={TENANT_BRANDING_PATH} data-testid="nav-branding">
                 Branding
               </Link>
+              <Link
+                to={CHECKLIST_TEMPLATES_PATH}
+                data-testid="nav-checklist-templates"
+              >
+                Checklist templates
+              </Link>
             </nav>
           ) : null}
           {user?.role === 'branch_manager' ? (
@@ -76,6 +86,12 @@ export default function AppLayout() {
               </Link>
               <Link to={MASTER_DATA_ADMIN_PATH} data-testid="nav-master-data">
                 Master data
+              </Link>
+              <Link
+                to={CHECKLIST_TEMPLATES_PATH}
+                data-testid="nav-checklist-templates"
+              >
+                Checklist templates
               </Link>
             </nav>
           ) : null}

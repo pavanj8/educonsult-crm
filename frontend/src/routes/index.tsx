@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import AppLayout from '../layouts/AppLayout'
 import BranchesPage from '../pages/BranchesPage'
+import ChecklistTemplatesPage from '../pages/ChecklistTemplatesPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
@@ -16,6 +17,7 @@ import TenantBrandingPage from '../pages/TenantBrandingPage'
 import TenantsPage from '../pages/TenantsPage'
 import VerifierDashboardPage from '../pages/VerifierDashboardPage'
 import CounselorDashboardPage from '../pages/CounselorDashboardPage'
+import ChecklistTemplateAdminRoute from './ChecklistTemplateAdminRoute'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
 import CounselorRoute from './CounselorRoute'
 import MasterDataAdminRoute from './MasterDataAdminRoute'
@@ -26,6 +28,7 @@ import StudentRoute from './StudentRoute'
 import SuperAdminRoute from './SuperAdminRoute'
 import VerifierRoute from './VerifierRoute'
 import {
+  CHECKLIST_TEMPLATES_PATH,
   COUNSELOR_DASHBOARD_PATH,
   FORGOT_PASSWORD_PATH,
   MASTER_DATA_ADMIN_PATH,
@@ -61,6 +64,12 @@ export function AppRoutes() {
             <Route
               path={MASTER_DATA_ADMIN_PATH.slice(1)}
               element={<MasterDataAdminPage />}
+            />
+          </Route>
+          <Route element={<ChecklistTemplateAdminRoute />}>
+            <Route
+              path={CHECKLIST_TEMPLATES_PATH.slice(1)}
+              element={<ChecklistTemplatesPage />}
             />
           </Route>
           <Route element={<StudentRoute />}>
