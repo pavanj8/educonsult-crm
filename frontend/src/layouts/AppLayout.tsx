@@ -1,9 +1,58 @@
 import { Link, Outlet } from 'react-router-dom'
+import type { ReactNode } from 'react'
 
 import NotificationBell from '../components/notifications/NotificationBell'
 import { CHECKLIST_TEMPLATES_PATH, MASTER_DATA_ADMIN_PATH } from '../routes/paths'
 import { useAuth } from '../store/authStore'
 import { useBranding } from '../store/brandingStore'
+
+interface NavLinkSpec {
+  to: string
+  testId: string
+  label: string
+}
+
+/**
+ * Role-keyed top-level nav (E15). Consultancy owner + branch manager
+ * share the same admin-tools nav block — they both carry
+ * ``checklist_template:manage`` and ``master_data:manage`` — so
+ * keying the links by role keeps the markup DRY when the E15 epic
+ * adds more admin tools. Each role still owns its links (e.g.
+ * consultancy owners additionally see ``/branches``).
+ */
+const ADMIN_NAV_LINKS: Record<'consultancy_owner' | 'branch_manager', NavLinkSpec[]> = {
+  consultancy_owner: [
+    { to: '/branches', testId: 'nav-branches', label: 'Branches' },
+    { to: '/staff', testId: 'nav-staff', label: 'Staff' },
+    { to: MASTER_DATA_ADMIN_PATH, testId: 'nav-master-data', label: 'Master data' },
+    {
+      to: CHECKLIST_TEMPLATES_PATH,
+      testId: 'nav-checklist-templates',
+      label: 'Checklist templates',
+    },
+  ],
+  branch_manager: [
+    { to: '/staff', testId: 'nav-staff', label: 'Staff' },
+    { to: MASTER_DATA_ADMIN_PATH, testId: 'nav-master-data', label: 'Master data' },
+    {
+      to: CHECKLIST_TEMPLATES_PATH,
+      testId: 'nav-checklist-templates',
+      label: 'Checklist templates',
+    },
+  ],
+}
+
+function NavLinks({ links }: { links: NavLinkSpec[] }): ReactNode {
+  return (
+    <nav className="app-header__nav" aria-label="Main">
+      {links.map((link) => (
+        <Link key={link.testId} to={link.to} data-testid={link.testId}>
+          {link.label}
+        </Link>
+      ))}
+    </nav>
+  )
+}
 
 export default function AppLayout() {
   const { user } = useAuth()
@@ -15,6 +64,22 @@ export default function AppLayout() {
   // has been uploaded yet so the app remains usable.
   const showLogo = logoUrl !== null
   const heading = tenantName ?? 'EduConsult CRM'
+
+  // Pick the role-specific nav. Non-admins get a single-link nav.
+  let navLinks: NavLinkSpec[] | null = null
+  if (user?.role === 'super_admin') {
+    navLinks = [{ to: '/tenants', testId: 'nav-tenants', label: 'Tenants' }]
+  } else if (user?.role === 'consultancy_owner' || user?.role === 'branch_manager') {
+    navLinks = ADMIN_NAV_LINKS[user.role]
+  } else if (user?.role === 'student') {
+    navLinks = [{ to: '/dashboard', testId: 'nav-dashboard', label: 'Dashboard' }]
+  } else if (user?.role === 'document_verifier') {
+    navLinks = [{ to: '/verifier', testId: 'nav-verifier', label: 'Verifier queue' }]
+  } else if (user?.role === 'counselor') {
+    navLinks = [
+      { to: '/my-applications', testId: 'nav-my-applications', label: 'My applications' },
+    ]
+  }
 
   // ``data-app-header-branded`` mirrors the brand-color side-effect
   // for tests + ops so the provider's mounted state is observable
@@ -46,69 +111,7 @@ export default function AppLayout() {
             />
           ) : null}
           <h1>{heading}</h1>
-          {user?.role === 'super_admin' ? (
-            <nav className="app-header__nav" aria-label="Main">
-              <Link to="/tenants" data-testid="nav-tenants">
-                Tenants
-              </Link>
-            </nav>
-          ) : null}
-          {user?.role === 'consultancy_owner' ? (
-            <nav className="app-header__nav" aria-label="Main">
-              <Link to="/branches" data-testid="nav-branches">
-                Branches
-              </Link>
-              <Link to="/staff" data-testid="nav-staff">
-                Staff
-              </Link>
-              <Link to={MASTER_DATA_ADMIN_PATH} data-testid="nav-master-data">
-                Master data
-              </Link>
-              <Link
-                to={CHECKLIST_TEMPLATES_PATH}
-                data-testid="nav-checklist-templates"
-              >
-                Checklist templates
-              </Link>
-            </nav>
-          ) : null}
-          {user?.role === 'branch_manager' ? (
-            <nav className="app-header__nav" aria-label="Main">
-              <Link to="/staff" data-testid="nav-staff">
-                Staff
-              </Link>
-              <Link to={MASTER_DATA_ADMIN_PATH} data-testid="nav-master-data">
-                Master data
-              </Link>
-              <Link
-                to={CHECKLIST_TEMPLATES_PATH}
-                data-testid="nav-checklist-templates"
-              >
-                Checklist templates
-              </Link>
-            </nav>
-          ) : null}
-          {user?.role === 'student' ? (
-            <nav className="app-header__nav" aria-label="Main">
-              <Link to="/dashboard" data-testid="nav-dashboard">
-                Dashboard
-              </Link>
-            </nav>
-          ) : null}
-          {user?.role === 'document_verifier' ? (
-            <nav className="app-header__nav" aria-label="Main">
-              <Link to="/verifier" data-testid="nav-verifier">
-                Verifier queue
-              </Link>
-            </nav>
-          ) : null}
-          {user?.role === 'counselor' ? (
-            <nav className="app-header__nav" aria-label="Main">
-              <Link to="/my-applications" data-testid="nav-my-applications">
-                My applications
-              </Link>
-            </nav>
-          ) : null}
+          {navLinks !== null ? <NavLinks links={navLinks} /> : null}
         </div>
         <NotificationBell />
       </header>

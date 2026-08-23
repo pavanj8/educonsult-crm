@@ -180,13 +180,49 @@ describe('ChecklistTemplatesPage', () => {
   })
 
   it('shows an empty state when no templates exist for the selected stage', async () => {
+    // Templates list contains a single row that belongs to
+    // ``document_verification``; with the default 'registered' tab
+    // active, the page must show the empty state for that stage.
     renderPage({ templates: [mockOtherStageTemplate] })
 
     await waitFor(() => {
-      expect(screen.getByTestId('checklist-template-row-3')).toBeInTheDocument()
+      expect(screen.getByTestId('checklist-templates-page')).toBeInTheDocument()
     })
 
+    expect(
+      screen.getByTestId('checklist-templates-stage-tab-registered'),
+    ).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('checklist-templates-empty')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('checklist-template-row-3'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows the empty state when the stage tab has no matching templates', async () => {
+    // Switch tabs and assert the empty state on the tab that has no
+    // rows (registered), confirming the empty state renders for any
+    // stage with no rows — not just the default tab.
+    const user = userEvent.setup()
+    renderPage({ templates: mockTemplates })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('checklist-template-row-1')).toBeInTheDocument()
+    })
+
+    // Switch to document_verification, which has no rows.
+    await user.click(
+      screen.getByTestId('checklist-templates-stage-tab-document_verification'),
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('checklist-templates-stage-tab-document_verification'),
+      ).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByTestId('checklist-templates-empty')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('checklist-template-row-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('checklist-template-row-2')).not.toBeInTheDocument()
   })
 
   it('shows an error message when the templates API returns 403', async () => {

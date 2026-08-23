@@ -2,8 +2,9 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useChecklistTemplates } from './useChecklistTemplates'
+import type { ChecklistItemTemplate } from '../types/checklist'
 
-const mockTemplateList = [
+const mockTemplateList: ChecklistItemTemplate[] = [
   {
     id: 1,
     tenant_id: 10,
@@ -151,10 +152,10 @@ describe('useChecklistTemplates', () => {
 
   it('creates a template, appends it to the list, and exposes it via the return value', async () => {
     localStorage.setItem('access_token', 'test-token')
-    const created = {
+    const created: ChecklistItemTemplate = {
       id: 3,
       tenant_id: 10,
-      stage: 'registered' as const,
+      stage: 'registered',
       program_id: null,
       name: 'Birth certificate',
       description: null,
@@ -171,7 +172,7 @@ describe('useChecklistTemplates', () => {
       expect(result.current.loading).toBe(false)
     })
 
-    let returned: typeof created | null = null
+    let returned: ChecklistItemTemplate | null = null
     await act(async () => {
       returned = await result.current.createTemplate({
         stage: 'registered',
@@ -221,7 +222,10 @@ describe('useChecklistTemplates', () => {
 
   it('updates a template in place and returns the updated row', async () => {
     localStorage.setItem('access_token', 'test-token')
-    const updated = { ...mockTemplateList[0], name: 'Passport (renamed)' }
+    const updated: ChecklistItemTemplate = {
+      ...mockTemplateList[0],
+      name: 'Passport (renamed)',
+    }
     setupFetchMock({
       'GET /checklist-templates$': okJson(mockTemplateList),
       'PATCH /checklist-templates/\\d+$': okJson(updated),
@@ -232,7 +236,7 @@ describe('useChecklistTemplates', () => {
       expect(result.current.loading).toBe(false)
     })
 
-    let returned: typeof updated | null = null
+    let returned: ChecklistItemTemplate | null = null
     await act(async () => {
       returned = await result.current.updateTemplate(1, { name: 'Passport (renamed)' })
     })
