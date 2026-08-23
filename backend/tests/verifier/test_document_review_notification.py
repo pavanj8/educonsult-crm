@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Document review outcome generates an in-app notification (E32; Journey J25; issue #190).
 
 End-to-end acceptance that approving or rejecting a pending student
@@ -29,6 +30,36 @@ Specifically:
   (no cross-tenant leak);
 * a 403 / 422 / 404 (cross-tenant) response never produces a
   notification.
+=======
+"""Document review outcome fires the right in-app notification (E32; Journey J25; issue #189).
+
+End-to-end coverage of the wiring that calls
+:func:`app.services.notifications.notify_document_approved` /
+:func:`notify_document_rejected` from the E29 / E30 verifier endpoints
+(E32 — "Document Review Outcome Notification"). Sibling ticket #190
+owns additional black-box coverage; this file is the developer-side
+acceptance that the verifier router actually invokes the notification
+helpers and produces the documented notification rows.
+
+Specifically, on the approve/reject happy paths we assert:
+
+* the student who uploaded the document receives exactly one
+  in-app :class:`Notification` (no self-notify of the verifier; no
+  double-insert);
+* the notification's ``title`` is the documented short heading
+  (``"Document approved"`` / ``"Document rejected"``);
+* the notification's ``message`` carries the verifier's comment /
+  rejection reason so the student sees the reviewer's feedback
+  alongside the verdict;
+* the notification is tenant-scoped to the document's tenant
+  (no cross-tenant leak).
+
+We exercise the hooks via the real ``POST /verifier/documents/{id}/approve``
+and ``POST /verifier/documents/{id}/reject`` endpoints (not by calling
+the service module directly) so that if the wiring is ever removed from
+the router, these tests fail -- which is the whole point of an
+integration test for an end-to-end wiring ticket.
+>>>>>>> origin/main
 """
 
 from __future__ import annotations
@@ -68,7 +99,11 @@ def _seed_pending_document(
     student_id: int,
     filename: str = "transcript.pdf",
 ) -> StudentDocument:
+<<<<<<< HEAD
     """Seed an application + pending StudentDocument row."""
+=======
+    """Seed an application + a pending StudentDocument row."""
+>>>>>>> origin/main
     application = seed_application(
         db_session,
         tenant_id=tenant_id,
@@ -114,12 +149,18 @@ def _auth_as_verifier(
 
 
 def _seed_verifier_student_doc(
+<<<<<<< HEAD
     db_session,
     *,
     slug: str,
     filename: str = "doc.pdf",
 ):
     """Seed tenant + branch + student + pending document + verifier."""
+=======
+    db_session, *, slug: str, filename: str = "doc.pdf"
+):
+    """Seed a tenant + branch + student + pending document + verifier."""
+>>>>>>> origin/main
     tenant = _create_tenant(db_session, name=slug, slug=slug)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     student = make_db_user(
@@ -140,7 +181,11 @@ def _seed_verifier_student_doc(
         Role.DOCUMENT_VERIFIER,
         tenant_id=tenant.id,
     )
+<<<<<<< HEAD
     return tenant, branch, student, verifier, document
+=======
+    return tenant, student, verifier, document
+>>>>>>> origin/main
 
 
 def _notifications_for(db_session, user_id: int) -> list[Notification]:
@@ -152,18 +197,29 @@ def _notifications_for(db_session, user_id: int) -> list[Notification]:
 
 
 # ---------------------------------------------------------------------------
+<<<<<<< HEAD
 # Approve path: notification is generated with the documented content
+=======
+# Approve path: notification content (E32 / J25 / #189)
+>>>>>>> origin/main
 # ---------------------------------------------------------------------------
 
 
 def test_approve_creates_notification_with_expected_title_and_message(
     client, db_session, override_authenticated_user
 ):
+<<<<<<< HEAD
     """Approving a pending document creates exactly one in-app notification
     for the uploading student with the documented title and a message
     that embeds the verifier's comment (E32; J25).
     """
     tenant, _branch, student, verifier, document = _seed_verifier_student_doc(
+=======
+    """The verifier approve endpoint creates one in-app notification for the
+    uploading student with the documented title and a message that
+    embeds the verifier's optional comment."""
+    tenant, student, verifier, document = _seed_verifier_student_doc(
+>>>>>>> origin/main
         db_session, slug="appr-notif-content"
     )
     _auth_as_verifier(
@@ -185,9 +241,14 @@ def test_approve_creates_notification_with_expected_title_and_message(
     assert notification.title == "Document approved"
     assert "approved" in notification.message.lower()
     assert "All good" in notification.message
+<<<<<<< HEAD
     # Tenant scope matches the document's tenant.
     assert notification.tenant_id == tenant.id
     # Freshly created, so still unread.
+=======
+    # Tenant scope matches the document's tenant (no cross-tenant leak).
+    assert notification.tenant_id == tenant.id
+>>>>>>> origin/main
     assert notification.read_at is None
 
 
@@ -195,8 +256,13 @@ def test_approve_creates_notification_without_comment_suffix_when_no_comment(
     client, db_session, override_authenticated_user
 ):
     """An approve without a comment produces the documented notification
+<<<<<<< HEAD
     whose message has no ``"Comment:"`` suffix."""
     tenant, _branch, student, verifier, document = _seed_verifier_student_doc(
+=======
+    whose message has no "Comment:" suffix (mirrors the service helper)."""
+    tenant, student, verifier, document = _seed_verifier_student_doc(
+>>>>>>> origin/main
         db_session, slug="appr-notif-nocomment"
     )
     _auth_as_verifier(
@@ -216,7 +282,11 @@ def test_approve_creates_notification_without_comment_suffix_when_no_comment(
     assert len(rows) == 1
     notification = rows[0]
     assert notification.title == "Document approved"
+<<<<<<< HEAD
     # No comment => no "Comment:" suffix.
+=======
+    # No comment => no "Comment:" suffix in the message body.
+>>>>>>> origin/main
     assert "Comment:" not in notification.message
     assert notification.tenant_id == tenant.id
 
@@ -226,7 +296,11 @@ def test_approve_does_not_notify_the_verifier(
 ):
     """The verifier is the actor; they must not be self-notified about
     their own approval action."""
+<<<<<<< HEAD
     tenant, _branch, _student, verifier, document = _seed_verifier_student_doc(
+=======
+    tenant, student, verifier, document = _seed_verifier_student_doc(
+>>>>>>> origin/main
         db_session, slug="appr-notif-self"
     )
     _auth_as_verifier(
@@ -244,6 +318,7 @@ def test_approve_does_not_notify_the_verifier(
     assert _notifications_for(db_session, verifier.id) == []
 
 
+<<<<<<< HEAD
 def test_approve_only_writes_one_notification_for_the_student(
     client, db_session, override_authenticated_user
 ):
@@ -272,17 +347,28 @@ def test_approve_only_writes_one_notification_for_the_student(
 
 # ---------------------------------------------------------------------------
 # Reject path: notification is generated with the documented content
+=======
+# ---------------------------------------------------------------------------
+# Reject path: notification content (E32 / J25 / #189)
+>>>>>>> origin/main
 # ---------------------------------------------------------------------------
 
 
 def test_reject_creates_notification_with_expected_title_and_message(
     client, db_session, override_authenticated_user
 ):
+<<<<<<< HEAD
     """Rejecting a pending document creates exactly one in-app notification
     for the uploading student with the documented title and a message
     that embeds the (mandatory) rejection reason (E32; J25).
     """
     tenant, _branch, student, verifier, document = _seed_verifier_student_doc(
+=======
+    """The verifier reject endpoint creates one in-app notification for the
+    uploading student with the documented title and a message that
+    embeds the mandatory rejection reason."""
+    tenant, student, verifier, document = _seed_verifier_student_doc(
+>>>>>>> origin/main
         db_session, slug="rej-notif-content"
     )
     _auth_as_verifier(
@@ -311,9 +397,15 @@ def test_reject_creates_notification_with_expected_title_and_message(
 def test_reject_does_not_notify_the_verifier(
     client, db_session, override_authenticated_user
 ):
+<<<<<<< HEAD
     """The verifier is the actor on the reject path too; they must not
     be self-notified about their own rejection."""
     tenant, _branch, _student, verifier, document = _seed_verifier_student_doc(
+=======
+    """The verifier is the actor on the reject path too; they must not be
+    self-notified about their own rejection."""
+    tenant, student, verifier, document = _seed_verifier_student_doc(
+>>>>>>> origin/main
         db_session, slug="rej-notif-self"
     )
     _auth_as_verifier(
@@ -331,6 +423,7 @@ def test_reject_does_not_notify_the_verifier(
     assert _notifications_for(db_session, verifier.id) == []
 
 
+<<<<<<< HEAD
 def test_reject_only_writes_one_notification_for_the_student(
     client, db_session, override_authenticated_user
 ):
@@ -357,6 +450,12 @@ def test_reject_only_writes_one_notification_for_the_student(
 # ---------------------------------------------------------------------------
 # Tenant isolation: cross-tenant requests surface as 404 and never
 # produce a notification for the foreign student.
+=======
+# ---------------------------------------------------------------------------
+# Tenant isolation (cross-tenant verifier cannot trigger a notification
+# for the foreign document's student -- the request is 404, so no row
+# is written at all).
+>>>>>>> origin/main
 # ---------------------------------------------------------------------------
 
 
@@ -365,8 +464,12 @@ def test_cross_tenant_approve_does_not_create_notification(
 ):
     """A verifier in tenant A cannot approve tenant B's document; the
     request is 404 and no notification is written for tenant B's student
+<<<<<<< HEAD
     (no cross-tenant leak via the wiring).
     """
+=======
+    (no cross-tenant notification leak via the wiring)."""
+>>>>>>> origin/main
     tenant_a = _create_tenant(db_session, name="Tenant A", slug="appr-xtenant-a")
     tenant_b = _create_tenant(db_session, name="Tenant B", slug="appr-xtenant-b")
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
@@ -424,7 +527,11 @@ def test_cross_tenant_reject_does_not_create_notification(
         tenant_id=tenant_b.id,
         branch_id=branch_b.id,
         student_id=student_b.id,
+<<<<<<< HEAD
         filename="foreign-rej.pdf",
+=======
+        filename="foreign.pdf",
+>>>>>>> origin/main
     )
     verifier_a = make_db_user(
         db_session,
@@ -447,7 +554,11 @@ def test_cross_tenant_reject_does_not_create_notification(
 
 
 # ---------------------------------------------------------------------------
+<<<<<<< HEAD
 # Negative paths: a 403 / 422 must NOT create a notification.
+=======
+# Negative path: a 403 / 422 must NOT create a notification.
+>>>>>>> origin/main
 # ---------------------------------------------------------------------------
 
 
@@ -458,6 +569,7 @@ def test_cross_tenant_reject_does_not_create_notification(
 def test_non_verifier_approve_attempt_does_not_create_notification(
     client, db_session, override_authenticated_user, role
 ):
+<<<<<<< HEAD
     """A non-verifier role attempting to approve is rejected (no role
     other than DOCUMENT_VERIFIER holds ``document:verify``). The wiring
     must not fire -- no spurious notifications are produced for the
@@ -466,6 +578,15 @@ def test_non_verifier_approve_attempt_does_not_create_notification(
     tenant = _create_tenant(
         db_session,
         name=f"{role.value} approve",
+=======
+    """A non-verifier role attempting to approve is 403 (or 422 once
+    permission-check ordering is in scope); in every case the wiring
+    must not fire -- no spurious notifications are produced for the
+    student when the action is rejected."""
+    tenant = _create_tenant(
+        db_session,
+        name=f"Authz {role.value}",
+>>>>>>> origin/main
         slug=f"appr-notif-{role.value}",
     )
     branch = seed_branch(db_session, tenant_id=tenant.id)
@@ -480,7 +601,10 @@ def test_non_verifier_approve_attempt_does_not_create_notification(
         tenant_id=tenant.id,
         branch_id=branch.id,
         student_id=student.id,
+<<<<<<< HEAD
         filename=f"{role.value}-approve.pdf",
+=======
+>>>>>>> origin/main
     )
 
     if role == Role.CONSULTANCY_OWNER:
@@ -512,6 +636,7 @@ def test_non_verifier_approve_attempt_does_not_create_notification(
         json={"comment": "trying"},
     )
 
+<<<<<<< HEAD
     assert response.status_code in (403, 422)
     assert _notifications_for(db_session, student.id) == []
 
@@ -576,5 +701,12 @@ def test_non_verifier_reject_attempt_does_not_create_notification(
         json={"comment": "trying"},
     )
 
+=======
+    # The exact status code varies by role (403 for STUDENT/COUNSELOR,
+    # 403 for CONSULTANCY_OWNER as well -- no role other than
+    # DOCUMENT_VERIFIER holds ``document:verify``), but no role in
+    # this parametrize set is allowed through, and no notification
+    # must have been written for the student.
+>>>>>>> origin/main
     assert response.status_code in (403, 422)
     assert _notifications_for(db_session, student.id) == []
