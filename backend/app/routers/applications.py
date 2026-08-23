@@ -129,6 +129,13 @@ def _get_tenant_application(
     Used by the E25 advance-stage endpoint (issue #169). Mirrors the
     tenant-scoping convention used by the E11/E12 routers so cross-tenant
     requests surface as 404 (never 403) -- prevents tenant-id enumeration.
+
+    Note on OperationalError handling: this helper performs a single
+    ``db.get`` (read-only) and therefore never has pending mutations to
+    roll back; the bare ``raise HTTPException`` without ``db.rollback()``
+    is intentional and consistent with the read-only nature of the
+    query. The handlers below add ``db.rollback()`` before raising 503
+    because they may have pending writes.
     """
     try:
         application = db.get(Application, application_id)
@@ -154,15 +161,24 @@ def _enforce_branch_scope(
     application: Application,
     current_user: AuthenticatedUser,
 ) -> None:
-    """Block counselors / branch managers from acting on applications in other branches.
+    """Block counselors / branch managers / receptionists from acting on applications in other branches.
 
     Consultancy owners and super admins keep cross-branch visibility by
     design (ADR-0004 + Security Analyst finding on iteration #1 of issue
     #169). A missing ``current_user.branch_id`` is treated as a 403 for
-    the same reason: a counselor without a branch assignment must not
-    be able to advance anything.
+    the same reason: a counselor / branch manager / receptionist without
+    a branch assignment must not be able to act on anything.
+
+    Receptionists are included because the E20 manual-reassignment flow
+    (Journey J13, issue #153) is granted to them too -- a receptionist
+    is bound to a single branch (ADR-0004) and must not be able to
+    reassign counselors in a sibling branch.
     """
-    if current_user.role in (Role.COUNSELOR, Role.BRANCH_MANAGER):
+    if current_user.role in (
+        Role.COUNSELOR,
+        Role.BRANCH_MANAGER,
+        Role.RECEPTIONIST,
+    ):
         if (
             current_user.branch_id is None
             or application.branch_id != current_user.branch_id
@@ -697,6 +713,81 @@ def mark_application_withdrawn(
     )
 
 
+<<<<<<< HEAD
+=======
+_COUNSELOR_NOT_FOUND_DETAIL = "Target counselor not found"
+_COUNSELOR_INACTIVE_DETAIL = "Target counselor is not active"
+
+
+def _validate_target_counselor(
+    db: Session,
+    *,
+    tenant_id: int,
+    branch_id: int | None,
+    counselor_id: int,
+) -> None:
+    """Validate the target counselor for a manual reassignment, or raise 422.
+
+    Enforces the same shape used elsewhere on the platform (E19
+    round-robin): the target must be an active ``COUNSELOR`` whose
+    ``tenant_id`` matches the application's tenant. For branch-scoped
+    actors (branch manager / receptionist) the counselor must also be
+    in the same branch as the application. ``branch_id=None`` means
+    cross-branch visibility is granted (consultancy owner scope).
+
+    This helper is a validator, not a loader: it has no return value,
+    just side-effects (raising 422 / 503 when the target is invalid).
+    The caller does not need the loaded ``User`` object -- it only
+    needs assurance that the requested ``counselor_id`` is acceptable.
+    """
+    try:
+        counselor = db.get(User, counselor_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if (
+        counselor is None
+        or counselor.tenant_id != tenant_id
+        or counselor.role != Role.COUNSELOR
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_COUNSELOR_NOT_FOUND_DETAIL,
+        )
+
+    if not counselor.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_COUNSELOR_INACTIVE_DETAIL,
+        )
+
+    if branch_id is not None and counselor.branch_id != branch_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_COUNSELOR_NOT_FOUND_DETAIL,
+        )
+
+
+def _target_branch_scope(
+    current_user: AuthenticatedUser,
+    application: Application,
+) -> int | None:
+    """Return the branch scope the target counselor must match.
+
+    Consultancy owners (cross-branch by design, ADR-0004) get ``None``
+    so the target-counselor validator allows any branch in the tenant.
+    Branch-scoped actors (branch manager / receptionist) must match the
+    application's branch.
+    """
+    if current_user.role == Role.CONSULTANCY_OWNER:
+        return None
+    return application.branch_id
+
+
+>>>>>>> origin/main
 @router.patch("/{application_id}/counselor", response_model=ApplicationResponse)
 def reassign_application_counselor(
     application_id: int,
@@ -717,6 +808,7 @@ def reassign_application_counselor(
 
     Behavior:
 
+<<<<<<< HEAD
     * Tenant scoping: cross-tenant access surfaces as 404 (not 403 -- prevents
       tenant-id enumeration).
     * Branch scoping for branch managers / receptionists: cross-branch access
@@ -733,6 +825,43 @@ def reassign_application_counselor(
     * No stage-history row is written and no in-app notification is
       generated -- those surfaces are not part of the Journey J13
       acceptance criteria and are deliberately out of scope for this ticket.
+=======
+    * Tenant scoping is enforced via :func:`_get_tenant_application`
+      (cross-tenant access surfaces as 404, not 403 -- prevents tenant
+      enumeration).
+    * Branch scoping for branch managers / receptionists is enforced
+      via :func:`_enforce_branch_scope` (cross-branch access surfaces
+      as 403). Consultancy owners keep cross-branch visibility by
+      design (ADR-0004).
+    * The target counselor must exist, belong to the application's
+      tenant, have ``role=COUNSELOR``, be ``is_active=True``, and (for
+      branch-scoped actors) be in the same branch as the application.
+      Cross-branch assignment by a branch manager / receptionist
+      surfaces as 422; consultancy owners may assign across branches
+      because :func:`_target_branch_scope` returns ``None`` for them.
+    * Passing ``counselor_id=None`` unassigns the application's current
+      counselor (the route deliberately does not silently no-op so a
+      explicit unassign by a manager is always recorded).
+    * No stage-history row is written and no in-app notification is
+      generated by this endpoint -- those surfaces are not part of the
+      Journey J13 acceptance criteria and are deliberately out of scope
+      for this ticket.
+
+    Request body shape (both forms accepted -- explicit null and
+    omitted field are equivalent and both unassign):
+
+    .. code-block:: json
+
+       { "counselor_id": 42 }
+
+    .. code-block:: json
+
+       { "counselor_id": null }
+
+    .. code-block:: json
+
+       {}
+>>>>>>> origin/main
 
     Errors:
 
@@ -740,10 +869,16 @@ def reassign_application_counselor(
     * 403 -- caller lacks the permission, has no tenant scope, or
       (branch-scoped actor) has no branch scope / is in a different
       branch than the application.
+<<<<<<< HEAD
     * 404 -- application does not exist or belongs to a different tenant,
       or the target counselor does not exist / is in a different tenant /
       is not a counselor / is inactive.
     * 422 -- the request body fails Pydantic validation.
+=======
+    * 404 -- application does not exist or belongs to a different tenant.
+    * 422 -- ``counselor_id`` does not name an active counselor in the
+      same tenant + branch, or the body fails Pydantic validation.
+>>>>>>> origin/main
     * 503 -- database unavailable while loading the application, the
       target counselor, or the commit.
     """
@@ -777,6 +912,7 @@ def reassign_application_counselor(
 
     db.refresh(application)
     return application
+<<<<<<< HEAD
 
 
 def _validate_target_counselor(
@@ -839,3 +975,5 @@ def _target_branch_scope(
     if current_user.role == Role.CONSULTANCY_OWNER:
         return None
     return application.branch_id
+=======
+>>>>>>> origin/main
