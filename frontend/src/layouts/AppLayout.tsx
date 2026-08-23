@@ -1,4 +1,5 @@
 import { Link, Outlet } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import LanguageSwitcher from '../components/i18n/LanguageSwitcher'
 import NotificationBell from '../components/notifications/NotificationBell'
@@ -13,13 +14,14 @@ import { useBranding } from '../store/brandingStore'
 export default function AppLayout() {
   const { user } = useAuth()
   const { brandColor, logoUrl, tenantName } = useBranding()
+  const { t } = useTranslation()
 
   // When the tenant has uploaded a logo, show it next to (or instead of)
   // the platform wordmark so the chrome carries the tenant identity.
   // The header still falls back to the platform wordmark when no logo
   // has been uploaded yet so the app remains usable.
   const showLogo = logoUrl !== null
-  const heading = tenantName ?? 'EduConsult CRM'
+  const heading = tenantName ?? t('app.platformName')
 
   // ``data-app-header-branded`` mirrors the brand-color side-effect
   // for tests + ops so the provider's mounted state is observable
@@ -52,75 +54,75 @@ export default function AppLayout() {
           ) : null}
           <h1>{heading}</h1>
           {user?.role === 'super_admin' ? (
-            <nav className="app-header__nav" aria-label="Main">
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/tenants" data-testid="nav-tenants">
-                Tenants
+                {t('app.nav.tenants')}
               </Link>
             </nav>
           ) : null}
           {user?.role === 'consultancy_owner' ? (
-            <nav className="app-header__nav" aria-label="Main">
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/branches" data-testid="nav-branches">
-                Branches
+                {t('app.nav.branches')}
               </Link>
               <Link to="/staff" data-testid="nav-staff">
-                Staff
+                {t('app.nav.staff')}
               </Link>
               <Link to={MASTER_DATA_ADMIN_PATH} data-testid="nav-master-data">
-                Master data
+                {t('app.nav.masterData')}
               </Link>
               <Link to={TENANT_BRANDING_PATH} data-testid="nav-branding">
-                Branding
+                {t('app.nav.branding')}
               </Link>
               <Link
                 to={CHECKLIST_TEMPLATES_PATH}
                 data-testid="nav-checklist-templates"
               >
-                Checklist templates
+                {t('app.nav.checklistTemplates')}
               </Link>
             </nav>
           ) : null}
           {user?.role === 'branch_manager' ? (
-            <nav className="app-header__nav" aria-label="Main">
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/staff" data-testid="nav-staff">
-                Staff
+                {t('app.nav.staff')}
               </Link>
               <Link to={MASTER_DATA_ADMIN_PATH} data-testid="nav-master-data">
-                Master data
+                {t('app.nav.masterData')}
               </Link>
               <Link
                 to={CHECKLIST_TEMPLATES_PATH}
                 data-testid="nav-checklist-templates"
               >
-                Checklist templates
+                {t('app.nav.checklistTemplates')}
               </Link>
             </nav>
           ) : null}
           {user?.role === 'student' ? (
-            <nav className="app-header__nav" aria-label="Main">
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/dashboard" data-testid="nav-dashboard">
-                Dashboard
+                {t('app.nav.dashboard')}
               </Link>
             </nav>
           ) : null}
           {user?.role === 'document_verifier' ? (
-            <nav className="app-header__nav" aria-label="Main">
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/verifier" data-testid="nav-verifier">
-                Verifier queue
+                {t('app.nav.verifierQueue')}
               </Link>
             </nav>
           ) : null}
           {user?.role === 'counselor' ? (
-            <nav className="app-header__nav" aria-label="Main">
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/my-applications" data-testid="nav-my-applications">
-                My applications
+                {t('app.nav.myApplications')}
               </Link>
             </nav>
           ) : null}
           {user?.role === 'receptionist' ? (
-            <nav className="app-header__nav" aria-label="Main">
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/receptionist/intake" data-testid="nav-receptionist-intake">
-                Intake
+                {t('app.nav.intake')}
               </Link>
             </nav>
           ) : null}
