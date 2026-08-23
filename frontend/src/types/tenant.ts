@@ -33,3 +33,33 @@ export type TenantCreateRequest = {
   slug: string
   owner_email: string
 }
+
+/**
+ * Payload accepted by ``PATCH /tenants/{id}/branding`` (E10; Journey J3;
+ * sibling backend ticket #110). Every field is optional — the backend applies
+ * only the keys supplied — but the settings page always sends the full set so
+ * any combination can change in one submit.
+ */
+export type TenantBrandingUpdateRequest = {
+  logo_url?: string | null
+  brand_color?: string | null
+  currency?: string | null
+}
+
+/**
+ * Curated ISO 4217 codes offered by the branding settings dropdown. The
+ * backend (E10 / E52) accepts any valid ISO 4217 code; the frontend constrains
+ * the dropdown to this set so the form is usable without listing every code.
+ */
+export const TENANT_BRANDING_CURRENCY_CODES = [
+  'INR',
+  'USD',
+  'EUR',
+  'GBP',
+  'CAD',
+  'AUD',
+  'NZD',
+  'SGD',
+] as const
+
+export type TenantBrandingCurrencyCode = (typeof TENANT_BRANDING_CURRENCY_CODES)[number]

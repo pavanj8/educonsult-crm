@@ -18,6 +18,7 @@ from app.routers.master_data_admin import router as master_data_admin_router
 from app.routers.notifications import router as notifications_router
 from app.routers.staff import router as staff_router
 from app.routers.student_documents import router as student_documents_router
+from app.routers.students import router as students_router
 from app.routers.tenants import router as tenants_router
 from app.routers.verifier import router as verifier_router
 from app.seed.runner import seed_demo_data_if_empty
@@ -96,6 +97,7 @@ app.include_router(verifier_router, prefix="/verifier", tags=["verifier"])
 app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 app.include_router(branches_router, prefix="/branches", tags=["branches"])
 app.include_router(staff_router, prefix="/staff", tags=["staff"])
+app.include_router(students_router, prefix="/students", tags=["students"])
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
 app.include_router(master_data_router, prefix="/tenants", tags=["master-data"])
 app.include_router(

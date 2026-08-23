@@ -12,6 +12,7 @@ import NotFoundPage from '../pages/NotFoundPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
 import StaffPage from '../pages/StaffPage'
 import StudentDashboardPage from '../pages/StudentDashboardPage'
+import TenantBrandingPage from '../pages/TenantBrandingPage'
 import TenantsPage from '../pages/TenantsPage'
 import VerifierDashboardPage from '../pages/VerifierDashboardPage'
 import CounselorDashboardPage from '../pages/CounselorDashboardPage'
@@ -32,6 +33,7 @@ import {
   REGISTER_PATH,
   RESET_PASSWORD_PATH,
   STUDENT_DASHBOARD_PATH,
+  TENANT_BRANDING_PATH,
   VERIFIER_DASHBOARD_PATH,
 } from './paths'
 
@@ -50,6 +52,7 @@ export function AppRoutes() {
           </Route>
           <Route element={<ConsultancyOwnerRoute />}>
             <Route path="branches" element={<BranchesPage />} />
+            <Route path={TENANT_BRANDING_PATH.slice(1)} element={<TenantBrandingPage />} />
           </Route>
           <Route element={<StaffManagerRoute />}>
             <Route path="staff" element={<StaffPage />} />

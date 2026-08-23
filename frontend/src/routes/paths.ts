@@ -22,3 +22,10 @@ export const MASTER_DATA_ADMIN_PATH = '/master-data'
 
 /** Checklist template builder UI (E15; Journey J8). */
 export const CHECKLIST_TEMPLATES_PATH = '/checklist-templates'
+
+/**
+ * Tenant branding settings route (E10; Journey J3; frontend ticket #112).
+ * Consultancy owners edit their tenant's logo, brand color, and display
+ * currency here; the route is guarded to that role.
+ */
+export const TENANT_BRANDING_PATH = '/branding'

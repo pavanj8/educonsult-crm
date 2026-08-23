@@ -103,3 +103,80 @@ class RegisterStudentResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     created_at: datetime
+
+
+class StaffCreateStudentRequest(BaseModel):
+    """Fields accepted when a staff member creates a walk-in student record (E17; J10).
+
+    The receptionist's tenant is taken from the authenticated user, so no
+    ``tenant_slug`` is accepted here (unlike :class:`RegisterStudentRequest`,
+    which is used by public self-registration).
+    """
+
+    branch_id: int = Field(ge=1)
+    email: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
+    name: str = Field(min_length=1, max_length=255)
+    phone: str = Field(min_length=1, max_length=50)
+    date_of_birth: date
+    target_country_id: int | None = Field(default=None, ge=1)
+    target_university_id: int | None = Field(default=None, ge=1)
+    target_program_id: int | None = Field(default=None, ge=1)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("Email must not be empty")
+        if not _EMAIL_PATTERN.match(normalized):
+            raise ValueError("Email must be a valid email address")
+        return normalized
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return validate_password_strength(value)
+
+    @field_validator("name", "phone")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Field must not be empty")
+        return stripped
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_date_of_birth(cls, value: date) -> date:
+        today = date.today()
+        if value >= today:
+            raise ValueError("Date of birth must be in the past")
+
+        age = today.year - value.year - (
+            (today.month, today.day) < (value.month, value.day)
+        )
+        if age < _MIN_STUDENT_AGE_YEARS:
+            raise ValueError(
+                f"Student must be at least {_MIN_STUDENT_AGE_YEARS} years old"
+            )
+        if age > _MAX_STUDENT_AGE_YEARS:
+            raise ValueError("Date of birth is not valid for a student")
+        return value
+
+
+class StaffCreateStudentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    role: Role
+    tenant_id: int
+    branch_id: int
+    name: str
+    phone: str
+    date_of_birth: date
+    target_country_id: int | None
+    target_university_id: int | None
+    target_program_id: int | None
+    created_at: datetime
