@@ -51,6 +51,7 @@ export default function ReceptionistIntakePage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [lastIssuedPassword, setLastIssuedPassword] = useState<string | null>(null)
   const errorId = useId()
   const successId = useId()
 
@@ -58,6 +59,7 @@ export default function ReceptionistIntakePage() {
     event.preventDefault()
     setError(null)
     setSuccessMessage(null)
+    setLastIssuedPassword(null)
 
     if (receptionistBranchId == null) {
       setError('Your account is not assigned to a branch. Contact your consultancy owner.')
@@ -102,6 +104,12 @@ export default function ReceptionistIntakePage() {
         ...(typeof universityId === 'number' ? { target_university_id: universityId } : {}),
         ...(typeof programId === 'number' ? { target_program_id: programId } : {}),
       })
+      // Keep the temporary password around on the success screen so the
+      // receptionist can hand it to the walk-in. The page never persists
+      // or transmits it elsewhere — it is shown once on the success
+      // banner and cleared the next time the receptionist begins a new
+      // intake.
+      setLastIssuedPassword(passwordValue)
       setSuccessMessage(`Student ${created.email} has been registered.`)
       // ``event.currentTarget`` is recycled after the async boundary, so
       // reset via the captured form reference and clear the controlled
@@ -260,14 +268,23 @@ export default function ReceptionistIntakePage() {
           </p>
         ) : null}
         {successMessage ? (
-          <p
+          <div
             className="receptionist-intake-form__success"
             data-testid="receptionist-intake-success"
             id={successId}
             role="status"
           >
-            {successMessage}
-          </p>
+            <p>{successMessage}</p>
+            {lastIssuedPassword ? (
+              <p
+                className="receptionist-intake-form__issued-password"
+                data-testid="receptionist-intake-issued-password"
+              >
+                Temporary password: <strong>{lastIssuedPassword}</strong> — hand it to the
+                walk-in so they can log in, then keep it private.
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         <button

@@ -20,6 +20,7 @@ const mockReceptionist: AuthUser = {
 const mockIntakeResponse = {
   id: 99,
   email: 'walkin.student@example.test',
+  role: 'student' as const,
   tenant_id: 10,
   branch_id: 1,
   name: 'Aarav Sharma',
@@ -441,6 +442,34 @@ describe('ReceptionistIntakePage', () => {
     expect(screen.getByTestId('receptionist-intake-date-of-birth')).toHaveValue('')
     expect(screen.getByTestId('receptionist-intake-success')).toHaveTextContent(
       'walkin.student@example.test',
+    )
+  })
+
+  it('displays the temporary password on the success banner so the receptionist can hand it to the walk-in', async () => {
+    const user = userEvent.setup()
+    renderIntake({
+      intake: async () =>
+        ({
+          ok: true,
+          status: 201,
+          json: async () => mockIntakeResponse,
+        }) as Response,
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'New student intake' }),
+      ).toBeInTheDocument()
+    })
+
+    await fillProfile(user)
+    await user.click(screen.getByTestId('receptionist-intake-submit'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('receptionist-intake-issued-password')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('receptionist-intake-issued-password')).toHaveTextContent(
+      TEMPORARY_PASSWORD,
     )
   })
 

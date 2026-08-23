@@ -13,6 +13,8 @@
  * walk-in so they can later log in via the E16 self-registration path.
  */
 
+import type { UserRole } from './auth'
+
 export type ReceptionistIntakeRequest = {
   branch_id: number
   email: string
@@ -25,10 +27,18 @@ export type ReceptionistIntakeRequest = {
   target_program_id?: number
 }
 
-/** Response mirrors the persisted ``Student`` row (no tokens issued). */
+/**
+ * Response mirrors the persisted ``Student`` row (no tokens issued).
+ *
+ * The ``role`` field is included to match the backend's
+ * :class:`StaffCreateStudentResponse` schema even though the receptionist
+ * intake UI does not consume it today — keeping the contract in lockstep
+ * with the backend prevents silent field drift if a caller ever reads it.
+ */
 export type ReceptionistIntakeResponse = {
   id: number
   email: string
+  role: UserRole
   tenant_id: number
   branch_id: number
   name: string

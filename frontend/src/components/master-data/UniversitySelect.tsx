@@ -12,11 +12,11 @@ type UniversitySelectProps = {
   describedBy?: string
   /**
    * Prefix used to build the ``data-testid`` attributes on the underlying
-   * select and on the error message. The shared default
-   * ``'master-data-'`` keeps the select namespaced independently of any
-   * specific consuming page; callers like the E16 self-registration
-   * flow override this with ``'register-'`` and the E17 receptionist
-   * intake form with ``'intake-'`` so test ids read in context.
+   * select and on the error message. The default ``'register-'`` matches
+   * the public E16 self-registration flow; alternative callers (e.g. the
+   * E17 receptionist intake form) override this so each caller's test ids
+   * read in context — without changing the shared fieldset's own
+   * internal contract.
    */
   idPrefix?: string
 }
@@ -28,7 +28,7 @@ export default function UniversitySelect({
   onChange,
   disabled = false,
   describedBy,
-  idPrefix = 'master-data-',
+  idPrefix = 'register-',
 }: UniversitySelectProps) {
   const errorId = useId()
   const waitingForCountry = typeof countryId !== 'number'
