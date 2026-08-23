@@ -27,8 +27,7 @@ visible at the OpenAPI layer:
   permission layer means a future ticket that wants to grant branch
   managers the right to edit a counselor's note can grant
   ``NOTE_UPDATE`` to a new role without weakening the
-  create-vs-edit distinction (security analyst finding on iteration
-  #1).
+  create-vs-edit distinction.
 * The student role is not granted any note permission, which is how
   the "hidden from student" requirement is enforced at the dependency
   layer.
@@ -79,9 +78,7 @@ _STUDENT_NOT_FOUND_DETAIL = "Student not found"
 _APPLICATION_NOT_FOUND_DETAIL = "Application not found"
 _STUDENT_MISMATCH_DETAIL = "Application is not for the named student"
 _BRANCH_ACCESS_DENIED_DETAIL = "User has no access to this resource"
-_COUNSELOR_NOT_ASSIGNED_DETAIL = (
-    "Counselor is not assigned to this student; cannot view notes"
-)
+_COUNSELOR_NOT_ASSIGNED_DETAIL = "Counselor is not assigned to this student"
 _AUTHOR_ONLY_EDIT_DETAIL = "Only the note's author may edit it"
 _AUTHOR_ONLY_DELETE_DETAIL = "Only the note's author may delete it"
 
@@ -102,7 +99,7 @@ _AUTHOR_ONLY_DELETE_DETAIL = "Only the note's author may delete it"
 # read-only staff (mirrors how meetings.py handles them). Adding a new
 # branch-scoped role on /notes requires updating both this frozenset and
 # the matching set in ``app/db/branch_scope.py`` so the role policy
-# stays canonical (software architect finding on iteration #1).
+# stays canonical.
 _BRANCH_SCOPED_NOTE_ROLES = frozenset({Role.BRANCH_MANAGER, Role.COUNSELOR})
 
 
@@ -142,8 +139,7 @@ def _load_student(db: Session, user: AuthenticatedUser, student_id: int) -> User
 
     The 404 collapses the "missing row" and "wrong-role row" failure
     modes into a single, indistinguishable response so a probe cannot
-    enumerate non-student user ids by status-code differential
-    (security analyst finding on iteration #1).
+    enumerate non-student user ids by status-code differential.
     """
     try:
         student = db.get(User, student_id)
@@ -190,8 +186,7 @@ def _load_application(
     # they may anchor a note to any tenant's application. Non-super-admin
     # callers require a tenant match (the canonical pattern from
     # ``_load_student`` / ``_load_note`` is applied here so the create
-    # path is consistent with the read/update/delete paths -- software
-    # architect finding on iteration #4).
+    # path is consistent with the read/update/delete paths).
     if (
         user.role != Role.SUPER_ADMIN
         and application.tenant_id != user.tenant_id
@@ -205,7 +200,7 @@ def _load_application(
         # Note: ``HTTPException(status_code=422)`` rather than the
         # ``HTTP_422_UNPROCESSABLE_ENTITY`` constant — the latter is
         # deprecated in modern Starlette and emits a DeprecationWarning
-        # on every request (security analyst finding on iteration #3).
+        # on every request.
         # The literal ``422`` is identical to ``HTTP_422_UNPROCESSABLE_CONTENT``
         # / ``HTTP_422_UNPROCESSABLE_ENTITY``; only the named constant
         # carries the deprecation warning.
@@ -256,7 +251,7 @@ def _enforce_branch_scope_on_student(
     ``Note.student_id`` (see :func:`_scoped_notes_query`) and on the
     per-note path via this helper, which checks the student's
     ``branch_id``. Keep both code paths in sync if branch-scoping
-    rules ever change (software architect finding on iteration #1).
+    rules ever change.
     """
     if user.role not in _BRANCH_SCOPED_NOTE_ROLES:
         return
@@ -490,8 +485,7 @@ def list_notes(
     notes-thread UI renders the conversation — a chat-style thread is
     read top-to-bottom with the most recent message first, mirroring
     the consumer expectation rather than forcing the frontend to
-    reverse the list client-side (UX architect finding on iteration
-    #1).
+    reverse the list client-side.
     """
     # Super admins are platform-wide with ``tenant_id=None`` by design;
     # :func:`_scoped_notes_query` short-circuits to the unfiltered
@@ -508,7 +502,7 @@ def list_notes(
         # student" from "the student is out of scope". The single-note
         # GET endpoint already returns 403 for the same probe via
         # :func:`_load_note`; the list endpoint mirrors that for
-        # consistency (senior developer finding on iteration #1).
+        # consistency.
         if student_id is not None and current_user.role in (
             Role.BRANCH_MANAGER,
             Role.COUNSELOR,

@@ -543,8 +543,7 @@ def test_counselor_cannot_post_for_unassigned_student(
 
     assert response.status_code == 403
     assert (
-        response.json()["detail"]
-        == "Counselor is not assigned to this student; cannot view notes"
+        response.json()["detail"] == "Counselor is not assigned to this student"
     )
 
 
