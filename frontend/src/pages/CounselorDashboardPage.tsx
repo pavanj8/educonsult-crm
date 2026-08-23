@@ -1,8 +1,10 @@
 import { useId } from 'react'
 
 import ApplicationMeetings from '../components/meetings/ApplicationMeetings'
+import ApplicationNotes from '../components/notes/ApplicationNotes'
 import { useAssignedApplications } from '../hooks/useAssignedApplications'
 import { PIPELINE_STAGE_LABELS } from '../types/application'
+import { useAuth } from '../store/authStore'
 
 function formatDate(iso: string): string {
   const date = new Date(iso)
@@ -14,10 +16,15 @@ function formatDate(iso: string): string {
  * (E21; Journey J14), with loading / error / empty states. Each row carries
  * the E22 meetings widget (Journey J15, frontend ticket #161) so the
  * counselor can review already-scheduled meetings and schedule new ones
- * against the same application without leaving the queue.
+ * against the same application without leaving the queue, and the E24
+ * notes thread (Journey J17, frontend ticket #166) so counselors can
+ * read and author internal counseling notes anchored to the
+ * application without leaving the queue either.
  */
 export default function CounselorDashboardPage() {
   const { applications, loading, error, reload } = useAssignedApplications()
+  const { user } = useAuth()
+  const currentUserId = user?.id ?? null
 
   return (
     <section className="counselor-dashboard" aria-labelledby="counselor-dashboard-heading">
@@ -49,6 +56,7 @@ export default function CounselorDashboardPage() {
               <th scope="col">Stage</th>
               <th scope="col">Created</th>
               <th scope="col">Meetings</th>
+              <th scope="col">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -61,6 +69,7 @@ export default function CounselorDashboardPage() {
                 programId={app.program_id}
                 stage={app.stage}
                 createdAt={app.created_at}
+                currentUserId={currentUserId}
               />
             ))}
           </tbody>
@@ -77,6 +86,7 @@ interface CounselorQueueRowProps {
   programId: number
   stage: string
   createdAt: string
+  currentUserId: number | null
 }
 
 function CounselorQueueRow({
@@ -86,6 +96,7 @@ function CounselorQueueRow({
   programId,
   stage,
   createdAt,
+  currentUserId,
 }: CounselorQueueRowProps) {
   // A stable, row-scoped id prefix avoids collisions across rows and
   // makes the schedule form's aria-labelledby pair with the heading.
@@ -104,6 +115,13 @@ function CounselorQueueRow({
       <td>{formatDate(createdAt)}</td>
       <td>
         <ApplicationMeetings applicationId={applicationId} />
+      </td>
+      <td>
+        <ApplicationNotes
+          applicationId={applicationId}
+          studentId={studentId}
+          currentUserId={currentUserId}
+        />
       </td>
     </tr>
   )

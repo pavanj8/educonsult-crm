@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "m6n7o8p9q0r1"
+HEAD_REVISION = "n7o8p9q0r1s2"
 
 
 def _alembic_config() -> Config:
@@ -201,6 +201,20 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "duration_minutes",
             "location",
             "notes",
+            "created_at",
+            "updated_at",
+        }
+        assert "notes" in table_names
+        note_columns = {
+            column["name"] for column in inspect(connection).get_columns("notes")
+        }
+        assert note_columns == {
+            "id",
+            "tenant_id",
+            "student_id",
+            "application_id",
+            "author_user_id",
+            "body",
             "created_at",
             "updated_at",
         }

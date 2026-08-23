@@ -25,6 +25,7 @@ from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.meeting import MeetingCreate, MeetingResponse, MeetingUpdate
+from app.services.notifications import notify_meeting_scheduled
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -311,6 +312,18 @@ def schedule_meeting(
         _handle_db_error(exc, rollback=True, db=db)
 
     db.refresh(meeting)
+    # Generate the in-app meeting-scheduled notification for the student
+    # (E23; Journey J16). The helper is a no-throw wrapper, so a flaky
+    # notification write never breaks the (already-committed) meeting
+    # creation response.
+    notify_meeting_scheduled(db, meeting=meeting)
+    try:
+        db.commit()
+    except OperationalError:
+        # The meeting row is already persisted; roll back only the
+        # failed notification insert and let the response stand.
+        db.rollback()
+        db.refresh(meeting)
     return meeting
 
 

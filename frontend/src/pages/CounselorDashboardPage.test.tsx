@@ -26,6 +26,12 @@ function createFetchMock(handlers: { status?: number; apps?: unknown[] } = {}) {
     if (/\/applications\/\d+\/meetings(\?|$)/.test(path)) {
       return { ok: true, status: 200, json: async () => [] }
     }
+    // The counselor dashboard also embeds the E24 notes thread widget
+    // (ticket #166); the default mock returns an empty list so the
+    // queue behaviour assertions continue to dominate.
+    if (path.includes('/notes')) {
+      return { ok: true, status: 200, json: async () => [] }
+    }
     throw new Error(`Unhandled fetch: ${path}`)
   }) as unknown as typeof fetch
 }

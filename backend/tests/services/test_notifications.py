@@ -11,6 +11,9 @@ Exercises the :func:`app.services.notifications` module in isolation:
   application student, optionally embedding the verifier's comment.
 * :func:`notify_document_rejected` writes a notification for the
   application student, embedding the required rejection reason.
+* :func:`notify_meeting_scheduled` writes a notification for the
+  meeting's student (J16), with the scheduling time + location in
+  the message body.
 * All helpers are no-throw wrappers — a flush failure logs and returns
   ``None`` but never raises, so a flaky notification path cannot break
   the originating event.
@@ -45,9 +48,11 @@ from app.services.notifications import (
     notify_application_stage_changed,
     notify_document_approved,
     notify_document_rejected,
+    notify_meeting_scheduled,
 )
 from tests.applications.helpers import seed_application
 from tests.branches.helpers import seed_branch
+from tests.counseling.helpers import seed_meeting
 from tests.factories.users import make_db_user
 
 
@@ -503,3 +508,167 @@ def test_new_notification_has_null_read_at(db_session):
     db_session.commit()
     db_session.refresh(notification)
     assert notification.read_at is None
+
+
+# ---------------------------------------------------------------------------
+# notify_meeting_scheduled (E23; Journey J16; issue #163)
+# ---------------------------------------------------------------------------
+
+
+def _meeting_for(db_session, *, tenant_id: int, branch_id: int, student_id: int, counselor_id: int):
+    application = seed_application(
+        db_session,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        student_id=student_id,
+        assigned_counselor_id=counselor_id,
+    )
+    return seed_meeting(
+        db_session,
+        tenant_id=tenant_id,
+        application_id=application.id,
+        student_id=student_id,
+        counselor_id=counselor_id,
+        location="Room 1",
+    )
+
+
+def test_meeting_scheduled_notifies_student(db_session):
+    """``notify_meeting_scheduled`` writes one notification for the student."""
+    tenant = _create_tenant(db_session, name="Notif Meeting", slug="notif-meeting")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _student(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    counselor = _counselor(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    meeting = _meeting_for(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        counselor_id=counselor.id,
+    )
+
+    notify_meeting_scheduled(db_session, meeting=meeting)
+    db_session.commit()
+
+    rows = (
+        db_session.query(Notification)
+        .filter(Notification.tenant_id == tenant.id)
+        .all()
+    )
+    # Student is the sole recipient. The counselor is the actor and is
+    # not notified about their own scheduling action.
+    assert len(rows) == 1
+    assert rows[0].user_id == student.id
+    assert rows[0].title == "Meeting scheduled"
+    assert rows[0].read_at is None
+
+
+def test_meeting_scheduled_message_includes_location_and_time(db_session):
+    """The notification message carries the meeting time and location."""
+    tenant = _create_tenant(db_session, name="Notif Meeting Loc", slug="notif-meeting-loc")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _student(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    counselor = _counselor(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    meeting = _meeting_for(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        counselor_id=counselor.id,
+    )
+
+    notify_meeting_scheduled(db_session, meeting=meeting)
+    db_session.commit()
+
+    row = (
+        db_session.query(Notification)
+        .filter(Notification.tenant_id == tenant.id)
+        .one()
+    )
+    assert "Room 1" in row.message
+    assert "UTC" in row.message
+
+
+def test_meeting_scheduled_without_location_omits_location_phrase(db_session):
+    """When the meeting has no ``location``, the message has no 'at <location>' suffix."""
+    tenant = _create_tenant(db_session, name="Notif Meeting NoLoc", slug="notif-meeting-noloc")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _student(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    counselor = _counselor(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        assigned_counselor_id=counselor.id,
+    )
+    meeting = seed_meeting(
+        db_session,
+        tenant_id=tenant.id,
+        application_id=application.id,
+        student_id=student.id,
+        counselor_id=counselor.id,
+        location=None,
+    )
+
+    notify_meeting_scheduled(db_session, meeting=meeting)
+    db_session.commit()
+
+    row = (
+        db_session.query(Notification)
+        .filter(Notification.tenant_id == tenant.id)
+        .one()
+    )
+    assert row.title == "Meeting scheduled"
+    # The message should not contain 'at ' (which would imply a location).
+    assert " at " not in row.message
+
+
+def test_meeting_scheduled_notification_carries_meeting_tenant_id(db_session):
+    """The persisted notification's tenant_id matches the meeting's tenant_id (J16 + ADR-0001)."""
+    tenant = _create_tenant(db_session, name="Notif Meeting Tenant", slug="notif-meeting-tenant")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _student(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    counselor = _counselor(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    meeting = _meeting_for(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        counselor_id=counselor.id,
+    )
+
+    notify_meeting_scheduled(db_session, meeting=meeting)
+    db_session.commit()
+
+    row = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == student.id)
+        .one()
+    )
+    assert row.tenant_id == meeting.tenant_id
+
+
+def test_meeting_scheduled_does_not_notify_counselor(db_session):
+    """The scheduling counselor (the actor) is not self-notified."""
+    tenant = _create_tenant(db_session, name="Notif Meeting Self", slug="notif-meeting-self")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = _student(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    counselor = _counselor(db_session, tenant_id=tenant.id, branch_id=branch.id)
+    meeting = _meeting_for(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        counselor_id=counselor.id,
+    )
+
+    notify_meeting_scheduled(db_session, meeting=meeting)
+    db_session.commit()
+
+    counselor_rows = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == counselor.id)
+        .all()
+    )
+    assert counselor_rows == []
