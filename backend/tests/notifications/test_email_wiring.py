@@ -27,6 +27,8 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 
+from sqlalchemy.exc import OperationalError
+
 from app.email.service import EmailDeliveryError
 from app.models.notification import Notification
 from app.models.student_document import StudentDocument, StudentDocumentStatus
@@ -199,6 +201,77 @@ def test_stage_change_skips_email_when_recipient_has_no_email(db_session):
         )
 
     # No email is dispatched for a recipient without an address.
+    mock_send.assert_not_called()
+
+
+def test_stage_change_skips_email_when_recipient_user_does_not_exist(db_session):
+    tenant = _seed_tenant(db_session, "wiring-stage-missing-user")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=999_999,
+        stage=PipelineStage.COUNSELING,
+    )
+
+    with patch("app.services.notifications.send_email") as mock_send:
+        notify_application_stage_changed(
+            db_session,
+            application=application,
+            from_stage=PipelineStage.COUNSELING,
+            to_stage=PipelineStage.UNIVERSITY_SHORTLISTING,
+            actor_user_id=1,
+        )
+
+    mock_send.assert_not_called()
+
+
+def test_stage_change_skips_email_when_user_lookup_fails(db_session):
+    """If the recipient-user DB lookup raises, email must be skipped silently."""
+    tenant = _seed_tenant(db_session, "wiring-stage-lookup-error")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    student = make_db_user(
+        db_session,
+        Role.STUDENT,
+        email="stu@wiring.test",
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        stage=PipelineStage.COUNSELING,
+    )
+
+    # Wrap the real session in a thin proxy whose ``.get`` raises the same
+    # OperationalError the production code is built to swallow. The proxy
+    # forwards every other attribute through to the real session so the
+    # create_notification() insert (which runs first) still works against
+    # the real DB.
+    class _RaisingSession:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def get(self, *args, **kwargs):
+            raise OperationalError("lookup", {}, Exception("simulated"))
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    raising_session = _RaisingSession(db_session)
+
+    with patch("app.services.notifications.send_email") as mock_send:
+        notify_application_stage_changed(
+            raising_session,
+            application=application,
+            from_stage=PipelineStage.COUNSELING,
+            to_stage=PipelineStage.UNIVERSITY_SHORTLISTING,
+            actor_user_id=student.id,
+        )
+
     mock_send.assert_not_called()
 
 

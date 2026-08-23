@@ -44,7 +44,7 @@ breaking the originating request.
 
 E49 wiring (Issue #234)
 -----------------------
-After persisting the in-app notification row, every hook also
+After attempting to persist the in-app notification row, every hook also
 dispatches an email through :func:`app.email.service.send_email` so
 users receive both an in-app and an email notification on the same
 event (Requirements §6: "In-app + email for status changes, document
