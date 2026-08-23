@@ -1463,9 +1463,11 @@ body {
 .upcoming-meetings__notes {
   font-size: 0.8125rem;
   color: #374151;
-  /* Defensive: counselor-typed strings are unbounded in length on the
-   * client. Force wrap on long unbreakable runs so a 10kB notes blob
-   * cannot break the dashboard layout. */
+  /* Belt-and-braces: ``notes`` is already capped server-side at
+   * 2000 chars by ``MeetingCreate`` / ``MeetingUpdate`` (E22; J15),
+   * but force-wrap here so an unusually long unbroken run typed by
+   * a counselor (URL, paste of a single-token string, etc.) cannot
+   * blow out the dashboard column width. */
   overflow-wrap: anywhere;
   word-break: break-word;
 }

@@ -26,8 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.meeting import Meeting
-from app.rbac.dependencies import require_permission
-from app.rbac.permissions import Permission
+from app.rbac.dependencies import get_current_user
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.meeting import MeetingResponse
@@ -56,10 +55,7 @@ def _ensure_student(current_user: AuthenticatedUser) -> None:
 
 @router.get("/meetings", response_model=list[MeetingResponse])
 def list_my_meetings(
-    current_user: Annotated[
-        AuthenticatedUser,
-        Depends(require_permission(Permission.MEETING_READ)),
-    ],
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     db: Session = Depends(get_db),
 ) -> list[Meeting]:
     """Return the authenticated student's meetings (E23; J16).
@@ -77,6 +73,15 @@ def list_my_meetings(
     stays a thin, predictable list and so a future "past meetings"
     view (out of scope for ticket #162) can reuse it without an
     extra round-trip.
+
+    The dependency is ``get_current_user`` rather than
+    ``require_permission(MEETING_READ)`` because the role check is
+    intentionally narrower than the permission check: a SUPER_ADMIN
+    has ``NOTIFICATION_READ`` but no ``MEETING_READ``, and we want
+    every non-student caller (regardless of which permission they do
+    or don't have) to be rejected with the same specific
+    "Only students can access this endpoint" message so the
+    contract is uniform.
     """
     _ensure_student(current_user)
 
