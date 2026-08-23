@@ -9,6 +9,14 @@ type CountrySelectProps = {
   onChange: (value: number | '') => void
   disabled?: boolean
   describedBy?: string
+  /**
+   * Prefix used to build the ``data-testid`` attributes on the underlying
+   * select and on the error message. The default ``'register-'`` matches
+   * the public E16 self-registration flow; alternative callers (e.g. the
+   * E17 receptionist intake form) override this to keep test ids scoped
+   * to their own context.
+   */
+  idPrefix?: string
 }
 
 export default function CountrySelect({
@@ -17,6 +25,7 @@ export default function CountrySelect({
   onChange,
   disabled = false,
   describedBy,
+  idPrefix = 'register-',
 }: CountrySelectProps) {
   const errorId = useId()
   const { items: countries, loading, error } = useCountries(tenantSlug, {
@@ -39,14 +48,14 @@ export default function CountrySelect({
         loadingMessage="Loading countries…"
         describedBy={describedByIds}
         errorId={error ? errorId : undefined}
-        data-testid="register-target-country"
+        data-testid={`${idPrefix}target-country`}
       />
       {error ? (
         <p
           className="login-form__error"
           role="alert"
           id={errorId}
-          data-testid="register-countries-error"
+          data-testid={`${idPrefix}countries-error`}
         >
           {error}
         </p>

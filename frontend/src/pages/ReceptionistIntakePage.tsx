@@ -19,12 +19,14 @@ import { useAuth } from '../store/authStore'
  *
  * * No ``tenant_slug`` field — the tenant is taken from the
  *   receptionist's auth session on the backend.
- * * No ``password`` field — the receptionist flow does not issue a
- *   student login at intake time; password setup belongs to the
- *   E16 self-registration path.
  * * ``branch_id`` is locked to the receptionist's own branch (read
  *   from the auth store) and shown as read-only context so the
  *   receptionist cannot accidentally cross-branch a record.
+ * * The ``password`` field is a temporary one the receptionist hands
+ *   to the walk-in; the student can later self-register via E16 to
+ *   set their own password. This is what the backend's
+ *   ``StaffCreateStudentRequest`` schema requires for every new
+ *   student account (see backend/app/schemas/student.py).
  */
 export default function ReceptionistIntakePage() {
   const { user } = useAuth()
@@ -66,21 +68,24 @@ export default function ReceptionistIntakePage() {
     const formData = new FormData(form)
     const name = formData.get('name')
     const email = formData.get('email')
+    const password = formData.get('password')
     const phone = formData.get('phone')
     const dateOfBirth = formData.get('date_of_birth')
 
     const trimmedName = typeof name === 'string' ? name.trim() : ''
     const trimmedEmail = typeof email === 'string' ? email.trim() : ''
+    const passwordValue = typeof password === 'string' ? password : ''
     const trimmedPhone = typeof phone === 'string' ? phone.trim() : ''
     const dateOfBirthValue = typeof dateOfBirth === 'string' ? dateOfBirth : ''
 
     if (
       !trimmedName ||
       !trimmedEmail ||
+      !passwordValue ||
       !trimmedPhone ||
       !dateOfBirthValue
     ) {
-      setError('Name, email, phone, and date of birth are required.')
+      setError('Name, email, password, phone, and date of birth are required.')
       return
     }
 
@@ -90,6 +95,7 @@ export default function ReceptionistIntakePage() {
         branch_id: receptionistBranchId,
         name: trimmedName,
         email: trimmedEmail,
+        password: passwordValue,
         phone: trimmedPhone,
         date_of_birth: dateOfBirthValue,
         ...(typeof countryId === 'number' ? { target_country_id: countryId } : {}),
@@ -176,6 +182,7 @@ export default function ReceptionistIntakePage() {
             }}
             onProgramChange={setProgramId}
             describedBy={error ? errorId : successMessage ? successId : undefined}
+            idPrefix="intake-"
           />
         </fieldset>
 
@@ -202,6 +209,19 @@ export default function ReceptionistIntakePage() {
               autoComplete="off"
               required
               maxLength={255}
+              aria-describedby={error ? errorId : successMessage ? successId : undefined}
+            />
+          </label>
+          <label className="login-form__field">
+            Temporary password
+            <input
+              data-testid="receptionist-intake-password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              maxLength={128}
               aria-describedby={error ? errorId : successMessage ? successId : undefined}
             />
           </label>

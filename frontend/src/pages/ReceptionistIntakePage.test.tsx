@@ -44,12 +44,15 @@ const mockTenant = {
   currency: 'INR',
 }
 
+// Password meets the platform strong-password policy (uppercase + lowercase
+// + digit + special, >= 8 chars; see backend/app/auth/password_policy.py).
+const TEMPORARY_PASSWORD = 'Welcome1!'
+
 type IntakeHandler = (url: string, init?: RequestInit) => Response | Promise<Response>
 type FetchHandler = (url: string, init?: RequestInit) => Response | Promise<Response>
 
 function buildFetchMock(options: {
   intake: IntakeHandler
-  includeTenantBranding?: boolean
 }): FetchHandler {
   return (url: string, init?: RequestInit) => {
     if (url.endsWith('/students') && init?.method === 'POST') {
@@ -115,11 +118,10 @@ function renderIntake(options: {
 
   const fetchMock = vi.fn(buildFetchMock({ intake: intakeHandler }))
 
-  // /auth/me should resolve to the receptionist user on first call.
-  let meCalls = 0
+  // /auth/me resolves to the receptionist user so the AuthProvider
+  // hydrates the user record and exposes branch_id to the page.
   const wrappedFetch = vi.fn((url: string, init?: RequestInit) => {
     if (url.endsWith('/auth/me')) {
-      meCalls += 1
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -155,6 +157,7 @@ async function fillProfile(user: ReturnType<typeof userEvent.setup>) {
     screen.getByTestId('receptionist-intake-email'),
     'walkin.student@example.test',
   )
+  await user.type(screen.getByTestId('receptionist-intake-password'), TEMPORARY_PASSWORD)
   await user.type(screen.getByTestId('receptionist-intake-phone'), '+91-9876543210')
   await user.type(screen.getByTestId('receptionist-intake-date-of-birth'), '2001-03-04')
 }
@@ -182,15 +185,16 @@ describe('ReceptionistIntakePage', () => {
     )
     expect(screen.getByTestId('receptionist-intake-name')).toBeInTheDocument()
     expect(screen.getByTestId('receptionist-intake-email')).toBeInTheDocument()
+    expect(screen.getByTestId('receptionist-intake-password')).toBeInTheDocument()
     expect(screen.getByTestId('receptionist-intake-phone')).toBeInTheDocument()
     expect(screen.getByTestId('receptionist-intake-date-of-birth')).toBeInTheDocument()
-    expect(screen.getByTestId('register-target-country')).toBeInTheDocument()
-    expect(screen.getByTestId('register-target-university')).toBeInTheDocument()
-    expect(screen.getByTestId('register-target-program')).toBeInTheDocument()
+    expect(screen.getByTestId('intake-target-country')).toBeInTheDocument()
+    expect(screen.getByTestId('intake-target-university')).toBeInTheDocument()
+    expect(screen.getByTestId('intake-target-program')).toBeInTheDocument()
     expect(screen.getByTestId('receptionist-intake-submit')).toBeInTheDocument()
   })
 
-  it('submits the receptionist branch and required profile fields to /students', async () => {
+  it('submits the receptionist branch and required profile fields (including a temporary password) to /students', async () => {
     const user = userEvent.setup()
     const { capturedIntake } = renderIntake({
       intake: async () =>
@@ -217,10 +221,14 @@ describe('ReceptionistIntakePage', () => {
     const captured = capturedIntake()
     expect(captured?.url).toBe('/students')
     expect(captured?.init?.method).toBe('POST')
+    // The backend's StaffCreateStudentRequest schema requires a `password`
+    // (min 8 chars, strong policy); the receptionist intake form must
+    // therefore send the temporary password the receptionist types in.
     expect(JSON.parse(String(captured?.init?.body))).toEqual({
       branch_id: 1,
       name: 'Aarav Sharma',
       email: 'walkin.student@example.test',
+      password: TEMPORARY_PASSWORD,
       phone: '+91-9876543210',
       date_of_birth: '2001-03-04',
     })
@@ -258,15 +266,15 @@ describe('ReceptionistIntakePage', () => {
     await waitFor(() => {
       expect(screen.getByRole('option', { name: 'Canada' })).toBeInTheDocument()
     })
-    await user.selectOptions(screen.getByTestId('register-target-country'), '1')
+    await user.selectOptions(screen.getByTestId('intake-target-country'), '1')
     await waitFor(() => {
       expect(screen.getByRole('option', { name: 'University of Toronto' })).toBeInTheDocument()
     })
-    await user.selectOptions(screen.getByTestId('register-target-university'), '10')
+    await user.selectOptions(screen.getByTestId('intake-target-university'), '10')
     await waitFor(() => {
       expect(screen.getByRole('option', { name: 'Computer Science MSc' })).toBeInTheDocument()
     })
-    await user.selectOptions(screen.getByTestId('register-target-program'), '100')
+    await user.selectOptions(screen.getByTestId('intake-target-program'), '100')
 
     await fillProfile(user)
     await user.click(screen.getByTestId('receptionist-intake-submit'))
@@ -279,6 +287,7 @@ describe('ReceptionistIntakePage', () => {
       branch_id: 1,
       name: 'Aarav Sharma',
       email: 'walkin.student@example.test',
+      password: TEMPORARY_PASSWORD,
       phone: '+91-9876543210',
       date_of_birth: '2001-03-04',
       target_country_id: 1,
@@ -312,6 +321,51 @@ describe('ReceptionistIntakePage', () => {
     })
     expect(screen.getByTestId('receptionist-intake-error')).toHaveTextContent(
       'Email already registered',
+    )
+    expect(screen.queryByTestId('receptionist-intake-success')).not.toBeInTheDocument()
+  })
+
+  it('surfaces the backend validation message when /students rejects a 422 for a missing required field', async () => {
+    // Mirrors the backend's `StaffCreateStudentRequest` Pydantic validation
+    // response shape (`detail` is an array of {loc, msg, type} entries).
+    const user = userEvent.setup()
+    renderIntake({
+      intake: async () =>
+        ({
+          ok: false,
+          status: 422,
+          json: async () => ({
+            detail: [
+              {
+                loc: ['body', 'name'],
+                msg: 'Field required',
+                type: 'value_error.missing',
+              },
+            ],
+          }),
+        }) as Response,
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'New student intake' }),
+      ).toBeInTheDocument()
+    })
+
+    // Fill the profile including the temporary password — the form
+    // itself considers the request well-formed (the backend is the one
+    // rejecting it). This proves the error UX is wired to the API's
+    // 422 response and not just to client-side validation.
+    await fillProfile(user)
+    await user.click(screen.getByTestId('receptionist-intake-submit'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('receptionist-intake-error')).toBeInTheDocument()
+    })
+    // apiFetch's parseErrorMessage surfaces the first entry's `msg` for
+    // FastAPI's array-shaped validation errors.
+    expect(screen.getByTestId('receptionist-intake-error')).toHaveTextContent(
+      'Field required',
     )
     expect(screen.queryByTestId('receptionist-intake-success')).not.toBeInTheDocument()
   })
@@ -382,6 +436,7 @@ describe('ReceptionistIntakePage', () => {
       expect(screen.getByTestId('receptionist-intake-name')).toHaveValue('')
     })
     expect(screen.getByTestId('receptionist-intake-email')).toHaveValue('')
+    expect(screen.getByTestId('receptionist-intake-password')).toHaveValue('')
     expect(screen.getByTestId('receptionist-intake-phone')).toHaveValue('')
     expect(screen.getByTestId('receptionist-intake-date-of-birth')).toHaveValue('')
     expect(screen.getByTestId('receptionist-intake-success')).toHaveTextContent(

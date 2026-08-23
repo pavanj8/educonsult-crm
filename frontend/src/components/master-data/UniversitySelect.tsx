@@ -10,6 +10,14 @@ type UniversitySelectProps = {
   onChange: (value: number | '') => void
   disabled?: boolean
   describedBy?: string
+  /**
+   * Prefix used to build the ``data-testid`` attributes on the underlying
+   * select and on the error message. The default ``'register-'`` matches
+   * the public E16 self-registration flow; alternative callers (e.g. the
+   * E17 receptionist intake form) override this to keep test ids scoped
+   * to their own context.
+   */
+  idPrefix?: string
 }
 
 export default function UniversitySelect({
@@ -19,6 +27,7 @@ export default function UniversitySelect({
   onChange,
   disabled = false,
   describedBy,
+  idPrefix = 'register-',
 }: UniversitySelectProps) {
   const errorId = useId()
   const waitingForCountry = typeof countryId !== 'number'
@@ -44,14 +53,14 @@ export default function UniversitySelect({
         waitingMessage="Select a country first"
         describedBy={describedByIds}
         errorId={error ? errorId : undefined}
-        data-testid="register-target-university"
+        data-testid={`${idPrefix}target-university`}
       />
       {error ? (
         <p
           className="login-form__error"
           role="alert"
           id={errorId}
-          data-testid="register-universities-error"
+          data-testid={`${idPrefix}universities-error`}
         >
           {error}
         </p>

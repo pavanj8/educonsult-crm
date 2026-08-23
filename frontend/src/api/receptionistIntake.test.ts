@@ -19,6 +19,7 @@ const mockIntakeResponse = {
 const validPayload = {
   branch_id: 1,
   email: 'walkin.student@example.test',
+  password: 'Welcome1!',
   name: 'Aarav Sharma',
   phone: '+91-9876543210',
   date_of_birth: '2001-03-04',
@@ -81,6 +82,7 @@ describe('receptionist intake API client', () => {
     await createStudentByReceptionist({
       branch_id: 1,
       email: 'walkin.student@example.test',
+      password: 'Welcome1!',
       name: 'Aarav Sharma',
       phone: '+91-9876543210',
       date_of_birth: '2001-03-04',
@@ -91,6 +93,7 @@ describe('receptionist intake API client', () => {
       body: JSON.stringify({
         branch_id: 1,
         email: 'walkin.student@example.test',
+        password: 'Welcome1!',
         name: 'Aarav Sharma',
         phone: '+91-9876543210',
         date_of_birth: '2001-03-04',

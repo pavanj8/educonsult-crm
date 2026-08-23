@@ -5,11 +5,18 @@
  * ``POST /students``. The backend derives ``tenant_id`` from the
  * receptionist's session and records the staff member as the
  * creator, so the request only carries the student's profile fields.
+ *
+ * A ``password`` is required because the backend's
+ * :class:`StaffCreateStudentRequest` schema enforces a non-empty,
+ * policy-compliant password for every student account. The receptionist
+ * generates a temporary password at intake time and hands it to the
+ * walk-in so they can later log in via the E16 self-registration path.
  */
 
 export type ReceptionistIntakeRequest = {
   branch_id: number
   email: string
+  password: string
   name: string
   phone: string
   date_of_birth: string
