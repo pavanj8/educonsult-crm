@@ -12,6 +12,14 @@ export {
   scheduleMeeting,
   updateMeeting,
 } from './meetings'
+export {
+  createNote,
+  deleteNote,
+  getNote,
+  listNotes,
+  updateNote,
+  type ListNotesParams,
+} from './notes'
 export { registerStudent } from './students'
 export {
   toChecklistUpload,
