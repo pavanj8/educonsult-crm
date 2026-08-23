@@ -4,13 +4,29 @@ from datetime import datetime, timezone
 
 from sqlalchemy import inspect
 
+from app.models.base import TenantScopedBase
 from app.models.meeting import Meeting
+
+
+def test_meeting_table_uses_tenant_scoped_base():
+    assert issubclass(Meeting, TenantScopedBase)
+    assert Meeting.tenant_id.property.columns[0].nullable is False
+    assert Meeting.scheduled_at.property.columns[0].nullable is False
 
 
 def test_meeting_model_has_required_columns():
     assert {column.key for column in inspect(Meeting).columns} == {
-        "id", "tenant_id", "application_id", "counselor_id", "student_id",
-        "scheduled_at", "duration_minutes", "location", "notes", "created_at", "updated_at",
+        "id",
+        "tenant_id",
+        "application_id",
+        "counselor_id",
+        "student_id",
+        "scheduled_at",
+        "duration_minutes",
+        "location",
+        "notes",
+        "created_at",
+        "updated_at",
     }
 
 

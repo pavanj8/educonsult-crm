@@ -7,7 +7,22 @@ Create Date: 2026-08-27 00:00:00.000000
 Meeting storage for E22 counselor scheduling (J15, Requirements §5).
 Every meeting is tenant-scoped and belongs to one application, counselor,
 and student. Foreign keys cascade when the associated record is deleted.
+
+Indexes:
+
+* ``ix_meetings_application_id`` / ``ix_meetings_student_id`` /
+  ``ix_meetings_scheduled_at`` -- single-column indexes for the
+  ``GET /meetings?application_id=...&student_id=...`` list filters and
+  the upcoming-meetings query ordered by ``scheduled_at`` (E23, J16).
+* ``ix_meetings_tenant_counselor_scheduled`` -- composite index for
+  the counselor's "my meetings" path (the dominant query from the
+  E22 counselor dashboard, J15).
+
+``duration_minutes`` carries a server-side default of 60 minutes to
+match the ORM / Pydantic default so a future migration that adds
+``Meeting(...)`` from a non-ORM path still gets a sensible value.
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -43,18 +58,57 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("scheduled_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("duration_minutes", sa.Integer(), nullable=False),
+        sa.Column(
+            "duration_minutes",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("60"),
+        ),
         sa.Column("location", sa.String(length=255), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    for column in ("tenant_id", "application_id", "counselor_id", "student_id", "scheduled_at"):
-        op.create_index(op.f(f"ix_meetings_{column}"), "meetings", [column], unique=False)
+    op.create_index(
+        op.f("ix_meetings_tenant_id"),
+        "meetings",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_meetings_application_id"),
+        "meetings",
+        ["application_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_meetings_student_id"),
+        "meetings",
+        ["student_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_meetings_scheduled_at"),
+        "meetings",
+        ["scheduled_at"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_meetings_tenant_counselor_scheduled"),
+        "meetings",
+        ["tenant_id", "counselor_id", "scheduled_at"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
-    for column in ("scheduled_at", "student_id", "counselor_id", "application_id", "tenant_id"):
-        op.drop_index(op.f(f"ix_meetings_{column}"), table_name="meetings")
+    op.drop_index(
+        op.f("ix_meetings_tenant_counselor_scheduled"),
+        table_name="meetings",
+    )
+    op.drop_index(op.f("ix_meetings_scheduled_at"), table_name="meetings")
+    op.drop_index(op.f("ix_meetings_student_id"), table_name="meetings")
+    op.drop_index(op.f("ix_meetings_application_id"), table_name="meetings")
+    op.drop_index(op.f("ix_meetings_tenant_id"), table_name="meetings")
     op.drop_table("meetings")
