@@ -19,6 +19,13 @@ function createFetchMock(handlers: { status?: number; apps?: unknown[] } = {}) {
       }
       return { ok: true, status: 200, json: async () => handlers.apps ?? [mockApp] }
     }
+    // The counselor dashboard embeds the E22 meeting widget per row;
+    // tests that care about meeting state inject their own mock. The
+    // default mock returns an empty list so the existing assertions
+    // continue to focus on the assigned-application queue behaviour.
+    if (/\/applications\/\d+\/meetings(\?|$)/.test(path)) {
+      return { ok: true, status: 200, json: async () => [] }
+    }
     throw new Error(`Unhandled fetch: ${path}`)
   }) as unknown as typeof fetch
 }

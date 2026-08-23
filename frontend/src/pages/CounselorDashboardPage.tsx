@@ -1,3 +1,6 @@
+import { useId } from 'react'
+
+import ApplicationMeetings from '../components/meetings/ApplicationMeetings'
 import { useAssignedApplications } from '../hooks/useAssignedApplications'
 import { PIPELINE_STAGE_LABELS } from '../types/application'
 
@@ -8,7 +11,10 @@ function formatDate(iso: string): string {
 
 /**
  * Counselor dashboard — the signed-in staff member's assigned-application queue
- * (E21; Journey J14), with loading / error / empty states.
+ * (E21; Journey J14), with loading / error / empty states. Each row carries
+ * the E22 meetings widget (Journey J15, frontend ticket #161) so the
+ * counselor can review already-scheduled meetings and schedule new ones
+ * against the same application without leaving the queue.
  */
 export default function CounselorDashboardPage() {
   const { applications, loading, error, reload } = useAssignedApplications()
@@ -42,23 +48,63 @@ export default function CounselorDashboardPage() {
               <th scope="col">University / Program</th>
               <th scope="col">Stage</th>
               <th scope="col">Created</th>
+              <th scope="col">Meetings</th>
             </tr>
           </thead>
           <tbody>
             {applications.map((app) => (
-              <tr key={app.id} data-testid={`counselor-queue-row-${app.id}`}>
-                <td>#{app.id}</td>
-                <td>#{app.student_id}</td>
-                <td>
-                  #{app.university_id} / #{app.program_id}
-                </td>
-                <td>{PIPELINE_STAGE_LABELS[app.stage]}</td>
-                <td>{formatDate(app.created_at)}</td>
-              </tr>
+              <CounselorQueueRow
+                key={app.id}
+                applicationId={app.id}
+                studentId={app.student_id}
+                universityId={app.university_id}
+                programId={app.program_id}
+                stage={app.stage}
+                createdAt={app.created_at}
+              />
             ))}
           </tbody>
         </table>
       )}
     </section>
+  )
+}
+
+interface CounselorQueueRowProps {
+  applicationId: number
+  studentId: number
+  universityId: number
+  programId: number
+  stage: string
+  createdAt: string
+}
+
+function CounselorQueueRow({
+  applicationId,
+  studentId,
+  universityId,
+  programId,
+  stage,
+  createdAt,
+}: CounselorQueueRowProps) {
+  // A stable, row-scoped id prefix avoids collisions across rows and
+  // makes the schedule form's aria-labelledby pair with the heading.
+  const rowKey = useId()
+  const headingId = `counselor-queue-row-${applicationId}-heading-${rowKey}`
+  return (
+    <tr data-testid={`counselor-queue-row-${applicationId}`}>
+      <th scope="row" id={headingId}>
+        #{applicationId}
+      </th>
+      <td>#{studentId}</td>
+      <td>
+        #{universityId} / #{programId}
+      </td>
+      <td>{PIPELINE_STAGE_LABELS[stage as keyof typeof PIPELINE_STAGE_LABELS] ?? stage}</td>
+      <td>{formatDate(createdAt)}</td>
+      <td>
+        <ApplicationMeetings applicationId={applicationId} />
+      </td>
+    </tr>
   )
 }

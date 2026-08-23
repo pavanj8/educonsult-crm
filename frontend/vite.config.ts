@@ -13,6 +13,7 @@ const API_PREFIXES = [
   '/branches',
   '/staff',
   '/tenants',
+  '/meetings',
   '/health',
 ]
 const BACKEND = process.env.VITE_DEV_BACKEND ?? 'http://127.0.0.1:8000'

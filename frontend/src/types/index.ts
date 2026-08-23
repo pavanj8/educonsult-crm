@@ -1,6 +1,11 @@
 export type { Application, PipelineStage } from './application'
 export type { AuthUser, LoginCredentials, TokenResponse, UserRole } from './auth'
 export type {
+  Meeting,
+  ScheduleMeetingRequest,
+  UpdateMeetingRequest,
+} from './meeting'
+export type {
   ChecklistItem,
   ChecklistItemTemplate,
   ChecklistItemTemplateCreateRequest,
