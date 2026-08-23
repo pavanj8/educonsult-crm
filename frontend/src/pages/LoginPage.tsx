@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { isApiError } from '../api/client'
 import { REGISTER_PATH, FORGOT_PASSWORD_PATH } from '../routes/paths'
@@ -22,6 +23,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login, clearError, isAuthenticated, isLoading } = useAuth()
+  const { t } = useTranslation()
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const errorId = useId()
@@ -51,7 +53,7 @@ export default function LoginPage() {
       if (isApiError(err)) {
         setError(err.message)
       } else {
-        setError('Unable to sign in')
+        setError(t('login.errors.fallback'))
       }
     } finally {
       setSubmitting(false)
@@ -61,8 +63,8 @@ export default function LoginPage() {
   if ((isLoading && !submitting) || isAuthenticated) {
     return (
       <main className="login-page">
-        <div className="auth-loading" role="status" aria-live="polite" aria-label="Loading">
-          Loading…
+        <div className="auth-loading" role="status" aria-live="polite" aria-label={t('common.loading')}>
+          {t('common.loadingEllipsis')}
         </div>
       </main>
     )
@@ -71,10 +73,10 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <div className="login-page__card">
-        <h1>Sign in</h1>
+        <h1>{t('login.title')}</h1>
         <form className="login-form" method="post" onSubmit={handleSubmit}>
           <label className="login-form__field">
-            Email
+            {t('login.fields.email')}
             <input
               data-testid="login-email"
               name="email"
@@ -85,7 +87,7 @@ export default function LoginPage() {
             />
           </label>
           <label className="login-form__field">
-            Password
+            {t('login.fields.password')}
             <input
               data-testid="login-password"
               name="password"
@@ -112,18 +114,18 @@ export default function LoginPage() {
             disabled={submitting}
             aria-busy={submitting}
           >
-            {submitting ? 'Signing in…' : 'Sign in'}
+            {submitting ? t('login.submit.submitting') : t('login.submit.idle')}
           </button>
         </form>
         <p className="login-page__footer">
           <Link to={FORGOT_PASSWORD_PATH} className="login-page__link">
-            Forgot password?
+            {t('login.links.forgotPassword')}
           </Link>
         </p>
         <p className="login-page__footer">
-          New student?{' '}
+          {t('login.links.newStudentPrompt')}{' '}
           <Link to={REGISTER_PATH} className="login-page__link">
-            Create an account
+            {t('login.links.createAccount')}
           </Link>
         </p>
       </div>

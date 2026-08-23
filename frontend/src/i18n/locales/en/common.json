@@ -4,5 +4,50 @@
     "english": "English",
     "hindi": "हिन्दी",
     "telugu": "తెలుగు"
+  },
+  "app": {
+    "platformName": "EduConsult CRM",
+    "nav": {
+      "main": "Main",
+      "tenants": "Tenants",
+      "branches": "Branches",
+      "staff": "Staff",
+      "masterData": "Master data",
+      "branding": "Branding",
+      "checklistTemplates": "Checklist templates",
+      "dashboard": "Dashboard",
+      "verifierQueue": "Verifier queue",
+      "myApplications": "My applications",
+      "intake": "Intake"
+    }
+  },
+  "home": {
+    "welcome": "Welcome to EduConsult CRM"
+  },
+  "notFound": {
+    "message": "Page not found"
+  },
+  "common": {
+    "loading": "Loading",
+    "loadingEllipsis": "Loading…"
+  },
+  "login": {
+    "title": "Sign in",
+    "fields": {
+      "email": "Email",
+      "password": "Password"
+    },
+    "submit": {
+      "idle": "Sign in",
+      "submitting": "Signing in…"
+    },
+    "errors": {
+      "fallback": "Unable to sign in"
+    },
+    "links": {
+      "forgotPassword": "Forgot password?",
+      "newStudentPrompt": "New student?",
+      "createAccount": "Create an account"
+    }
   }
 }
