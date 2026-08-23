@@ -89,3 +89,24 @@ export async function markWithdrawn(
     body: JSON.stringify({ reason }),
   })
 }
+
+/**
+ * Manually reassign (or unassign) the counselor on an application (E20;
+ * Journey J13; frontend #154). Backed by
+ * ``PATCH /applications/{id}/counselor``.
+ *
+ * Pass an integer ``counselorId`` to assign that counselor; pass
+ * ``null`` to unassign the application's current counselor. Server-side
+ * permission / branch-scope / counselor-validity checks are unchanged
+ * — the backend surfaces 403 / 422 with a meaningful ``detail`` that
+ * the calling UI maps to a user-readable error message.
+ */
+export async function reassignCounselor(
+  applicationId: number,
+  counselorId: number | null,
+): Promise<Application> {
+  return apiFetch<Application>(`/applications/${applicationId}/counselor`, {
+    method: 'PATCH',
+    body: JSON.stringify({ counselor_id: counselorId }),
+  })
+}
