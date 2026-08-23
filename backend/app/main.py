@@ -15,6 +15,7 @@ from app.routers.checklist import router as checklist_router
 from app.routers.checklist_templates import router as checklist_templates_router
 from app.routers.master_data import router as master_data_router
 from app.routers.master_data_admin import router as master_data_admin_router
+from app.routers.meetings import router as meetings_router
 from app.routers.notifications import router as notifications_router
 from app.routers.staff import router as staff_router
 from app.routers.student_documents import router as student_documents_router
@@ -100,11 +101,8 @@ app.include_router(staff_router, prefix="/staff", tags=["staff"])
 app.include_router(students_router, prefix="/students", tags=["students"])
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
 app.include_router(master_data_router, prefix="/tenants", tags=["master-data"])
-app.include_router(
-    master_data_admin_router,
-    prefix="/master-data/admin",
-    tags=["master-data-admin"],
-)
+app.include_router(master_data_admin_router, prefix="/master-data/admin", tags=["master-data-admin"])
+app.include_router(meetings_router, tags=["meetings"])
 
 
 @app.get("/health")
