@@ -713,8 +713,6 @@ def mark_application_withdrawn(
     )
 
 
-<<<<<<< HEAD
-=======
 _COUNSELOR_NOT_FOUND_DETAIL = "Target counselor not found"
 _COUNSELOR_INACTIVE_DETAIL = "Target counselor is not active"
 
@@ -787,7 +785,6 @@ def _target_branch_scope(
     return application.branch_id
 
 
->>>>>>> origin/main
 @router.patch("/{application_id}/counselor", response_model=ApplicationResponse)
 def reassign_application_counselor(
     application_id: int,
@@ -808,24 +805,6 @@ def reassign_application_counselor(
 
     Behavior:
 
-<<<<<<< HEAD
-    * Tenant scoping: cross-tenant access surfaces as 404 (not 403 -- prevents
-      tenant-id enumeration).
-    * Branch scoping for branch managers / receptionists: cross-branch access
-      surfaces as 403. Consultancy owners keep cross-branch visibility by
-      design (ADR-0004).
-    * The target counselor, when supplied, must be an active ``COUNSELOR``
-      whose ``tenant_id`` matches the application's tenant. Cross-tenant or
-      non-counselor / inactive targets surface as 404 (the target is treated
-      as "not visible from this tenant" rather than revealed as 422, to avoid
-      leaking user-id existence across tenants).
-    * For branch-scoped actors (branch manager / receptionist) the target
-      counselor must also be in the same branch as the application;
-      consultancy owners may target any branch in the tenant.
-    * No stage-history row is written and no in-app notification is
-      generated -- those surfaces are not part of the Journey J13
-      acceptance criteria and are deliberately out of scope for this ticket.
-=======
     * Tenant scoping is enforced via :func:`_get_tenant_application`
       (cross-tenant access surfaces as 404, not 403 -- prevents tenant
       enumeration).
@@ -861,7 +840,6 @@ def reassign_application_counselor(
     .. code-block:: json
 
        {}
->>>>>>> origin/main
 
     Errors:
 
@@ -869,16 +847,9 @@ def reassign_application_counselor(
     * 403 -- caller lacks the permission, has no tenant scope, or
       (branch-scoped actor) has no branch scope / is in a different
       branch than the application.
-<<<<<<< HEAD
-    * 404 -- application does not exist or belongs to a different tenant,
-      or the target counselor does not exist / is in a different tenant /
-      is not a counselor / is inactive.
-    * 422 -- the request body fails Pydantic validation.
-=======
     * 404 -- application does not exist or belongs to a different tenant.
     * 422 -- ``counselor_id`` does not name an active counselor in the
       same tenant + branch, or the body fails Pydantic validation.
->>>>>>> origin/main
     * 503 -- database unavailable while loading the application, the
       target counselor, or the commit.
     """
@@ -912,68 +883,3 @@ def reassign_application_counselor(
 
     db.refresh(application)
     return application
-<<<<<<< HEAD
-
-
-def _validate_target_counselor(
-    db: Session,
-    *,
-    tenant_id: int,
-    branch_id: int | None,
-    counselor_id: int,
-) -> None:
-    """Validate the target counselor for a manual reassignment, or raise 404.
-
-    The target must be an active ``COUNSELOR`` whose ``tenant_id`` matches
-    the application's tenant. For branch-scoped actors (``branch_id`` is
-    not ``None``) the counselor must also be in the same branch as the
-    application. ``branch_id=None`` means cross-branch visibility is
-    granted (consultancy owner scope).
-
-    Validation failures surface as **404** ("target not visible from this
-    tenant") rather than 422 / 403, to avoid leaking user-id existence
-    across tenants -- the target counselor is part of the E20 data path
-    and a 422 would let them enumerate other tenants' counselor rosters.
-    """
-    try:
-        counselor = db.get(User, counselor_id)
-    except OperationalError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_DB_UNAVAILABLE_DETAIL,
-        ) from None
-
-    if (
-        counselor is None
-        or counselor.tenant_id != tenant_id
-        or counselor.role != Role.COUNSELOR
-        or not counselor.is_active
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Target counselor not found",
-        )
-
-    if branch_id is not None and counselor.branch_id != branch_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Target counselor not found",
-        )
-
-
-def _target_branch_scope(
-    current_user: AuthenticatedUser,
-    application: Application,
-) -> int | None:
-    """Return the branch scope the target counselor must match.
-
-    Consultancy owners (cross-branch by design, ADR-0004) get ``None``
-    so the target-counselor validator allows any branch in the tenant.
-    Branch-scoped actors (branch manager / receptionist) must match the
-    application's branch.
-    """
-    if current_user.role == Role.CONSULTANCY_OWNER:
-        return None
-    return application.branch_id
-=======
->>>>>>> origin/main

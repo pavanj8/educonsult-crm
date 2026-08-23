@@ -148,15 +148,6 @@ class MarkWithdrawnRequest(BaseModel):
 class ReassignCounselorRequest(BaseModel):
     """Body for ``PATCH /applications/{id}/counselor`` (E20; Journey J13; issue #153).
 
-<<<<<<< HEAD
-    The new counselor's user id. ``None`` unassigns the application's current
-    counselor (explicit unassign by a manager is recorded; the route does not
-    silently no-op). The endpoint's permission + tenant/branch scoping
-    guarantees are documented on the route function.
-    """
-
-    counselor_id: int | None = Field(default=None, ge=1)
-=======
     Manual counselor reassignment for an application. The ``counselor_id``
     field accepts either a positive integer (the id of the new counselor
     to assign) or ``null`` (unassign the current counselor). When a non-null
@@ -176,4 +167,3 @@ class ReassignCounselorRequest(BaseModel):
             "current counselor."
         ),
     )
->>>>>>> origin/main
