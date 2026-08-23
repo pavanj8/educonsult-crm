@@ -42,6 +42,7 @@ import {
 } from '../types/application'
 import { useChecklistTemplates } from '../hooks/useChecklistTemplates'
 import { useMasterDataAdmin } from '../hooks/useMasterDataAdmin'
+import { hasAccessToken } from '../store/authStorage'
 import type { ChecklistItemTemplate } from '../types/checklist'
 import type { Program } from '../types/masterData'
 
@@ -583,6 +584,11 @@ export default function ChecklistTemplatesPage() {
         {loading ? (
           <p role="status" data-testid="checklist-templates-loading">
             Loading templates…
+          </p>
+        ) : null}
+        {!loading && !hasAccessToken() ? (
+          <p data-testid="checklist-templates-unauthenticated">
+            Please log in to manage checklist templates.
           </p>
         ) : null}
         {error ? (
