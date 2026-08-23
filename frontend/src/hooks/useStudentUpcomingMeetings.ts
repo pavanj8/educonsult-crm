@@ -72,8 +72,20 @@ export function useStudentUpcomingMeetings(): UseStudentUpcomingMeetingsResult {
     void load()
   }, [load])
 
+  // Re-run the filter against a fresh ``Date.now()`` once per minute so a
+  // meeting that ticks into the past (or out of "upcoming") while the
+  // student has the dashboard open updates without a manual Refresh
+  // click. The fetch itself is not reticked -- only the slicing/sort.
+  // Cheap because ``meetings`` is already in memory.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now())
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [])
+
   const upcoming = useMemo(() => {
-    const now = Date.now()
     return meetings
       .filter((meeting) => {
         const time = new Date(meeting.scheduled_at).getTime()
@@ -85,7 +97,7 @@ export function useStudentUpcomingMeetings(): UseStudentUpcomingMeetingsResult {
         const bTime = new Date(b.scheduled_at).getTime()
         return aTime - bTime
       })
-  }, [meetings])
+  }, [meetings, now])
 
   return { upcoming, loading, error, reload: load }
 }

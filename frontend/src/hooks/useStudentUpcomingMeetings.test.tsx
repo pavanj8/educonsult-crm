@@ -116,6 +116,44 @@ describe('useStudentUpcomingMeetings', () => {
     expect(result.current.error).toBeNull()
   })
 
+  it('drops meetings with a malformed scheduled_at (NaN guard)', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    const malformed = {
+      ...futureMeeting,
+      id: 200,
+      scheduled_at: 'not-a-real-iso-string',
+    }
+    globalThis.fetch = makeFetch(async (path) => {
+      if (path.endsWith('/me/meetings')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [futureMeeting, malformed],
+        } as Response
+      }
+      throw new Error(`unexpected fetch: ${path}`)
+    })
+
+    const { result } = renderHook(() => useStudentUpcomingMeetings())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBeNull()
+    expect(result.current.upcoming.map((m) => m.id)).toEqual([futureMeeting.id])
+  })
+
+  it('maps a 500 server error to the generic failure message', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    globalThis.fetch = makeFetch(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ detail: 'Internal server error' }),
+    } as unknown as Response))
+
+    const { result } = renderHook(() => useStudentUpcomingMeetings())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toMatch(/failed to load/i)
+    expect(result.current.upcoming).toEqual([])
+  })
+
   it('reload triggers a fresh fetch', async () => {
     localStorage.setItem('access_token', 'test-token')
     let calls = 0

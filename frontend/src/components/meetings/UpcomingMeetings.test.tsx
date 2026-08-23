@@ -123,6 +123,18 @@ describe('UpcomingMeetings', () => {
     )
   })
 
+  it('renders a generic error state on 500', async () => {
+    globalThis.fetch = makeFetch(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ detail: 'Internal server error' }),
+    } as unknown as Response))
+    render(<UpcomingMeetings />)
+    expect(await screen.findByTestId('upcoming-meetings-error')).toHaveTextContent(
+      /failed to load/i,
+    )
+  })
+
   it('reload button triggers a fresh fetch', async () => {
     let calls = 0
     globalThis.fetch = makeFetch(async (path) => {
