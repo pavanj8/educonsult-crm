@@ -28,11 +28,11 @@ export async function fetchApplicationChecklist({
 /* ------------------------------------------------------------------ *
  * E15 — Checklist template CRUD client (Journey J8; sibling #132).
  *
- * The backend exposes ``/checklist-templates/admin/templates`` (GET,
- * POST) and ``/checklist-templates/admin/templates/{id}`` (GET, PATCH,
- * DELETE), gated by the ``checklist_template:manage`` permission
- * (granted to consultancy owner + branch manager). Templates are
- * tenant-scoped via the authenticated caller's ``tenant_id``.
+ * The backend exposes ``/checklist-templates`` (GET, POST) and
+ * ``/checklist-templates/{id}`` (GET, PATCH, DELETE), gated by the
+ * ``checklist_template:manage`` permission (granted to consultancy
+ * owner + branch manager). Templates are tenant-scoped via the
+ * authenticated caller's ``tenant_id`` (ADR-0004).
  * ------------------------------------------------------------------ */
 
 /** Filter parameters for {@link fetchAdminChecklistItemTemplates}. */
@@ -41,8 +41,8 @@ export interface FetchAdminChecklistItemTemplatesParams {
   program_id?: number
 }
 
-function checklistTemplatesAdminPath(id?: number): string {
-  const base = '/checklist-templates/admin/templates'
+function checklistTemplatePath(id?: number): string {
+  const base = '/checklist-templates'
   return typeof id === 'number' ? `${base}/${id}` : base
 }
 
@@ -62,14 +62,14 @@ export async function fetchAdminChecklistItemTemplates(
     search.push(`program_id=${params.program_id}`)
   }
   const query = search.length > 0 ? `?${search.join('&')}` : ''
-  return apiFetch<ChecklistItemTemplate[]>(`${checklistTemplatesAdminPath()}${query}`)
+  return apiFetch<ChecklistItemTemplate[]>(`${checklistTemplatePath()}${query}`)
 }
 
 /** Create a checklist item template (E15; Journey J8). */
 export async function createAdminChecklistItemTemplate(
   payload: ChecklistItemTemplateCreateRequest,
 ): Promise<ChecklistItemTemplate> {
-  return apiFetch<ChecklistItemTemplate>(checklistTemplatesAdminPath(), {
+  return apiFetch<ChecklistItemTemplate>(checklistTemplatePath(), {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -80,7 +80,7 @@ export async function updateAdminChecklistItemTemplate(
   id: number,
   payload: ChecklistItemTemplateUpdateRequest,
 ): Promise<ChecklistItemTemplate> {
-  return apiFetch<ChecklistItemTemplate>(checklistTemplatesAdminPath(id), {
+  return apiFetch<ChecklistItemTemplate>(checklistTemplatePath(id), {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
@@ -88,7 +88,7 @@ export async function updateAdminChecklistItemTemplate(
 
 /** Delete a checklist item template (E15; Journey J8). */
 export async function deleteAdminChecklistItemTemplate(id: number): Promise<void> {
-  await apiFetch<void>(checklistTemplatesAdminPath(id), {
+  await apiFetch<void>(checklistTemplatePath(id), {
     method: 'DELETE',
   })
 }

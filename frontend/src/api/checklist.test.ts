@@ -135,7 +135,7 @@ describe('checklist template admin CRUD client (E15; Journey J8)', () => {
     const result = await fetchAdminChecklistItemTemplates()
 
     expect(result).toEqual(mockTemplates)
-    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates/admin/templates', {
+    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates', {
       headers: {
         'Content-Type': 'application/json',
         Authorization: 'Bearer token-abc',
@@ -157,7 +157,7 @@ describe('checklist template admin CRUD client (E15; Journey J8)', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/checklist-templates/admin/templates?stage=document_verification&program_id=100',
+      '/checklist-templates?stage=document_verification&program_id=100',
       {
         headers: {
           'Content-Type': 'application/json',
@@ -186,7 +186,7 @@ describe('checklist template admin CRUD client (E15; Journey J8)', () => {
     })
 
     expect(result).toEqual(created)
-    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates/admin/templates', {
+    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -217,7 +217,7 @@ describe('checklist template admin CRUD client (E15; Journey J8)', () => {
     })
 
     expect(result).toEqual(updated)
-    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates/admin/templates/1', {
+    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates/1', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -237,7 +237,7 @@ describe('checklist template admin CRUD client (E15; Journey J8)', () => {
 
     await deleteAdminChecklistItemTemplate(1)
 
-    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates/admin/templates/1', {
+    expect(fetchMock).toHaveBeenCalledWith('/checklist-templates/1', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

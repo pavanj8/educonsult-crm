@@ -28,35 +28,36 @@ Traceability
   template for a stage/program).
 * Epic E15 (Document Checklist Template Management).
 * Backend: :mod:`app.routers.checklist` (E26 read) + the E15 CRUD
-  router mounted under ``/checklist-templates/admin/templates``
-  (sibling ticket #132).
+  router mounted under ``/checklist-templates`` (sibling ticket #132).
 * Frontend sibling: :mod:`useChecklistTemplates` (state hook).
 */
 
 import { useId, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
-import { PIPELINE_STAGE_LABELS, type PipelineStage } from '../types/application'
+import {
+  NON_TERMINAL_PIPELINE_STAGES,
+  PIPELINE_STAGE_LABELS,
+  type PipelineStage,
+} from '../types/application'
 import { useChecklistTemplates } from '../hooks/useChecklistTemplates'
 import { useMasterDataAdmin } from '../hooks/useMasterDataAdmin'
 import type { ChecklistItemTemplate } from '../types/checklist'
 import type { Program } from '../types/masterData'
 
 /**
- * Stages that can host a checklist template. Terminal stages
- * (enrolled/rejected/withdrawn) are excluded — no documents are
- * collected once an application has reached its final state.
+ * Stages that can host a checklist template.
+ *
+ * Derived from :ts:type:`PipelineStage` minus the terminal stages
+ * (``enrolled`` / ``rejected`` / ``withdrawn``) co-located with that
+ * type in :mod:`frontend/src/types/application`. No documents are
+ * collected once an application has reached its final state, so
+ * those stages are excluded here. Deriving from a single source of
+ * truth means adding a new non-terminal pipeline stage to
+ * :ts:type:`PipelineStage` automatically surfaces it in this picker
+ * (Software Architect review on issue #133).
  */
-const STAGE_OPTIONS: PipelineStage[] = [
-  'registered',
-  'counseling',
-  'university_shortlisting',
-  'application_submitted',
-  'document_verification',
-  'offer_letter',
-  'visa_processing',
-  'loan_processing',
-]
+const STAGE_OPTIONS: readonly PipelineStage[] = NON_TERMINAL_PIPELINE_STAGES
 
 const DEFAULT_STAGE: PipelineStage = 'registered'
 

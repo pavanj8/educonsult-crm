@@ -80,7 +80,7 @@ function defaultHandlersFor(options: FetchRouteOptions): Array<{
   return [
     {
       method: 'GET',
-      path: /\/checklist-templates\/admin\/templates$/,
+      path: /\/checklist-templates(\?.*)?$/,
       handler: () => jsonResponse(templates),
     },
     {
@@ -194,7 +194,7 @@ describe('ChecklistTemplatesPage', () => {
       handlers: [
         {
           method: 'GET',
-          path: /\/checklist-templates\/admin\/templates$/,
+          path: /\/checklist-templates(\?.*)?$/,
           handler: () =>
             jsonResponse({ detail: 'Insufficient permissions' }, 403),
         },
@@ -237,7 +237,7 @@ describe('ChecklistTemplatesPage', () => {
         ...defaultHandlersFor({}),
         {
           method: 'POST',
-          path: /\/checklist-templates\/admin\/templates$/,
+          path: /\/checklist-templates$/,
           handler: () => jsonResponse(createdTemplate, 201),
         },
       ],
@@ -264,7 +264,13 @@ describe('ChecklistTemplatesPage', () => {
 
     const postCalls = fetchSpy.mock.calls.filter((call) => {
       const [url, init] = call
-      if (typeof url !== 'string' || !url.endsWith('/checklist-templates/admin/templates')) {
+      if (typeof url !== 'string') {
+        return false
+      }
+      // Match the bare ``/checklist-templates`` POST endpoint, not the
+      // ``/checklist-templates/{id}`` PATCH/DELETE endpoint.
+      const pathOnly = url.split('?')[0] ?? url
+      if (pathOnly !== '/checklist-templates') {
         return false
       }
       const method = (init as RequestInit | undefined)?.method ?? 'GET'
@@ -289,7 +295,7 @@ describe('ChecklistTemplatesPage', () => {
         ...defaultHandlersFor({}),
         {
           method: 'POST',
-          path: /\/checklist-templates\/admin\/templates$/,
+          path: /\/checklist-templates$/,
           handler: () => jsonResponse({ detail: 'name is required' }, 422),
         },
       ],
@@ -318,7 +324,7 @@ describe('ChecklistTemplatesPage', () => {
         ...defaultHandlersFor({}),
         {
           method: 'PATCH',
-          path: /\/checklist-templates\/admin\/templates\/\d+$/,
+          path: /\/checklist-templates\/\d+$/,
           handler: () => jsonResponse(updatedTemplate),
         },
       ],
@@ -348,10 +354,11 @@ describe('ChecklistTemplatesPage', () => {
 
     const patchCalls = fetchSpy.mock.calls.filter((call) => {
       const [url, init] = call
-      if (
-        typeof url !== 'string' ||
-        !/\/checklist-templates\/admin\/templates\/\d+$/.test(url)
-      ) {
+      if (typeof url !== 'string') {
+        return false
+      }
+      const pathOnly = url.split('?')[0] ?? url
+      if (!/^\/checklist-templates\/\d+$/.test(pathOnly)) {
         return false
       }
       const method = (init as RequestInit | undefined)?.method ?? 'GET'
@@ -381,7 +388,7 @@ describe('ChecklistTemplatesPage', () => {
         ...defaultHandlersFor({}),
         {
           method: 'DELETE',
-          path: /\/checklist-templates\/admin\/templates\/\d+$/,
+          path: /\/checklist-templates\/\d+$/,
           handler: () => jsonResponse(undefined, 204),
         },
       ],
@@ -400,10 +407,11 @@ describe('ChecklistTemplatesPage', () => {
 
     const deleteCalls = fetchSpy.mock.calls.filter((call) => {
       const [url, init] = call
-      if (
-        typeof url !== 'string' ||
-        !/\/checklist-templates\/admin\/templates\/\d+$/.test(url)
-      ) {
+      if (typeof url !== 'string') {
+        return false
+      }
+      const pathOnly = url.split('?')[0] ?? url
+      if (!/^\/checklist-templates\/\d+$/.test(pathOnly)) {
         return false
       }
       const method = (init as RequestInit | undefined)?.method ?? 'GET'
@@ -419,7 +427,7 @@ describe('ChecklistTemplatesPage', () => {
         ...defaultHandlersFor({}),
         {
           method: 'DELETE',
-          path: /\/checklist-templates\/admin\/templates\/\d+$/,
+          path: /\/checklist-templates\/\d+$/,
           handler: () =>
             jsonResponse({ detail: 'Template is in use' }, 409),
         },

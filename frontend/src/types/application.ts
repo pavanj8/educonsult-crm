@@ -1,4 +1,13 @@
-/** Application types aligned with backend E18 schemas (Journey J11). */
+/** Application types aligned with backend E18 schemas (Journey J11).
+
+Defines the canonical pipeline stage set and the terminal/non-terminal
+partition used across the UI. The terminal/non-terminal split lives
+here (not in feature pages) so any future pipeline stage added in
+:ts:type:`PipelineStage` is automatically picked up by code that asks
+"which stages still allow document collection?" without having to
+duplicate the membership list (E15 / Journey J8 — terminal applications
+never need a checklist template).
+*/
 
 export type PipelineStage =
   | 'registered'
@@ -12,6 +21,39 @@ export type PipelineStage =
   | 'enrolled'
   | 'rejected'
   | 'withdrawn'
+
+/**
+ * Stages that resolve an application to a final state. Requirements §5
+ * (Pipeline stages) names the three: enrolled / rejected / withdrawn.
+ * Document collection stops here — the J8 checklist builder UI excludes
+ * these from its template picker (E15).
+ */
+export const TERMINAL_PIPELINE_STAGES: ReadonlySet<PipelineStage> = new Set<
+  PipelineStage
+>(['enrolled', 'rejected', 'withdrawn'])
+
+/**
+ * Pipeline stages that may still collect documents (Requirements §5).
+ * Derived from :ts:var:`PipelineStage` minus :ts:var:`TERMINAL_PIPELINE_STAGES`
+ * so adding a new non-terminal stage to :ts:type:`PipelineStage`
+ * automatically surfaces it everywhere that asks for "non-terminal
+ * stages" (e.g. the E15 checklist template picker).
+ */
+export const NON_TERMINAL_PIPELINE_STAGES: readonly PipelineStage[] = (
+  [
+    'registered',
+    'counseling',
+    'university_shortlisting',
+    'application_submitted',
+    'document_verification',
+    'offer_letter',
+    'visa_processing',
+    'loan_processing',
+    'enrolled',
+    'rejected',
+    'withdrawn',
+  ] as PipelineStage[]
+).filter((stage) => !TERMINAL_PIPELINE_STAGES.has(stage))
 
 export type Application = {
   id: number

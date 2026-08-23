@@ -9,10 +9,10 @@ response exactly; keep field names in sync with
 ``backend/app/schemas/checklist.py`` (Requirements §5; ADR-0012).
 
 E15 (Document Checklist Template Management) adds the
-:class:`ChecklistItemTemplate` CRUD endpoints
-(``/checklist-templates/admin/...``); the request/response shapes for
-those endpoints are mirrored below so the template builder UI can
-manage the definitions the J19 read endpoint serves.
+:class:`ChecklistItemTemplate` CRUD endpoints mounted under
+``/checklist-templates``; the request/response shapes for those
+endpoints are mirrored below so the template builder UI can manage the
+definitions the J19 read endpoint serves.
 */
 
 import type { PipelineStage } from './application'
@@ -71,10 +71,11 @@ export interface ChecklistResponse {
  * E15 — Checklist template CRUD types (Journey J8; sibling #132/#134).
  *
  * The backend CRUD endpoints are mounted under
- * ``/checklist-templates/admin/templates``. The ``program_id`` field
- * is nullable: ``null`` means "applies to every program" (the common
- * case for documents like "passport" or "transcripts"). ``order_index``
- * is also nullable; the backend uses NULL to mean "append at the end".
+ * ``/checklist-templates`` (with ``/{id}`` for the single-resource
+ * routes). The ``program_id`` field is nullable: ``null`` means
+ * "applies to every program" (the common case for documents like
+ * "passport" or "transcripts"). ``order_index`` is also nullable; the
+ * backend uses NULL to mean "append at the end".
  * ------------------------------------------------------------------ */
 
 /**
@@ -96,7 +97,7 @@ export interface ChecklistItemTemplate {
   order_index: number | null
 }
 
-/** Payload for ``POST /checklist-templates/admin/templates`` (J8). */
+/** Payload for ``POST /checklist-templates`` (J8). */
 export interface ChecklistItemTemplateCreateRequest {
   stage: PipelineStage
   /** Omit or ``null`` to apply the template to every program. */
@@ -108,7 +109,7 @@ export interface ChecklistItemTemplateCreateRequest {
   order_index?: number | null
 }
 
-/** Payload for ``PATCH /checklist-templates/admin/templates/{id}`` (J8). */
+/** Payload for ``PATCH /checklist-templates/{id}`` (J8). */
 export interface ChecklistItemTemplateUpdateRequest {
   stage?: PipelineStage
   program_id?: number | null
