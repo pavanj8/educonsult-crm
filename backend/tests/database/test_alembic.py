@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "l5m6n7o8p9q0"
+HEAD_REVISION = "m6n7o8p9q0r1"
 
 
 def _alembic_config() -> Config:
@@ -183,6 +183,24 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "token_hash",
             "expires_at",
             "used_at",
+            "created_at",
+            "updated_at",
+        }
+        assert "meetings" in table_names
+        meeting_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("meetings")
+        }
+        assert meeting_columns == {
+            "id",
+            "tenant_id",
+            "application_id",
+            "counselor_id",
+            "student_id",
+            "scheduled_at",
+            "duration_minutes",
+            "location",
+            "notes",
             "created_at",
             "updated_at",
         }
