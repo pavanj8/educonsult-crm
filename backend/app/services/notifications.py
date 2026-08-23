@@ -28,16 +28,40 @@ This slice covers:
     fire from the E29 / E30 verifier endpoints. The student who
     uploaded the document is the recipient.
 
+* Hooks for the meeting-scheduled event:
+
+  * :func:`notify_meeting_scheduled` fires from the E22
+    ``POST /meetings`` endpoint. The student is the recipient.
+
 Each hook is intentionally a no-throw wrapper: a notification failure
-must not break the originating request (which has already been
-validated and partly executed). The originating endpoint still
-returns its normal 2xx response; the notification row simply doesn't
-appear if the DB is down or the inputs are unusable. Failures are
-logged at warning level so the harness and operators can spot them.
+(or, after #234, an email delivery failure) must not break the
+originating request (which has already been validated and partly
+executed). The originating endpoint still returns its normal 2xx
+response; the notification row simply doesn't appear if the DB is down
+or the inputs are unusable. Email delivery failures are logged at
+warning level so the harness and operators can spot them without
+breaking the originating request.
+
+E49 wiring (Issue #234)
+-----------------------
+After persisting the in-app notification row, every hook also
+dispatches an email through :func:`app.email.service.send_email` so
+users receive both an in-app and an email notification on the same
+event (Requirements §6: "In-app + email for status changes, document
+verification results, meeting scheduling"). The email-send is a
+no-throw wrapper: a flaky SMTP transport (or any other
+:class:`EmailDeliveryError`) is logged but never propagated, so a
+broken email path cannot break the (already committed) originating
+event.
+
+The email content for each event is composed by a small template
+function in :mod:`app.email.notification_templates` (introduced in
+this same ticket). That module is a deliberate seam — the in-progress
+#233 templates ticket can later replace those builders with richer
+HTML / i18n templates without touching the call sites here.
 
 Out of scope (tracked as separate issues)
 -----------------------------------------
-* Email delivery — Epic E49, Journey J42 (issue after #230).
 * The notification-center read/mark-read API and UI — Epic E50,
   Journey J43 (sibling issues).
 * Owner-invite / new-tenant notifications — covered by E8 / J1
@@ -57,10 +81,19 @@ from typing import Optional
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.email.notification_templates import (
+    build_counselor_stage_change_email,
+    build_document_approved_email,
+    build_document_rejected_email,
+    build_meeting_scheduled_email,
+    build_stage_change_email,
+)
+from app.email.service import EmailDeliveryError, send_email
 from app.models.application import Application
 from app.models.meeting import Meeting
 from app.models.notification import Notification
 from app.models.student_document import StudentDocument
+from app.models.user import User
 from app.pipeline.stages import PipelineStage
 
 __all__ = [
@@ -142,6 +175,58 @@ def create_notification(
     return notification
 
 
+def _send_notification_email(
+    db: Session,
+    *,
+    user_id: int,
+    subject: str,
+    body_text: str,
+) -> None:
+    """Best-effort dispatch of one notification email (Issue #234).
+
+    Looks up the recipient's email address via the shared SQLAlchemy
+    session (the same one that holds the originating transaction) and
+    delegates to :func:`app.email.service.send_email`. Any failure —
+    missing user, missing email, SMTP transport errors raised as
+    :class:`EmailDeliveryError` — is logged at warning level and
+    swallowed so a broken email path never breaks the originating
+    request. The in-app notification row has already been committed
+    before this helper is called, so the user has at least the
+    in-app channel as a fallback.
+
+    Args:
+        db: Active SQLAlchemy session (shared with the caller).
+        user_id: Recipient user id.
+        subject: Email subject line.
+        body_text: Plain-text body.
+    """
+    try:
+        user = db.get(User, user_id)
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.warning(
+            "notification email skipped (user lookup failed user_id=%s): %s",
+            user_id,
+            exc,
+        )
+        return
+
+    if user is None or not user.email:
+        logger.warning(
+            "notification email skipped (no email on file user_id=%s)",
+            user_id,
+        )
+        return
+
+    try:
+        send_email(to=user.email, subject=subject, body_text=body_text)
+    except EmailDeliveryError as exc:
+        logger.warning(
+            "notification email delivery failed (user_id=%s): %s",
+            user_id,
+            exc,
+        )
+
+
 def notify_application_stage_changed(
     db: Session,
     *,
@@ -150,7 +235,7 @@ def notify_application_stage_changed(
     to_stage: PipelineStage,
     actor_user_id: int,
 ) -> None:
-    """Generate in-app notifications for an application stage transition (E25; J18).
+    """Generate in-app + email notifications for an application stage transition (E25; J18).
 
     Called from the E25 ``POST /applications/{id}/stage`` endpoint
     (and the E38/E39/E40 mark-enrolled/rejected/withdrawn wrappers,
@@ -167,6 +252,10 @@ def notify_application_stage_changed(
     flow). Self-actions on one's own application remain useful for
     audit: "Your application moved to X" is meaningful even when the
     student is the actor.
+
+    After persisting the in-app notification rows, the same user_ids
+    receive an outbound email through the E49 abstraction (Issue
+    #234; J42). Email failures are logged but never propagated.
 
     Args:
         db: Active SQLAlchemy session (shared with the caller — the
@@ -195,6 +284,16 @@ def notify_application_stage_changed(
         message=message,
     )
 
+    email_subject, email_body = build_stage_change_email(
+        from_stage=from_stage, to_stage=to_stage,
+    )
+    _send_notification_email(
+        db,
+        user_id=application.student_id,
+        subject=email_subject,
+        body_text=email_body,
+    )
+
     # The assigned counselor gets a separate notification, but not
     # when they were the actor (avoid notifying a user about their
     # own action).
@@ -217,6 +316,16 @@ def notify_application_stage_changed(
             message=counselor_message,
         )
 
+        counselor_email_subject, counselor_email_body = build_counselor_stage_change_email(
+            from_stage=from_stage, to_stage=to_stage,
+        )
+        _send_notification_email(
+            db,
+            user_id=counselor_id,
+            subject=counselor_email_subject,
+            body_text=counselor_email_body,
+        )
+
 
 def notify_document_approved(
     db: Session,
@@ -233,6 +342,10 @@ def notify_document_approved(
     approval comment so the student sees the verifier's feedback
     in their notification center alongside the standard
     "approved" message.
+
+    After persisting the in-app notification row, the student also
+    receives an outbound email through the E49 abstraction (Issue
+    #234; J42). Email failures are logged but never propagated.
 
     Args:
         db: Active SQLAlchemy session.
@@ -256,6 +369,14 @@ def notify_document_approved(
         message=body,
     )
 
+    email_subject, email_body = build_document_approved_email(comment=comment)
+    _send_notification_email(
+        db,
+        user_id=application.student_id,
+        subject=email_subject,
+        body_text=email_body,
+    )
+
 
 def notify_document_rejected(
     db: Session,
@@ -269,6 +390,10 @@ def notify_document_rejected(
     Called from the E30 ``POST /verifier/documents/{id}/reject``
     endpoint. The rejection comment is REQUIRED at the E30 layer
     (Journey J23) so it is always present here.
+
+    After persisting the in-app notification row, the student also
+    receives an outbound email through the E49 abstraction (Issue
+    #234; J42). Email failures are logged but never propagated.
 
     Args:
         db: Active SQLAlchemy session.
@@ -285,6 +410,14 @@ def notify_document_rejected(
         user_id=application.student_id,
         title=title,
         message=body,
+    )
+
+    email_subject, email_body = build_document_rejected_email(comment=comment)
+    _send_notification_email(
+        db,
+        user_id=application.student_id,
+        subject=email_subject,
+        body_text=email_body,
     )
 
 
@@ -309,6 +442,10 @@ def notify_meeting_scheduled(
     ``Notification`` FK target, but the parent application is the
     natural drill-down target from J16's "view meeting" CTA.
 
+    After persisting the in-app notification row, the student also
+    receives an outbound email through the E49 abstraction (Issue
+    #234; J42). Email failures are logged but never propagated.
+
     Args:
         db: Active SQLAlchemy session.
         meeting: The freshly created :class:`Meeting`. The caller has
@@ -330,4 +467,15 @@ def notify_meeting_scheduled(
         user_id=meeting.student_id,
         title=title,
         message=message,
+    )
+
+    email_subject, email_body = build_meeting_scheduled_email(
+        scheduled_at_text=when,
+        location=meeting.location,
+    )
+    _send_notification_email(
+        db,
+        user_id=meeting.student_id,
+        subject=email_subject,
+        body_text=email_body,
     )
