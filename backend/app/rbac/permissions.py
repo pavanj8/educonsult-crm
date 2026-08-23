@@ -186,6 +186,15 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.DOCUMENT_READ,
             Permission.DOCUMENT_VERIFY,
+            # NOTE_READ per Requirements §5: "Internal notes: Staff-only
+            # comment thread per student (counselor/verifier/branch
+            # manager visible), hidden from student". The verifier is
+            # explicitly named as a visible-staff role; they need
+            # context (counseling notes) when approving/rejecting
+            # documents. NOTE_CREATE/UPDATE/DELETE are intentionally
+            # NOT granted -- the verifier verifies documents, they do
+            # not author internal counseling notes.
+            Permission.NOTE_READ,
             Permission.NOTIFICATION_READ,
         }
     ),
@@ -202,6 +211,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.STUDENT_READ,
             Permission.APPLICATION_READ,
             Permission.APPLICATION_REASSIGN_COUNSELOR,
+            # NOTE_READ grants front-desk visibility into the staff-only
+            # note thread so they can pick up caller context ("please
+            # ask about the visa follow-up the counselor flagged").
+            # Like the verifier, they have read-only access; they do not
+            # author internal notes.
+            Permission.NOTE_READ,
             Permission.NOTIFICATION_READ,
         }
     ),

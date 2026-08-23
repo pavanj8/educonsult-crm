@@ -122,7 +122,8 @@ def _load_student(db: Session, user: AuthenticatedUser, student_id: int) -> User
     Returns 404 for:
 
     * a row that does not exist,
-    * a cross-tenant row,
+    * a cross-tenant row (skipping the tenant check for super admins,
+      who are platform-wide by design),
     * a row whose role is not ``STUDENT`` (e.g. the caller probes a
       ``users`` id that resolves to a non-student row).
 
@@ -136,11 +137,14 @@ def _load_student(db: Session, user: AuthenticatedUser, student_id: int) -> User
     except OperationalError as exc:
         _handle_db_error(exc, rollback=False)
 
-    if (
-        student is None
-        or student.tenant_id != user.tenant_id
-        or student.role != Role.STUDENT
-    ):
+    if student is None or student.role != Role.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_STUDENT_NOT_FOUND_DETAIL,
+        )
+
+    # Super admins are platform-wide and have tenant_id=None by design.
+    if user.role != Role.SUPER_ADMIN and student.tenant_id != user.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_STUDENT_NOT_FOUND_DETAIL,
@@ -302,7 +306,18 @@ def _load_note(
     except OperationalError as exc:
         _handle_db_error(exc, rollback=False)
 
-    if note is None or note.tenant_id != user.tenant_id:
+    # Super admins are platform-wide with ``tenant_id=None``; their
+    # note query is unfiltered by tenant. Non-super-admin callers
+    # require a tenant match.
+    if note is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_NOTE_NOT_FOUND_DETAIL,
+        )
+    if (
+        user.role != Role.SUPER_ADMIN
+        and note.tenant_id != user.tenant_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_NOTE_NOT_FOUND_DETAIL,
@@ -313,9 +328,19 @@ def _load_note(
     except OperationalError as exc:
         _handle_db_error(exc, rollback=False)
 
-    if student is None or student.tenant_id != user.tenant_id:
+    if student is None:
         # The student FK is ON DELETE CASCADE; treat a dangling FK
         # as a not-found note rather than leaking internals.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_NOTE_NOT_FOUND_DETAIL,
+        )
+    if (
+        user.role != Role.SUPER_ADMIN
+        and student.tenant_id != user.tenant_id
+    ):
+        # A super admin can read notes for any tenant; a tenant-scoped
+        # caller must match the student's tenant.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_NOTE_NOT_FOUND_DETAIL,
@@ -343,7 +368,13 @@ def create_note(
     counselors must additionally be the assigned counselor on at least
     one of the student's applications.
     """
-    if current_user.tenant_id is None or current_user.id is None:
+    # Only ``current_user.id`` is the genuine precondition for create
+    # (we need to know who the author is). ``tenant_id`` may legitimately
+    # be ``None`` for super admins (platform-wide role); we derive the
+    # note's ``tenant_id`` from the student in that case so the row
+    # satisfies the NOT NULL constraint while still letting the
+    # platform-wide role author on any tenant.
+    if current_user.id is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
@@ -358,9 +389,15 @@ def create_note(
 
     _enforce_branch_scope_on_student(db, current_user, student)
 
+    note_tenant_id = (
+        current_user.tenant_id
+        if current_user.tenant_id is not None
+        else student.tenant_id
+    )
+
     now = _utc_now()
     note = Note(
-        tenant_id=current_user.tenant_id,
+        tenant_id=note_tenant_id,
         student_id=payload.student_id,
         application_id=payload.application_id,
         author_user_id=current_user.id,
@@ -402,11 +439,10 @@ def list_notes(
     reverse the list client-side (UX architect finding on iteration
     #1).
     """
-    if current_user.tenant_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
-        )
+    # Super admins are platform-wide with ``tenant_id=None`` by design;
+    # :func:`_scoped_notes_query` short-circuits to the unfiltered
+    # SELECT in that case. We do NOT raise here so the platform-wide
+    # role can list platform-wide.
 
     try:
         statement = _scoped_notes_query(db, current_user)
@@ -478,11 +514,6 @@ def get_note(
     db: Session = Depends(get_db),
 ) -> Note:
     """Fetch a single note by id (J17)."""
-    if current_user.tenant_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
-        )
     return _load_note(db, note_id, current_user)
 
 
@@ -511,7 +542,11 @@ def update_note(
       replace) the inline check; the OpenAPI contract now exposes the
       role distinction at the dependency layer.
     """
-    if current_user.tenant_id is None or current_user.id is None:
+    # Super admins are platform-wide with ``tenant_id=None`` by
+    # design; the role is the platform-wide author and may edit any
+    # note they authored. We only require ``current_user.id`` so the
+    # author-only check below has a comparison value.
+    if current_user.id is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
@@ -554,7 +589,11 @@ def delete_note(
       letting a peer silently remove another staff's note would break
       the audit trail).
     """
-    if current_user.tenant_id is None or current_user.id is None:
+    # Super admins are platform-wide with ``tenant_id=None`` by
+    # design; the role is the platform-wide author and may delete any
+    # note they authored. We only require ``current_user.id`` so the
+    # author-only check below has a comparison value.
+    if current_user.id is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
