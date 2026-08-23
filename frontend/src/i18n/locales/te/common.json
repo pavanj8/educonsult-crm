@@ -1,4 +1,49 @@
 {
+  "app": {
+    "platformName": "EduConsult CRM",
+    "nav": {
+      "main": "ప్రధాన",
+      "tenants": "టెనెంట్లు",
+      "branches": "శాఖలు",
+      "staff": "సిబ్బంది",
+      "masterData": "మాస్టర్ డేటా",
+      "branding": "బ్రాండింగ్",
+      "checklistTemplates": "చెక్‌లిస్ట్ టెంప్లేట్లు",
+      "dashboard": "డాష్‌బోర్డ్",
+      "verifierQueue": "ధృవీకరణదారు క్యూ",
+      "myApplications": "నా దరఖాస్తులు",
+      "intake": "ఇంటేక్"
+    }
+  },
+  "home": {
+    "welcome": "EduConsult CRM కి స్వాగతం"
+  },
+  "login": {
+    "title": "సైన్ ఇన్",
+    "fields": {
+      "email": "ఇమెయిల్",
+      "password": "పాస్‌వర్డ్"
+    },
+    "submit": {
+      "idle": "సైన్ ఇన్",
+      "submitting": "సైన్ ఇన్ అవుతోంది…"
+    },
+    "links": {
+      "forgotPassword": "పాస్‌వర్డ్ మర్చిపోయారా?",
+      "newStudentPrompt": "కొత్త విద్యార్థినా?",
+      "createAccount": "ఖాతా సృష్టించండి"
+    },
+    "errors": {
+      "fallback": "సైన్ ఇన్ కావడం సాధ్యం కాదు"
+    }
+  },
+  "common": {
+    "loading": "లోడ్ అవుతోంది",
+    "loadingEllipsis": "లోడ్ అవుతోంది…"
+  },
+  "notFound": {
+    "message": "పేజీ దొరకలేదు"
+  },
   "languageSwitcher": {
     "label": "భాష",
     "english": "English",
