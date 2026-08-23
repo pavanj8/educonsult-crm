@@ -214,3 +214,81 @@ describe('markWithdrawn API client', () => {
     )
   })
 })
+
+describe('reassignCounselor API client', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('patches a counselor_id to the applications counselor endpoint', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const updated = {
+      id: 5,
+      tenant_id: 10,
+      student_id: 42,
+      university_id: 1,
+      program_id: 10,
+      stage: 'registered' as const,
+      assigned_counselor_id: 77,
+      created_at: '2026-01-15T10:00:00Z',
+      updated_at: '2026-01-15T10:00:00Z',
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => updated })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { reassignCounselor } = await import('./applications')
+    const res = await reassignCounselor(5, 77)
+    expect(res).toEqual(updated)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/counselor',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ counselor_id: 77 }),
+      }),
+    )
+    const headers = (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer stored-access-token')
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+
+  it('patches counselor_id of null to unassign the current counselor', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const updated = {
+      id: 5,
+      tenant_id: 10,
+      student_id: 42,
+      university_id: 1,
+      program_id: 10,
+      stage: 'registered' as const,
+      assigned_counselor_id: null,
+      created_at: '2026-01-15T10:00:00Z',
+      updated_at: '2026-01-15T10:00:00Z',
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => updated })
+    globalThis.fetch = fetchMock as typeof fetch
+    const { reassignCounselor } = await import('./applications')
+    const res = await reassignCounselor(5, null)
+    expect(res).toEqual(updated)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/counselor',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ counselor_id: null }),
+      }),
+    )
+  })
+
+  it('surfaces the backend detail message when the API rejects (422)', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({ detail: 'Target counselor not found' }),
+    }) as typeof fetch
+    const { reassignCounselor } = await import('./applications')
+    await expect(reassignCounselor(5, 99)).rejects.toMatchObject({
+      message: 'Target counselor not found',
+      status: 422,
+    })
+  })
+})
