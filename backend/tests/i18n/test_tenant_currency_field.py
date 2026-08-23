@@ -25,8 +25,6 @@ here -- this issue (#241) covers the field + migration only.
 from __future__ import annotations
 
 import importlib
-import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -156,7 +154,9 @@ def test_tenant_supports_all_default_iso_4217_codes(db_session, currency_code: s
     assert tenant.currency == normalized
 
 
-def test_tenant_currency_field_lives_on_tenants_table_after_migration():
+def test_tenant_currency_field_lives_on_tenants_table_after_migration(
+    tmp_path, monkeypatch
+):
     """The ``currency`` column survives an ``alembic upgrade head`` on a clean DB.
 
     Mirrors the broader Alembic upgrade test in
@@ -176,62 +176,56 @@ def test_tenant_currency_field_lives_on_tenants_table_after_migration():
     backend_dir = Path(__file__).resolve().parents[2]
     alembic_cfg = Config(str(backend_dir / "alembic.ini"))
 
-    with tempfile.TemporaryDirectory() as tmp:
-        db_path = Path(tmp) / "e52_currency.db"
-        database_url = f"sqlite:///{db_path}"
+    db_path = tmp_path / "e52_currency.db"
+    database_url = f"sqlite:///{db_path}"
+    # Swap the runtime database URL to an isolated SQLite file so the
+    # migration runs against a known-clean state and does not touch any
+    # other test's database. ``monkeypatch.setenv`` is undone at teardown
+    # by pytest; the autouse ``_restore_database_module_after_reload``
+    # fixture in conftest then rebinds the module's engine/get_db back
+    # to the originals, so no state leaks into later tests.
+    monkeypatch.setenv("DATABASE_OVERRIDE", database_url)
+    importlib.reload(database_module)
+    command.upgrade(alembic_cfg, "head")
 
-        # Swap the runtime database URL to an isolated SQLite file so the
-        # migration runs against a known-clean state and does not touch
-        # any other test's database.
-        previous_override = os.environ.get("DATABASE_OVERRIDE")
-        os.environ["DATABASE_OVERRIDE"] = database_url
-        try:
-            importlib.reload(database_module)
-            command.upgrade(alembic_cfg, "head")
-        finally:
-            if previous_override is None:
-                os.environ.pop("DATABASE_OVERRIDE", None)
-            else:
-                os.environ["DATABASE_OVERRIDE"] = previous_override
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            table_names = inspect(connection).get_table_names()
+            assert "tenants" in table_names
+            tenant_columns = {
+                column["name"]
+                for column in inspect(connection).get_columns("tenants")
+            }
+            assert "currency" in tenant_columns
 
-        engine = create_engine(database_url)
-        try:
-            with engine.connect() as connection:
-                table_names = inspect(connection).get_table_names()
-                assert "tenants" in table_names
-                tenant_columns = {
-                    column["name"]
-                    for column in inspect(connection).get_columns("tenants")
-                }
-                assert "currency" in tenant_columns
+            # Confirm the column type / nullability on the migrated
+            # schema too -- a string-only check would pass even if the
+            # migration dropped the NOT NULL constraint by accident.
+            column_info = next(
+                column
+                for column in inspect(connection).get_columns("tenants")
+                if column["name"] == "currency"
+            )
+            assert column_info["nullable"] is False
+            assert (
+                column_info["type"].length == 3
+            ), "currency column must remain VARCHAR(3)"
 
-                # Confirm the column type / nullability on the migrated
-                # schema too -- a string-only check would pass even if the
-                # migration dropped the NOT NULL constraint by accident.
-                column_info = next(
-                    column
-                    for column in inspect(connection).get_columns("tenants")
-                    if column["name"] == "currency"
+            # A freshly inserted row with no currency supplied picks
+            # up the server default ``'INR'`` -- this is what keeps
+            # existing tenants rendering sensibly after the migration.
+            connection.execute(
+                text(
+                    "INSERT INTO tenants (name, slug, created_at, updated_at) "
+                    "VALUES ('E52 Migration', 'e52-migration', "
+                    "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
                 )
-                assert column_info["nullable"] is False
-                assert (
-                    column_info["type"].length == 3
-                ), "currency column must remain VARCHAR(3)"
-
-                # A freshly inserted row with no currency supplied picks
-                # up the server default ``'INR'`` -- this is what keeps
-                # existing tenants rendering sensibly after the migration.
-                connection.execute(
-                    text(
-                        "INSERT INTO tenants (name, slug, created_at, updated_at) "
-                        "VALUES ('E52 Migration', 'e52-migration', "
-                        "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-                    )
-                )
-                connection.commit()
-                stored = connection.execute(
-                    text("SELECT currency FROM tenants WHERE slug = 'e52-migration'")
-                ).scalar_one()
-                assert stored == "INR"
-        finally:
-            engine.dispose()
+            )
+            connection.commit()
+            stored = connection.execute(
+                text("SELECT currency FROM tenants WHERE slug = 'e52-migration'")
+            ).scalar_one()
+            assert stored == "INR"
+    finally:
+        engine.dispose()
