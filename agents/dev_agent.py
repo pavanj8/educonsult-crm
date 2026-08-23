@@ -50,6 +50,7 @@ DEV_BUILD_ATTEMPTS = int(os.environ.get("DEV_BUILD_ATTEMPTS", "2"))
 DEV_RETRY_MAX_TURNS = int(os.environ.get("DEV_RETRY_MAX_TURNS", "20"))
 
 _backend_deps_ready = False
+_frontend_deps_ready = False
 
 
 def _ensure_backend_deps() -> None:
@@ -65,23 +66,77 @@ def _ensure_backend_deps() -> None:
     _backend_deps_ready = True
 
 
+def _frontend_dir() -> str:
+    return harness_config.CONFIG.get("frontend", {}).get("dir", "frontend")
+
+
+def _ensure_frontend_deps() -> int:
+    """Install frontend node_modules if missing so the in-run gate can type-check.
+    Returns 0 on success (or if already present); non-zero if the install failed
+    (the caller then skips the frontend gate rather than false-failing on infra)."""
+    global _frontend_deps_ready
+    if _frontend_deps_ready:
+        return 0
+    fe_dir = REPO_ROOT / _frontend_dir()
+    if (fe_dir / "node_modules").exists():
+        _frontend_deps_ready = True
+        return 0
+    cmd = ["npm", "ci"] if (fe_dir / "package-lock.json").exists() else ["npm", "install"]
+    res = subprocess.run(cmd, cwd=str(fe_dir), capture_output=True, text=True)
+    if res.returncode == 0:
+        _frontend_deps_ready = True
+    return res.returncode
+
+
 def _dev_gate() -> tuple[int, str]:
-    """In-run gate: backend lint + ONLY the tests the agent added/changed — NOT
-    the whole suite. The full regression + build runs exactly once, at the merge
-    gate (`run_local`'s `check.sh all`) and in CI, so we don't re-run hundreds of
-    tests on every in-run attempt/iteration (docs/adr/0031)."""
-    if not (target_app.BACKEND_DIR / "requirements.txt").exists():
-        return 0, "(no backend to check)"
-    _ensure_backend_deps()
-    lint = subprocess.run(
-        ["bash", "scripts/check.sh", "backend-lint"],
+    """In-run gate: backend lint + ONLY the tests the agent added/changed, plus a
+    frontend build (tsc + lint) WHEN the ticket touched the frontend. The full
+    backend regression still runs once at the merge gate + CI, so we don't re-run
+    hundreds of tests every iteration (docs/adr/0031). The frontend build is here
+    because oxlint alone does not type-check: without it, TS6133 unused-vars and
+    missing-import errors only surfaced at Review, burning whole iterations
+    (docs/adr/0033)."""
+    outputs: list[str] = []
+    # --- Backend ---
+    if (target_app.BACKEND_DIR / "requirements.txt").exists():
+        _ensure_backend_deps()
+        lint = subprocess.run(
+            ["bash", "scripts/check.sh", "backend-lint"],
+            cwd=str(REPO_ROOT), capture_output=True, text=True,
+        )
+        outputs.append(lint.stdout + lint.stderr)
+        if lint.returncode != 0:
+            return lint.returncode, "\n".join(outputs)
+        rc, tout = run_targeted_tests()
+        outputs.append(tout)
+        if rc != 0:
+            return rc, "\n".join(outputs)
+    # --- Frontend (only when the ticket changed frontend code) ---
+    rc_fe, fe_out = _frontend_gate()
+    if fe_out:
+        outputs.append(fe_out)
+    if rc_fe != 0:
+        return rc_fe, "\n".join(outputs)
+    return 0, "\n".join(outputs) or "(no checks ran)"
+
+
+def _frontend_gate() -> tuple[int, str]:
+    """Run `check.sh frontend` (oxlint + tsc + vite build) when the ticket changed
+    frontend source, so type errors are caught IN-RUN and fed back for the agent
+    to fix (docs/adr/0033). Skips silently when there is no frontend, no frontend
+    change, or deps can't be installed (CI still catches those cases)."""
+    fe_dir = REPO_ROOT / _frontend_dir()
+    if not (fe_dir / "package.json").exists():
+        return 0, ""
+    if not _changed_frontend_files():
+        return 0, "(no changed frontend source — frontend build deferred to the gate/CI)"
+    if _ensure_frontend_deps() != 0:
+        return 0, "(frontend deps unavailable on this runner — in-run frontend gate skipped; CI will still gate it)"
+    res = subprocess.run(
+        ["bash", "scripts/check.sh", "frontend"],
         cwd=str(REPO_ROOT), capture_output=True, text=True,
     )
-    out = lint.stdout + lint.stderr
-    if lint.returncode != 0:
-        return lint.returncode, out
-    rc, tout = run_targeted_tests()
-    return rc, out + "\n" + tout
+    return res.returncode, res.stdout + res.stderr
 
 
 def read_text(path: Path) -> str:
@@ -249,9 +304,14 @@ describe -- nothing more, nothing speculative.
      and unused imports (F401); fix remaining e.g. F841 by hand), then run ONLY
      the tests you added/changed (`python -m pytest tests/<area>/test_x.py -q`)
      and make them green.
-   - Frontend: `npm run lint`, and if you added a component test run just that
-     spec. The full `npm run build` is part of the merge gate.
-   Do NOT finish while lint fails or your own tests fail.
+   - Frontend: run `npm run build` (this is `tsc -b` + vite build) AND
+     `npm run lint` inside `frontend/`, and make BOTH green — the in-run gate
+     now runs the full frontend build, so a TS error (e.g. TS6133 unused-var,
+     a missing import, or a test file that references symbols it never imports)
+     will bounce this iteration. `noUnusedLocals` is on: delete dead code from
+     abandoned refactors rather than leaving it. If you added a component test,
+     also run just that spec.
+   Do NOT finish while lint, the build, or your own tests fail.
 7. This is iteration {iteration} for this issue. If the feedback section
    above is non-empty, treating it as optional is a failure.
 
@@ -336,6 +396,16 @@ def _changed_backend_test_files() -> list[str]:
         if f.startswith(f"{bname}/tests/") and f.endswith(".py") and Path(f).name.startswith("test_"):
             rel.append(f[len(bname) + 1:])  # strip "<backend>/"
     return rel
+
+
+def _changed_frontend_files() -> list[str]:
+    """New/modified frontend TS/JS source files (repo-relative). Signals the Dev
+    gate to type-check the frontend for this ticket (docs/adr/0033)."""
+    fe = _frontend_dir()
+    return [
+        f for f in git_files_changed()
+        if f.startswith(f"{fe}/") and f.endswith((".ts", ".tsx", ".js", ".jsx"))
+    ]
 
 
 def run_targeted_tests() -> tuple[int, str]:
