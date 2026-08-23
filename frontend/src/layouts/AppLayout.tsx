@@ -97,6 +97,13 @@ export default function AppLayout() {
               </Link>
             </nav>
           ) : null}
+          {user?.role === 'receptionist' ? (
+            <nav className="app-header__nav" aria-label="Main">
+              <Link to="/receptionist/intake" data-testid="nav-receptionist-intake">
+                Intake
+              </Link>
+            </nav>
+          ) : null}
         </div>
         <NotificationBell />
       </header>

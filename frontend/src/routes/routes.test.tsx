@@ -48,6 +48,14 @@ const mockStudent = {
   branch_id: 1,
 }
 
+const mockReceptionist = {
+  id: 7,
+  email: 'receptionist@demo.test',
+  role: 'receptionist' as const,
+  tenant_id: 10,
+  branch_id: 1,
+}
+
 function LocationStateProbe() {
   const location = useLocation()
   const fromPath =
@@ -447,5 +455,49 @@ describe('AppRouter routes', () => {
 
     expect(screen.queryByTestId('student-dashboard-page')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
+  })
+
+  it('renders receptionist intake page for receptionist users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockReceptionist,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => null,
+      }) as typeof fetch
+
+    renderAppAt('/receptionist/intake')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('receptionist-intake-page')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Intake' })).toBeInTheDocument()
+  })
+
+  it('denies receptionist intake page to non-receptionist users', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    localStorage.setItem('refresh_token', 'stored-refresh-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockUser,
+    }) as typeof fetch
+
+    renderAppAt('/receptionist/intake')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('access-denied')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('receptionist-intake-page')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Intake' })).not.toBeInTheDocument()
   })
 })

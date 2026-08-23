@@ -6,6 +6,7 @@ import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import MasterDataAdminPage from '../pages/MasterDataAdminPage'
+import ReceptionistIntakePage from '../pages/ReceptionistIntakePage'
 import RegisterStudentPage from '../pages/RegisterStudentPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
@@ -18,6 +19,7 @@ import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
 import CounselorRoute from './CounselorRoute'
 import MasterDataAdminRoute from './MasterDataAdminRoute'
 import ProtectedRoute, { LOGIN_PATH } from './ProtectedRoute'
+import ReceptionistRoute from './ReceptionistRoute'
 import StaffManagerRoute from './StaffManagerRoute'
 import StudentRoute from './StudentRoute'
 import SuperAdminRoute from './SuperAdminRoute'
@@ -26,6 +28,7 @@ import {
   COUNSELOR_DASHBOARD_PATH,
   FORGOT_PASSWORD_PATH,
   MASTER_DATA_ADMIN_PATH,
+  RECEPTIONIST_INTAKE_PATH,
   REGISTER_PATH,
   RESET_PASSWORD_PATH,
   STUDENT_DASHBOARD_PATH,
@@ -65,6 +68,12 @@ export function AppRoutes() {
           </Route>
           <Route element={<CounselorRoute />}>
             <Route path={COUNSELOR_DASHBOARD_PATH.slice(1)} element={<CounselorDashboardPage />} />
+          </Route>
+          <Route element={<ReceptionistRoute />}>
+            <Route
+              path={RECEPTIONIST_INTAKE_PATH.slice(1)}
+              element={<ReceptionistIntakePage />}
+            />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
