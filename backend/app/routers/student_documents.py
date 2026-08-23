@@ -1,4 +1,5 @@
-"""Student-document upload router (E27; Journey J20; issue #175).
+"""Student-document upload router (E27; Journey J20; issue #175;
+E31 / Journey J24 re-upload support added in issue #187).
 
 Endpoint
 --------
@@ -10,6 +11,13 @@ Endpoint
       :class:`ChecklistItemTemplate`. Omit for ad-hoc uploads (the
       ``student_documents.checklist_item_template_id`` column is
       nullable for that case; see the model docstring).
+    * ``supersedes_document_id`` — optional id of a previously
+      **rejected** :class:`StudentDocument` this upload replaces
+      (E31 / Journey J24 / issue #187). When supplied, the new row
+      is persisted with ``supersedes_id`` pointing at the rejected
+      row; the rejected row itself is left untouched so the
+      verifier's earlier ``rejection_reason`` and audit trail are
+      preserved (Requirements §8).
 
 The endpoint streams the file to the S3-compatible document store
 configured by :mod:`app.storage`, then inserts a
@@ -23,14 +31,22 @@ Traceability
 * Requirements §5 (Documents: per-stage/program checklist templates;
   students upload against each checklist item; default limits 10MB,
   PDF/JPG/PNG/DOCX).
+* Requirements §8 (Audit log on key actions such as document
+  approvals — the re-upload flow preserves the rejected row's
+  audit trail by linking the new row to it via ``supersedes_id``).
 * Requirements §2 (Storage: S3-compatible object storage; AWS S3 for
   SaaS, MinIO for on-prem).
 * Journey J20 (Student uploads a document against a checklist item).
+* Journey J24 (Student re-uploads a rejected document).
 * Epic E27 (Student Document Upload); this router is the file-upload
   half. Sibling tickets own the StudentDocument read side (#174),
   the size/type validation layer (#176 — see
   :mod:`app.storage.validation`), the upload UI (#177), and the
   validation+completeness test suite (#178).
+* Epic E31 (Document Re-upload Flow); this router handles the
+  ``supersedes_document_id`` form field on the existing upload
+  endpoint (issue #187). Sibling issue #188 owns the frontend
+  re-upload flow UI.
 """
 
 from __future__ import annotations
@@ -53,6 +69,7 @@ from app.rbac.user import AuthenticatedUser
 from app.schemas.student_document import (
     CHECKLIST_ITEM_TEMPLATE_ID_FORM_FIELD,
     FILE_FORM_FIELD,
+    SUPERSEDES_DOCUMENT_ID_FORM_FIELD,
     StudentDocumentUploadResponse,
 )
 from app.storage import (
@@ -203,6 +220,74 @@ def _resolve_checklist_template(
     return template.id
 
 
+def _resolve_superseded_document(
+    db: Session,
+    *,
+    tenant_id: int,
+    application_id: int,
+    superseded_id: int | None,
+) -> int | None:
+    """Validate the optional ``supersedes_document_id`` form field (E31 / J24).
+
+    When omitted the upload is an *initial* upload (NULL FK; the
+    ``student_documents.supersedes_id`` column is nullable for that
+    reason — see ``student_document.py``'s docstring). When provided,
+    the referenced :class:`StudentDocument` row must:
+
+    * exist,
+    * belong to the caller's tenant (cross-tenant ids are 422, not
+      404 — the same rationale as :func:`_resolve_checklist_template`),
+    * belong to the *same* application this upload is being filed
+      against (a re-upload replaces its own predecessor; one cannot
+      re-upload into a different application's audit chain),
+    * and be in ``rejected`` status — J24 only fires after the
+      verifier rejected the previous attempt (J23). An approved or
+      still-pending document is not eligible: re-uploading against an
+      approved document would silently shadow a verified file, and
+      re-uploading against a still-pending document would create two
+      competing ``pending`` rows for the same checklist slot. Both
+      are rejected as 422 with a stable ``detail`` so the frontend
+      can surface the right error.
+
+    The rejected row itself is *never* mutated here — the audit trail
+    (verifier, rejection_reason, verified_at) stays intact for
+    Requirements §8. Only the *new* row's ``supersedes_id`` is set.
+    """
+    if superseded_id is None:
+        return None
+
+    try:
+        document = db.get(StudentDocument, superseded_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if document is None or document.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid supersedes_document_id",
+        )
+
+    if document.application_id != application_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="supersedes_document_id must reference a document on this application",
+        )
+
+    if document.status != StudentDocumentStatus.REJECTED:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "supersedes_document_id must reference a rejected document "
+                f"(current status: '{document.status.value}')"
+            ),
+        )
+
+    return document.id
+
+
 async def _read_upload_bytes(upload: UploadFile) -> bytes:
     """Read the multipart upload into memory with a defensive upper bound.
 
@@ -257,6 +342,17 @@ async def upload_student_document(
             ),
         ),
     ] = None,
+    supersedes_document_id: Annotated[
+        int | None,
+        Form(
+            alias=SUPERSEDES_DOCUMENT_ID_FORM_FIELD,
+            description=(
+                "Optional id of a previously rejected StudentDocument this "
+                "upload replaces (E31 / Journey J24 / issue #187). Omit for "
+                "initial uploads."
+            ),
+        ),
+    ] = None,
 ) -> StudentDocumentUploadResponse:
     """Upload a student document to S3-compatible storage and persist the row.
 
@@ -268,6 +364,18 @@ async def upload_student_document(
     :func:`_get_tenant_application`, and :func:`_authorize_owner`.
     Cross-tenant application ids surface as 404 to prevent tenant-id
     enumeration (ADR-0004).
+
+    Re-upload (E31 / J24)
+    ---------------------
+    When the optional ``supersedes_document_id`` form field is set,
+    the new row's ``supersedes_id`` is populated with that document's
+    id, *if* the referenced row is ``rejected`` and belongs to this
+    application in this tenant (see :func:`_resolve_superseded_document`).
+    The rejected row is never mutated — its
+    ``status='rejected'`` / ``rejection_reason`` / ``verified_by`` /
+    ``verified_at`` stay intact for the audit trail (Requirements §8),
+    and the new row starts in ``pending`` state for the verifier to
+    re-review.
 
     Errors
     ------
@@ -281,7 +389,9 @@ async def upload_student_document(
       :data:`app.storage.validation.ALLOWED_EXTENSIONS` (PDF/JPG/PNG/
       DOCX), or its ``Content-Type`` does not match the extension.
     * 422 — ``checklist_item_template_id`` does not exist or belongs to
-      another tenant.
+      another tenant; OR ``supersedes_document_id`` does not exist,
+      belongs to another tenant, references a different application,
+      or references a document whose ``status`` is not ``rejected``.
     * 503 — storage backend is unreachable / rejected the upload, or
       the database is unavailable while reading / writing the row.
     """
@@ -299,6 +409,12 @@ async def upload_student_document(
         db,
         tenant_id=student.tenant_id,
         template_id=checklist_item_template_id,
+    )
+    supersedes_id = _resolve_superseded_document(
+        db,
+        tenant_id=student.tenant_id,
+        application_id=application.id,
+        superseded_id=supersedes_document_id,
     )
 
     content = await _read_upload_bytes(file)
@@ -345,6 +461,7 @@ async def upload_student_document(
         storage_path=storage_path,
         uploaded_by_user_id=student.id,
         uploaded_at=uploaded_at,
+        supersedes_id=supersedes_id,
     )
     db.add(document)
 
@@ -364,4 +481,5 @@ async def upload_student_document(
 __all__ = [
     "router",
     "FILE_FORM_FIELD",
+    "SUPERSEDES_DOCUMENT_ID_FORM_FIELD",
 ]
