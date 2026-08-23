@@ -1741,3 +1741,223 @@ def test_update_with_empty_payload_returns_meeting_unchanged(
     body = response.json()
     assert body["duration_minutes"] == 45
     assert body["notes"] == "original"
+
+
+# ---------------------------------------------------------------------------
+# E23 / Journey J16: meeting creation must trigger a student notification.
+# Regression test for issue #163 ("Wire meeting creation into notification
+# trigger"). Without the wiring, ``POST /meetings`` persists the Meeting
+# row but no Notification row is written, and the student never learns
+# about the meeting through the in-app notification center.
+# ---------------------------------------------------------------------------
+
+
+def test_schedule_meeting_creates_notification_for_student(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    counselor = make_db_user(
+        db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
+    )
+    student = make_db_user(
+        db_session, Role.STUDENT, tenant_id=tenant.id, branch_id=branch.id
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        assigned_counselor_id=counselor.id,
+    )
+    override_authenticated_user(_auth_for(counselor))
+
+    response = client.post(
+        "/meetings",
+        json=_schedule_payload(
+            application_id=application.id,
+            student_id=student.id,
+            counselor_id=counselor.id,
+            location="Room 1",
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 201, response.text
+
+    # The student gets exactly one in-app notification for the newly
+    # scheduled meeting. The counselor (the actor) is not self-notified.
+    from app.models.notification import Notification
+
+    student_rows = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == student.id)
+        .all()
+    )
+    assert len(student_rows) == 1
+    assert student_rows[0].title == "Meeting scheduled"
+    assert "Room 1" in student_rows[0].message
+
+    counselor_rows = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == counselor.id)
+        .all()
+    )
+    assert counselor_rows == []
+
+
+def test_schedule_meeting_notification_carries_meeting_time(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """The notification body contains the scheduled time (UTC) so the student
+    can see when the meeting is without opening the full meeting view."""
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    counselor = make_db_user(
+        db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
+    )
+    student = make_db_user(
+        db_session, Role.STUDENT, tenant_id=tenant.id, branch_id=branch.id
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        assigned_counselor_id=counselor.id,
+    )
+    override_authenticated_user(_auth_for(counselor))
+
+    response = client.post(
+        "/meetings",
+        json=_schedule_payload(
+            application_id=application.id,
+            student_id=student.id,
+            counselor_id=counselor.id,
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 201, response.text
+
+    from app.models.notification import Notification
+
+    row = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == student.id)
+        .one()
+    )
+    assert "UTC" in row.message
+
+
+def test_schedule_meeting_notification_failure_does_not_break_meeting_creation(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """A flaky notification write must not surface as a 5xx on meeting creation
+    (J16 / E23 + E48 contract: notification helpers are no-throw wrappers)."""
+    from app.db.database import get_db
+    from app.main import app
+    from app.models.notification import Notification
+    from sqlalchemy.exc import OperationalError
+
+    tenant = _create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    counselor = make_db_user(
+        db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
+    )
+    student = make_db_user(
+        db_session, Role.STUDENT, tenant_id=tenant.id, branch_id=branch.id
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        assigned_counselor_id=counselor.id,
+    )
+    override_authenticated_user(_auth_for(counselor))
+
+    real_session = db_session
+
+    # Count how many times the router calls commit() so we can
+    # selectively fail the *second* commit (the one that follows
+    # notify_meeting_scheduled) without breaking the meeting insert.
+    state = {"commit_count": 0}
+
+    class _FlakySecondCommitSession:
+        def __init__(self, real):
+            self._real = real
+
+        def commit(self, *args, **kwargs):
+            state["commit_count"] += 1
+            if state["commit_count"] == 2:
+                raise OperationalError("stmt", {}, Exception("disk full"))
+            return self._real.commit(*args, **kwargs)
+
+        def rollback(self, *args, **kwargs):
+            return self._real.rollback(*args, **kwargs)
+
+        def add(self, *args, **kwargs):
+            return self._real.add(*args, **kwargs)
+
+        def flush(self, *args, **kwargs):
+            return self._real.flush(*args, **kwargs)
+
+        def refresh(self, *args, **kwargs):
+            return self._real.refresh(*args, **kwargs)
+
+        def execute(self, *args, **kwargs):
+            return self._real.execute(*args, **kwargs)
+
+        def get(self, *args, **kwargs):
+            return self._real.get(*args, **kwargs)
+
+        def scalars(self, *args, **kwargs):
+            return self._real.scalars(*args, **kwargs)
+
+        def __getattr__(self, name):
+            return getattr(self._real, name)
+
+    def override_get_db():
+        yield _FlakySecondCommitSession(real_session)
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = client.post(
+            "/meetings",
+            json=_schedule_payload(
+                application_id=application.id,
+                student_id=student.id,
+                counselor_id=counselor.id,
+            ),
+            headers={"Authorization": "Bearer test-token"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    # The meeting itself was created (first commit succeeded); the
+    # notification write failed (second commit failed) but the route
+    # swallows that, so the response is still 201.
+    assert response.status_code == 201, response.text
+
+    # The student did NOT get a notification row (the second commit
+    # rolled back the failed notification insert).
+    rows = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == student.id)
+        .all()
+    )
+    assert rows == []
+    # But the meeting IS in the database.
+    from app.models.meeting import Meeting
+
+    assert (
+        db_session.query(Meeting)
+        .filter(Meeting.application_id == application.id)
+        .count()
+        == 1
+    )

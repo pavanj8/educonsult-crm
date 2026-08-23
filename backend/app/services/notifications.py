@@ -40,9 +40,12 @@ Out of scope (tracked as separate issues)
 * Email delivery — Epic E49, Journey J42 (issue after #230).
 * The notification-center read/mark-read API and UI — Epic E50,
   Journey J43 (sibling issues).
-* Meeting-scheduled notifications — Epic E23, Journey J16.
 * Owner-invite / new-tenant notifications — covered by E8 / J1
   today (an email is sent; the in-app row is not required for v1).
+
+Meeting-scheduled notifications (E23 / Journey J16) are produced by
+:func:`notify_meeting_scheduled` and wired into the E22
+``POST /meetings`` endpoint from this issue's sibling ticket.
 """
 
 from __future__ import annotations
@@ -55,6 +58,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.application import Application
+from app.models.meeting import Meeting
 from app.models.notification import Notification
 from app.models.student_document import StudentDocument
 from app.pipeline.stages import PipelineStage
@@ -64,6 +68,7 @@ __all__ = [
     "notify_application_stage_changed",
     "notify_document_approved",
     "notify_document_rejected",
+    "notify_meeting_scheduled",
 ]
 
 logger = logging.getLogger(__name__)
@@ -280,4 +285,49 @@ def notify_document_rejected(
         user_id=application.student_id,
         title=title,
         message=body,
+    )
+
+
+def notify_meeting_scheduled(
+    db: Session,
+    *,
+    meeting: Meeting,
+) -> None:
+    """Notify the student that a meeting has been scheduled (E23; Journey J16).
+
+    Called from the E22 ``POST /meetings`` endpoint when a new meeting
+    is created. The student is the sole recipient — the counselor who
+    scheduled it is the actor and does not need an in-app notification
+    for their own action. The notification text carries the meeting's
+    scheduled time and (if set) its location so the student sees the
+    key details in the notification center before opening the full
+    meeting view.
+
+    The ``application_id`` on the persisted notification is populated
+    so the (future) notification center UI can deep-link back to the
+    parent application — the meeting itself is not a first-class
+    ``Notification`` FK target, but the parent application is the
+    natural drill-down target from J16's "view meeting" CTA.
+
+    Args:
+        db: Active SQLAlchemy session.
+        meeting: The freshly created :class:`Meeting`. The caller has
+            already committed; this helper uses the same session so
+            the notification row lands in the same transaction.
+    """
+    when = meeting.scheduled_at.strftime("%Y-%m-%d %H:%M UTC")
+    title = "Meeting scheduled"
+    if meeting.location:
+        message = (
+            f"A meeting has been scheduled for {when} at {meeting.location}."
+        )
+    else:
+        message = f"A meeting has been scheduled for {when}."
+
+    create_notification(
+        db,
+        tenant_id=meeting.tenant_id,
+        user_id=meeting.student_id,
+        title=title,
+        message=message,
     )
