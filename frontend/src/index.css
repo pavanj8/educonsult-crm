@@ -1463,6 +1463,11 @@ body {
 .upcoming-meetings__notes {
   font-size: 0.8125rem;
   color: #374151;
+  /* Defensive: counselor-typed strings are unbounded in length on the
+   * client. Force wrap on long unbreakable runs so a 10kB notes blob
+   * cannot break the dashboard layout. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .upcoming-meetings__label {
