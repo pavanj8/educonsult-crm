@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import AppLayout from './AppLayout'
 import { AuthProvider } from '../store/authStore'
 import { BrandingProvider } from '../store/brandingStore'
+import { I18nProvider } from '../store/i18nStore'
 
 const superAdminUser = {
   id: 1,
@@ -38,21 +39,23 @@ const emptyNotifications = { items: [], unread_count: 0 }
 
 function LayoutHarness({ children }: { children?: ReactNode }) {
   return (
-    <AuthProvider>
-      <BrandingProvider>
-        <MemoryRouter>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route
-                index
-                element={<div data-testid="layout-content">outlet</div>}
-              />
-            </Route>
-          </Routes>
-          {children}
-        </MemoryRouter>
-      </BrandingProvider>
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <BrandingProvider>
+          <MemoryRouter>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route
+                  index
+                  element={<div data-testid="layout-content">outlet</div>}
+                />
+              </Route>
+            </Routes>
+            {children}
+          </MemoryRouter>
+        </BrandingProvider>
+      </AuthProvider>
+    </I18nProvider>
   )
 }
 

@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router-dom'
 
+import LanguageSwitcher from '../components/i18n/LanguageSwitcher'
 import NotificationBell from '../components/notifications/NotificationBell'
 import {
   CHECKLIST_TEMPLATES_PATH,
@@ -124,7 +125,10 @@ export default function AppLayout() {
             </nav>
           ) : null}
         </div>
-        <NotificationBell />
+        <div className="app-header__actions">
+          <LanguageSwitcher />
+          <NotificationBell />
+        </div>
       </header>
       <main className="app-main">
         <Outlet />
