@@ -13,10 +13,11 @@ type StudyPreferencesFieldsetProps = {
   describedBy?: string
   /**
    * Prefix used to build the ``data-testid`` attributes on each select.
-   * The default ``'register-'`` matches the public E16 self-registration
-   * flow; alternative callers (e.g. the E17 receptionist intake form)
-   * override this so each caller's test ids read in context — without
-   * changing the shared fieldset's own internal contract.
+   * The shared default ``'master-data-'`` keeps the fieldset namespaced
+   * independently of any specific consuming page; callers like the E16
+   * self-registration flow override this with ``'register-'`` and the
+   * E17 receptionist intake form with ``'intake-'`` so test ids read
+   * in context.
    */
   idPrefix?: string
 }
@@ -30,7 +31,7 @@ export default function StudyPreferencesFieldset({
   onUniversityChange,
   onProgramChange,
   describedBy,
-  idPrefix = 'register-',
+  idPrefix = 'master-data-',
 }: StudyPreferencesFieldsetProps) {
   return (
     <fieldset className="login-form__section">

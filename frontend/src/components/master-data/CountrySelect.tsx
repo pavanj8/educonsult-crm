@@ -11,10 +11,11 @@ type CountrySelectProps = {
   describedBy?: string
   /**
    * Prefix used to build the ``data-testid`` attributes on the underlying
-   * select and on the error message. The default ``'register-'`` matches
-   * the public E16 self-registration flow; alternative callers (e.g. the
-   * E17 receptionist intake form) override this to keep test ids scoped
-   * to their own context.
+   * select and on the error message. The shared default
+   * ``'master-data-'`` keeps the select namespaced independently of any
+   * specific consuming page; callers like the E16 self-registration
+   * flow override this with ``'register-'`` and the E17 receptionist
+   * intake form with ``'intake-'`` so test ids read in context.
    */
   idPrefix?: string
 }
@@ -25,7 +26,7 @@ export default function CountrySelect({
   onChange,
   disabled = false,
   describedBy,
-  idPrefix = 'register-',
+  idPrefix = 'master-data-',
 }: CountrySelectProps) {
   const errorId = useId()
   const { items: countries, loading, error } = useCountries(tenantSlug, {
