@@ -1,10 +1,20 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { initI18n, resetI18nForTests } from '../i18n'
 import { AuthProvider } from '../store/authStore'
 import LoginPage from './LoginPage'
+
+// ``LoginPage`` renders ``useTranslation()`` against the shared i18next
+// instance. The provider-driven initialiser runs in a ``useEffect`` so
+// it does not help the very first render — seed i18next up-front so
+// the labels (e.g. ``login.title`` -> "Sign in") are translated before
+// the test asserts on them. These keys are populated by ticket #239.
+beforeAll(() => {
+  initI18n('en')
+})
 
 const mockUser = {
   id: 1,
@@ -49,12 +59,15 @@ function renderLogin() {
 }
 
 describe('LoginPage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear()
+    await resetI18nForTests()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllGlobals()
+    localStorage.clear()
+    await resetI18nForTests()
   })
 
   it('renders the sign-in form with required fields', async () => {

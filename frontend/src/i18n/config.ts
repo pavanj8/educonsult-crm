@@ -113,19 +113,19 @@ export function initI18n(initialLanguage: SupportedLanguage = DEFAULT_LANGUAGE):
   return i18next
 }
 
-// Auto-initialise at module load so that any ``useTranslation()``
-// consumer renders against an already-ready i18next instance, even when
-// the component sits outside an :tsx:func:`I18nProvider` (most
-// prominently in unit tests that render a single page in isolation).
-// The provider's ``useEffect`` still runs the initialiser once more on
-// mount; the idempotent guard above makes that a no-op aside from
-// ``changeLanguage`` to the value stored in ``localStorage``.
-initI18n(DEFAULT_LANGUAGE)
-
 /**
  * Reset the shared i18next instance to a known state. Tests use this
  * between cases so a ``changeLanguage`` in one test does not bleed into
  * the next; the production code path never calls it.
+ *
+ * NOTE: This module deliberately does NOT call ``initI18n`` at import
+ * time. The provider (:file:`frontend/src/store/i18nStore.tsx`) owns
+ * initialisation on mount, and unit tests that render a single page in
+ * isolation (e.g. ``LoginPage.test.tsx``, ``AppLayout.test.tsx``) call
+ * ``initI18n`` themselves in ``beforeAll`` so the first render of
+ * ``useTranslation()`` never sees an uninitialised i18next instance.
+ * This keeps the init lifecycle single-sourced and lets tests reset
+ * the language between cases without racing a hot module reload.
  */
 export async function resetI18nForTests(): Promise<void> {
   if (i18next.isInitialized) {
