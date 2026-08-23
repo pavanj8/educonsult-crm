@@ -20,7 +20,9 @@ Covers:
   - branch manager sees branch-scoped notes
   - consultancy owner sees all in tenant
   - super admin sees all (no tenant filter)
-  - document verifier / receptionist read-only behavior
+  - document verifier read-only behavior
+  - receptionist blocked at the dependency layer (NOT in J17
+    visibility set)
   - student (no NOTE_READ) is rejected
   - cross-tenant returns empty
   - filter by student_id / application_id
@@ -291,6 +293,60 @@ def test_super_admin_creates_note_for_any_tenant(
 
     assert response.status_code == 201, response.text
     assert response.json()["tenant_id"] == tenant.id
+
+
+def test_super_admin_creates_note_with_application_id(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """Super Admin may anchor a note to an application in any tenant.
+
+    Regression test for the software-architect finding on iteration #4:
+    ``_load_application`` previously used a plain
+    ``application.tenant_id != user.tenant_id`` check, which always
+    evaluated True for a Super Admin (whose ``tenant_id`` is ``None``)
+    and surfaced a misleading "Application not found" 404 for every
+    POST ``/notes`` with an ``application_id``. The companion
+    helpers (``_load_student``, ``_load_note``) already bypass the
+    tenant check for ``SUPER_ADMIN``; this test pins that behavior
+    to the create path so future refactors do not regress it.
+    """
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    super_admin = make_db_user(
+        db_session, Role.SUPER_ADMIN, tenant_id=None, branch_id=None
+    )
+    counselor = make_db_user(
+        db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
+    )
+    student = make_db_user(
+        db_session, Role.STUDENT, tenant_id=tenant.id, branch_id=branch.id
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        assigned_counselor_id=counselor.id,
+    )
+    override_authenticated_user(_auth_super_admin(super_admin))
+
+    response = client.post(
+        "/notes",
+        json=_note_payload(
+            student_id=student.id,
+            application_id=application.id,
+            body="Platform-level audit note anchored to an application",
+        ),
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["tenant_id"] == tenant.id
+    assert body["application_id"] == application.id
+    assert body["author_user_id"] == super_admin.id
 
 
 # ---------------------------------------------------------------------------
@@ -1044,12 +1100,18 @@ def test_document_verifier_can_list_notes_tenant_wide(
     assert ids == {note_a.id, note_b.id}
 
 
-def test_receptionist_can_list_notes_tenant_wide(
+def test_receptionist_cannot_list_notes(
     client: TestClient,
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    """Receptionist has NOTE_READ for front-desk caller-context visibility."""
+    """Receptionist must NOT have NOTE_READ.
+
+    Requirements §5 names the visibility set as
+    "counselor/verifier/branch manager visible, hidden from student";
+    the receptionist is not in that set, so they cannot list internal
+    counseling notes (E24 / J17 black-box finding on iteration #4).
+    """
     tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
@@ -1068,13 +1130,13 @@ def test_receptionist_can_list_notes_tenant_wide(
     student_b = make_db_user(
         db_session, Role.STUDENT, tenant_id=tenant.id, branch_id=branch_b.id
     )
-    note_a = seed_note(
+    seed_note(
         db_session,
         tenant_id=tenant.id,
         student_id=student_a.id,
         author_user_id=counselor_a.id,
     )
-    note_b = seed_note(
+    seed_note(
         db_session,
         tenant_id=tenant.id,
         student_id=student_b.id,
@@ -1087,9 +1149,45 @@ def test_receptionist_can_list_notes_tenant_wide(
         headers={"Authorization": "Bearer test-token"},
     )
 
-    assert response.status_code == 200, response.text
-    ids = {item["id"] for item in response.json()}
-    assert ids == {note_a.id, note_b.id}
+    assert response.status_code == 403, response.text
+
+
+def test_receptionist_cannot_get_single_note(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """Receptionist must NOT be able to read a single note by id.
+
+    Mirrors the list-endpoint block above; the J17 visibility set
+    names counselor / verifier / branch manager only (E24 / J17
+    black-box finding on iteration #4).
+    """
+    tenant = create_tenant(db_session)
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    receptionist = make_db_user(
+        db_session, Role.RECEPTIONIST, tenant_id=tenant.id, branch_id=branch.id
+    )
+    counselor = make_db_user(
+        db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
+    )
+    student = make_db_user(
+        db_session, Role.STUDENT, tenant_id=tenant.id, branch_id=branch.id
+    )
+    note = seed_note(
+        db_session,
+        tenant_id=tenant.id,
+        student_id=student.id,
+        author_user_id=counselor.id,
+    )
+    override_authenticated_user(_auth_for(receptionist))
+
+    response = client.get(
+        f"/notes/{note.id}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 403, response.text
 
 
 def test_student_cannot_list_notes(
@@ -1877,7 +1975,9 @@ def test_patch_rejects_roles_without_note_update_permission(
     actor_role: Role,
 ) -> None:
     """Roles without ``NOTE_UPDATE`` are rejected (403). Verifier and
-    receptionist can read notes but cannot edit them."""
+    receptionist are NOT in the J17 visibility set for any note
+    operation (Requirements §5); they cannot edit notes they did not
+    author either way."""
     tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     actor = make_db_user(

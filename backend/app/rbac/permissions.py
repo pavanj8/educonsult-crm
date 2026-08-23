@@ -211,12 +211,16 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.STUDENT_READ,
             Permission.APPLICATION_READ,
             Permission.APPLICATION_REASSIGN_COUNSELOR,
-            # NOTE_READ grants front-desk visibility into the staff-only
-            # note thread so they can pick up caller context ("please
-            # ask about the visa follow-up the counselor flagged").
-            # Like the verifier, they have read-only access; they do not
-            # author internal notes.
-            Permission.NOTE_READ,
+            # NOTE_READ is intentionally NOT granted. Requirements §5
+            # names the staff-only note thread visibility set as
+            # "counselor/verifier/branch manager visible, hidden from
+            # student"; the receptionist is not in that set, so they
+            # must NOT see internal counseling notes (E24 / J17
+            # black-box finding on iteration #4). If a future ticket
+            # wants to grant receptionist front-desk caller-context
+            # visibility, it should add a narrower permission
+            # (e.g. ``NOTE_READ_FRONTDESK``) and update the
+            # requirements/journey contract first.
             Permission.NOTIFICATION_READ,
         }
     ),

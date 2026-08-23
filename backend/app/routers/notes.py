@@ -180,15 +180,37 @@ def _load_application(
     except OperationalError as exc:
         _handle_db_error(exc, rollback=False)
 
-    if application is None or application.tenant_id != user.tenant_id:
+    if application is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_APPLICATION_NOT_FOUND_DETAIL,
+        )
+
+    # Super admins are platform-wide with ``tenant_id=None`` by design;
+    # they may anchor a note to any tenant's application. Non-super-admin
+    # callers require a tenant match (the canonical pattern from
+    # ``_load_student`` / ``_load_note`` is applied here so the create
+    # path is consistent with the read/update/delete paths -- software
+    # architect finding on iteration #4).
+    if (
+        user.role != Role.SUPER_ADMIN
+        and application.tenant_id != user.tenant_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_APPLICATION_NOT_FOUND_DETAIL,
         )
 
     if application.student_id != student_id:
+        # Note: ``HTTPException(status_code=422)`` rather than the
+        # ``HTTP_422_UNPROCESSABLE_ENTITY`` constant — the latter is
+        # deprecated in modern Starlette and emits a DeprecationWarning
+        # on every request (security analyst finding on iteration #3).
+        # The literal ``422`` is identical to ``HTTP_422_UNPROCESSABLE_CONTENT``
+        # / ``HTTP_422_UNPROCESSABLE_ENTITY``; only the named constant
+        # carries the deprecation warning.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=422,
             detail=_STUDENT_MISMATCH_DETAIL,
         )
 
