@@ -5,6 +5,7 @@ import { createStudentByReceptionist } from './receptionistIntake'
 const mockIntakeResponse = {
   id: 99,
   email: 'walkin.student@example.test',
+  role: 'student' as const,
   tenant_id: 10,
   branch_id: 1,
   name: 'Aarav Sharma',

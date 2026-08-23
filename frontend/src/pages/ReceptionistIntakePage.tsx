@@ -222,6 +222,10 @@ export default function ReceptionistIntakePage() {
           </label>
           <label className="login-form__field">
             Temporary password
+            {/* ``maxLength`` matches the backend's ``PASSWORD_MAX_LENGTH``
+                (backend/app/auth/password_policy.py) so the receptionist
+                gets immediate client-side feedback instead of a 422 from
+                the backend when they try to issue a too-long password. */}
             <input
               data-testid="receptionist-intake-password"
               name="password"
@@ -229,7 +233,7 @@ export default function ReceptionistIntakePage() {
               autoComplete="new-password"
               required
               minLength={8}
-              maxLength={128}
+              maxLength={72}
               aria-describedby={error ? errorId : successMessage ? successId : undefined}
             />
           </label>
