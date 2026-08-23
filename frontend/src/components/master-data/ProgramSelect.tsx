@@ -10,6 +10,15 @@ type ProgramSelectProps = {
   onChange: (value: number | '') => void
   disabled?: boolean
   describedBy?: string
+  /**
+   * Prefix used to build the ``data-testid`` attributes on the underlying
+   * select and on the error message. The default ``'register-'`` matches
+   * the public E16 self-registration flow; alternative callers (e.g. the
+   * E17 receptionist intake form) override this so each caller's test ids
+   * read in context — without changing the shared fieldset's own
+   * internal contract.
+   */
+  idPrefix?: string
 }
 
 export default function ProgramSelect({
@@ -19,6 +28,7 @@ export default function ProgramSelect({
   onChange,
   disabled = false,
   describedBy,
+  idPrefix = 'register-',
 }: ProgramSelectProps) {
   const errorId = useId()
   const waitingForUniversity = typeof universityId !== 'number'
@@ -44,14 +54,14 @@ export default function ProgramSelect({
         waitingMessage="Select a university first"
         describedBy={describedByIds}
         errorId={error ? errorId : undefined}
-        data-testid="register-target-program"
+        data-testid={`${idPrefix}target-program`}
       />
       {error ? (
         <p
           className="login-form__error"
           role="alert"
           id={errorId}
-          data-testid="register-programs-error"
+          data-testid={`${idPrefix}programs-error`}
         >
           {error}
         </p>

@@ -17,6 +17,9 @@ export const VERIFIER_DASHBOARD_PATH = '/verifier'
 /** Counselor dashboard / assigned-application queue route (E21; Journey J14). */
 export const COUNSELOR_DASHBOARD_PATH = '/my-applications'
 
+/** Receptionist walk-in student intake form (E17; Journey J10). */
+export const RECEPTIONIST_INTAKE_PATH = '/receptionist/intake'
+
 /** Master-data admin UI (E14; Journey J7). */
 export const MASTER_DATA_ADMIN_PATH = '/master-data'
 

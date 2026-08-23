@@ -11,6 +11,14 @@ type StudyPreferencesFieldsetProps = {
   onUniversityChange: (value: number | '') => void
   onProgramChange: (value: number | '') => void
   describedBy?: string
+  /**
+   * Prefix used to build the ``data-testid`` attributes on each select.
+   * The default ``'register-'`` matches the public E16 self-registration
+   * flow; alternative callers (e.g. the E17 receptionist intake form)
+   * override this so each caller's test ids read in context — without
+   * changing the shared fieldset's own internal contract.
+   */
+  idPrefix?: string
 }
 
 export default function StudyPreferencesFieldset({
@@ -22,6 +30,7 @@ export default function StudyPreferencesFieldset({
   onUniversityChange,
   onProgramChange,
   describedBy,
+  idPrefix = 'register-',
 }: StudyPreferencesFieldsetProps) {
   return (
     <fieldset className="login-form__section">
@@ -31,6 +40,7 @@ export default function StudyPreferencesFieldset({
         value={countryId}
         onChange={onCountryChange}
         describedBy={describedBy}
+        idPrefix={idPrefix}
       />
       <UniversitySelect
         tenantSlug={tenantSlug}
@@ -38,6 +48,7 @@ export default function StudyPreferencesFieldset({
         value={universityId}
         onChange={onUniversityChange}
         describedBy={describedBy}
+        idPrefix={idPrefix}
       />
       <ProgramSelect
         tenantSlug={tenantSlug}
@@ -45,6 +56,7 @@ export default function StudyPreferencesFieldset({
         value={programId}
         onChange={onProgramChange}
         describedBy={describedBy}
+        idPrefix={idPrefix}
       />
     </fieldset>
   )
