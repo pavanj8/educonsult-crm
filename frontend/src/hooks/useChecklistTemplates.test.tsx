@@ -118,24 +118,6 @@ describe('useChecklistTemplates', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('short-circuits to a "please log in" hint when mounted without a token (page UX polish)', async () => {
-    const fetchSpy = vi.fn()
-    globalThis.fetch = fetchSpy as unknown as typeof fetch
-    localStorage.removeItem('access_token')
-
-    render(<ChecklistTemplatesPage />)
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('checklist-templates-unauthenticated'),
-      ).toBeInTheDocument()
-    })
-    expect(screen.getByTestId('checklist-templates-unauthenticated')).toHaveTextContent(
-      /log in/i,
-    )
-    expect(fetchSpy).not.toHaveBeenCalled()
-  })
-
   it('maps 403/401 responses to a permission-friendly error message', async () => {
     localStorage.setItem('access_token', 'test-token')
     setupFetchMock({

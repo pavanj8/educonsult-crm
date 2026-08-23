@@ -249,6 +249,15 @@ export default function ChecklistTemplatesPage() {
   }
 
   async function handleDelete(template: ChecklistItemTemplate) {
+    // Deleting a template is irreversible and can affect every student's
+    // checklist for the stage, so require an explicit confirmation first.
+    if (
+      !window.confirm(
+        `Delete the "${template.name}" checklist item? This cannot be undone.`,
+      )
+    ) {
+      return
+    }
     setSuccessMessage(null)
     clearErrors()
     try {

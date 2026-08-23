@@ -48,6 +48,11 @@ const mockUniversities = [
   { id: 11, tenant_id: 10, country_id: 2, name: 'University of Manchester' },
 ]
 
+const mockCountries = [
+  { id: 1, tenant_id: 10, name: 'Canada', code: 'CA' },
+  { id: 2, tenant_id: 10, name: 'United Kingdom', code: 'GB' },
+]
+
 type MockResponse = {
   ok: boolean
   status: number
@@ -66,6 +71,7 @@ interface FetchRouteOptions {
   templates?: unknown[]
   programs?: unknown[]
   universities?: unknown[]
+  countries?: unknown[]
   handlers?: Array<{ method: string; path: RegExp; handler: () => MockResponse }>
 }
 
@@ -92,6 +98,13 @@ function defaultHandlersFor(options: FetchRouteOptions): Array<{
       method: 'GET',
       path: /\/master-data\/admin\/universities$/,
       handler: () => jsonResponse(universities),
+    },
+    {
+      // useMasterDataAdmin always fetches countries too; mock it so the call
+      // doesn't fall through to the 500 default and mask a real regression.
+      method: 'GET',
+      path: /\/master-data\/admin\/countries$/,
+      handler: () => jsonResponse(options.countries ?? mockCountries),
     },
   ]
 }
@@ -127,6 +140,24 @@ describe('ChecklistTemplatesPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     localStorage.setItem('access_token', 'test-token')
+  })
+
+  it('short-circuits to a "please log in" hint when mounted without a token', async () => {
+    const fetchSpy = vi.fn()
+    globalThis.fetch = fetchSpy as unknown as typeof fetch
+    localStorage.removeItem('access_token')
+
+    render(<ChecklistTemplatesPage />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('checklist-templates-unauthenticated'),
+      ).toBeInTheDocument()
+    })
+    expect(
+      screen.getByTestId('checklist-templates-unauthenticated'),
+    ).toHaveTextContent(/log in/i)
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('renders the templates table for the default stage filter', async () => {
@@ -419,6 +450,7 @@ describe('ChecklistTemplatesPage', () => {
 
   it('deletes a template and shows a success message', async () => {
     const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const fetchSpy = setupFetchMock({
       handlers: [
         ...defaultHandlersFor({}),
@@ -458,6 +490,7 @@ describe('ChecklistTemplatesPage', () => {
 
   it('shows the API error when deleting a template fails', async () => {
     const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     setupFetchMock({
       handlers: [
         ...defaultHandlersFor({}),
@@ -482,5 +515,37 @@ describe('ChecklistTemplatesPage', () => {
         'Template is in use',
       )
     })
+  })
+
+  it('does not delete when the confirmation is dismissed', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const fetchSpy = setupFetchMock({
+      handlers: [
+        ...defaultHandlersFor({}),
+        {
+          method: 'DELETE',
+          path: /\/checklist-templates\/\d+$/,
+          handler: () => jsonResponse(undefined, 204),
+        },
+      ],
+    })
+    render(<ChecklistTemplatesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('checklist-template-delete-1')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTestId('checklist-template-delete-1'))
+
+    // The user cancelled, so no DELETE request is issued and no success shows.
+    const deleteCalls = fetchSpy.mock.calls.filter((call) => {
+      const init = call[1] as RequestInit | undefined
+      return (init?.method ?? 'GET') === 'DELETE'
+    })
+    expect(deleteCalls).toHaveLength(0)
+    expect(
+      screen.queryByTestId('checklist-templates-success'),
+    ).not.toBeInTheDocument()
   })
 })

@@ -33,11 +33,14 @@ export const TERMINAL_PIPELINE_STAGES: ReadonlySet<PipelineStage> = new Set<
 >(['enrolled', 'rejected', 'withdrawn'])
 
 /**
- * Pipeline stages that may still collect documents (Requirements §5).
- * Derived from :ts:var:`PipelineStage` minus :ts:var:`TERMINAL_PIPELINE_STAGES`
- * so adding a new non-terminal stage to :ts:type:`PipelineStage`
- * automatically surfaces it everywhere that asks for "non-terminal
- * stages" (e.g. the E15 checklist template picker).
+ * Pipeline stages that may still collect documents (Requirements §5) — used by
+ * e.g. the E15 checklist template picker.
+ *
+ * This is a manually-maintained list of every :ts:type:`PipelineStage`, then
+ * filtered to drop :ts:var:`TERMINAL_PIPELINE_STAGES`. It is NOT auto-derived
+ * from the type: adding a new stage to :ts:type:`PipelineStage` also requires
+ * adding it to the literal below (TypeScript does not enumerate union members
+ * at runtime).
  */
 export const NON_TERMINAL_PIPELINE_STAGES: readonly PipelineStage[] = (
   [
