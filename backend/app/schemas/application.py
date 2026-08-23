@@ -143,3 +143,27 @@ class MarkWithdrawnRequest(BaseModel):
             raise ValueError("reason is required")
         self.reason = trimmed
         return self
+
+
+class ReassignCounselorRequest(BaseModel):
+    """Body for ``PATCH /applications/{id}/counselor`` (E20; Journey J13; issue #153).
+
+    Manual counselor reassignment for an application. The ``counselor_id``
+    field accepts either a positive integer (the id of the new counselor
+    to assign) or ``null`` (unassign the current counselor). When a non-null
+    id is supplied, the endpoint validates that the target user is an
+    active ``COUNSELOR`` in the same branch as the application (or, for
+    consultancy owners acting cross-branch, in the same tenant).
+
+    Permission gating is handled by ``require_permission(...)`` on the
+    endpoint itself; this schema enforces only the shape of the request
+    payload and the integer-vs-null choice.
+    """
+
+    counselor_id: int | None = Field(
+        default=None,
+        description=(
+            "Id of the new counselor to assign, or null to unassign the "
+            "current counselor."
+        ),
+    )
