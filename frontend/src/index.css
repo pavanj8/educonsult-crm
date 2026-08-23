@@ -141,6 +141,47 @@ body {
   padding: 1.5rem;
 }
 
+/* App shell — language switcher (E51 ticket #238). The switcher sits in
+ * the header next to the notification bell; it is a tiny label + native
+ * select so it works without a custom dropdown dependency and is
+ * accessible by default. */
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--brand-color-contrast);
+}
+
+.language-switcher__label {
+  font-weight: 500;
+}
+
+.language-switcher__select {
+  padding: 0.375rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.language-switcher__select:hover {
+  background: #f9fafb;
+}
+
+.language-switcher__select:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 /* Notification bell + center */
 .notification-bell {
   position: relative;
