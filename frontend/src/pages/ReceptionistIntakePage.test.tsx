@@ -7,11 +7,12 @@ import ReceptionistIntakePage from './ReceptionistIntakePage'
 import { AuthProvider } from '../store/authStore'
 import { BrandingProvider } from '../store/brandingStore'
 import { RECEPTIONIST_INTAKE_PATH } from '../routes/paths'
+import type { AuthUser } from '../types/auth'
 
-const mockReceptionist = {
+const mockReceptionist: AuthUser = {
   id: 7,
   email: 'receptionist@example.test',
-  role: 'receptionist' as const,
+  role: 'receptionist',
   tenant_id: 10,
   branch_id: 1,
 }
