@@ -50,16 +50,15 @@ __all__ = [
 
 
 def _format_scheduled_at(when: datetime) -> str:
-    """Render a meeting time in a stable, locale-neutral string.
+    """Render a meeting time using its timezone's UTC offset.
 
-    Mirrors the format used by the in-app notification body in
-    :mod:`app.services.notifications` so the two channels carry the
-    same text. We deliberately do NOT do timezone conversion here --
-    the caller is expected to pass a UTC-aware ``datetime`` (the
-    :class:`app.models.meeting.Meeting` column is ``DateTime(timezone=True)``
-    so it always comes back tz-aware from the DB).
+    Raises:
+        ValueError: If ``when`` is naive or otherwise has no valid
+            timezone offset.
     """
-    return when.strftime("%Y-%m-%d %H:%M UTC")
+    if when.tzinfo is None or when.utcoffset() is None:
+        raise ValueError("scheduled_at must be a timezone-aware datetime")
+    return when.astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _student_dashboard_url() -> str:
@@ -142,7 +141,11 @@ def build_document_approved_body(
     document_label: str | None,
     comment: str | None,
 ) -> str:
-    """Plain-text body for the document-approved notification (J22 / J25)."""
+    """Plain-text body for the document-approved notification (J22 / J25).
+
+    An empty-string ``comment`` is treated as no comment, so no
+    Verifier's note line is emitted.
+    """
     greeting = f"Hi {student_name}," if student_name else "Hi,"
 
     label = document_label or "your document"

@@ -1,22 +1,10 @@
-"""SMTP configuration for outbound email (Requirements §2; MailHog in local dev).
+"""Environment-backed configuration for outbound email.
 
-E49 / Issue #232 — Email service abstraction (SMTP client wrapper).
+SMTP settings and the application base URL are read at call time so
+deployments can override them without restarting the process.
 
-Every value in this module is read from an environment variable at
-call time (never at import time) so:
-
-* Local development points at MailHog (``localhost:1025``) via the
-  E1 Docker Compose defaults — no code change required.
-* On-prem / SaaS deployments override ``SMTP_HOST``, ``SMTP_PORT``,
-  and ``SMTP_FROM`` via the deployment env file (E4 owns the env
-  reference doc; the operator-facing knobs live here).
-* The future E49 pluggable-transport story (SMS / WhatsApp providers
-  shipping behind the same :func:`app.email.service.send_email` call
-  site) can swap the transport without touching call sites — only
-  this module needs to learn about a new backend's configuration.
-
-The defaults below match the E1 docker-compose ``mailhog`` service so
-a fresh checkout can send email with zero env configuration.
+The defaults match the local MailHog service. ``smtp_port`` raises
+``ValueError`` for a non-integer ``SMTP_PORT`` value.
 """
 
 import os
@@ -33,7 +21,11 @@ def smtp_host() -> str:
 
 
 def smtp_port() -> int:
-    """Return the SMTP server port (default: 1025 for MailHog in local dev)."""
+    """Return the SMTP server port (default: 1025 for MailHog in local dev).
+
+    Raises:
+        ValueError: If ``SMTP_PORT`` is not an integer.
+    """
     return int(os.environ.get("SMTP_PORT", str(_DEFAULT_SMTP_PORT)))
 
 
@@ -45,8 +37,6 @@ def smtp_from_address() -> str:
 def app_base_url() -> str:
     """Return the public-facing frontend base URL used in email links.
 
-    The trailing slash is stripped so callers can safely concatenate
-    paths like ``f"{app_base_url()}/reset-password?token=..."`` without
-    producing ``//reset-password``.
+    A trailing slash is stripped so paths can be concatenated safely.
     """
     return os.environ.get("APP_BASE_URL", _DEFAULT_APP_BASE_URL).rstrip("/")
