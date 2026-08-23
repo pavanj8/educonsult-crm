@@ -34,6 +34,7 @@ const mockUploadResponse: StudentDocumentUploadResponse = {
   uploaded_at: '2026-02-01T10:00:00Z',
   verified_at: null,
   rejection_reason: null,
+  supersedes_id: null,
   created_at: '2026-02-01T10:00:00Z',
   updated_at: '2026-02-01T10:00:00Z',
 }
@@ -165,6 +166,55 @@ describe('useStudentDocumentUpload', () => {
       expect(result.current.uploading).toBe(false)
     })
     expect(result.current.error).toBe('Failed to upload document')
+  })
+
+  it('forwards supersedesDocumentId to the upload call (E31; Journey J24)', async () => {
+    vi.mocked(uploadStudentDocument).mockResolvedValueOnce({
+      ...mockUploadResponse,
+      id: 100,
+      supersedes_id: 42,
+    })
+
+    const { result } = renderHook(() =>
+      useStudentDocumentUpload({
+        applicationId: 7,
+        checklistItemTemplateId: 11,
+        supersedesDocumentId: 42,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.upload(makeFile())
+    })
+
+    expect(uploadStudentDocument).toHaveBeenCalledWith({
+      applicationId: 7,
+      file: expect.any(File),
+      checklistItemTemplateId: 11,
+      supersedesDocumentId: 42,
+    })
+  })
+
+  it('omits supersedesDocumentId from the upload call when not supplied', async () => {
+    vi.mocked(uploadStudentDocument).mockResolvedValueOnce(mockUploadResponse)
+
+    const { result } = renderHook(() =>
+      useStudentDocumentUpload({
+        applicationId: 7,
+        checklistItemTemplateId: 11,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.upload(makeFile())
+    })
+
+    expect(uploadStudentDocument).toHaveBeenCalledWith({
+      applicationId: 7,
+      file: expect.any(File),
+      checklistItemTemplateId: 11,
+      supersedesDocumentId: undefined,
+    })
   })
 
   it('clearError resets the error state', async () => {

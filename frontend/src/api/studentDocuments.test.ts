@@ -20,6 +20,7 @@ const mockUploadResponse: StudentDocumentUploadResponse = {
   uploaded_at: '2026-02-01T10:00:00Z',
   verified_at: null,
   rejection_reason: null,
+  supersedes_id: null,
   created_at: '2026-02-01T10:00:00Z',
   updated_at: '2026-02-01T10:00:00Z',
 }
@@ -104,6 +105,59 @@ describe('uploadStudentDocument', () => {
     expect(body.has('checklist_item_template_id')).toBe(false)
   })
 
+  it('appends supersedes_document_id when supplied (E31; Journey J24)', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockUploadResponse,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    await uploadStudentDocument({
+      applicationId: 7,
+      file: makeFile(),
+      supersedesDocumentId: 42,
+    })
+
+    const body = fetchMock.mock.calls[0]![1]!.body as FormData
+    expect(body.get('supersedes_document_id')).toBe('42')
+  })
+
+  it('omits supersedes_document_id when explicitly null (initial-upload path)', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockUploadResponse,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    await uploadStudentDocument({
+      applicationId: 7,
+      file: makeFile(),
+      supersedesDocumentId: null,
+    })
+
+    const body = fetchMock.mock.calls[0]![1]!.body as FormData
+    expect(body.has('supersedes_document_id')).toBe(false)
+  })
+
+  it('omits supersedes_document_id when not supplied (initial-upload path)', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockUploadResponse,
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    await uploadStudentDocument({ applicationId: 7, file: makeFile() })
+
+    const body = fetchMock.mock.calls[0]![1]!.body as FormData
+    expect(body.has('supersedes_document_id')).toBe(false)
+  })
+
   it('surfaces backend error detail on failure', async () => {
     localStorage.setItem('access_token', 'test-token')
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -166,6 +220,7 @@ describe('toChecklistUpload', () => {
       uploadedAt: '2026-02-01T10:00:00Z',
       verifiedAt: null,
       rejectionReason: null,
+      supersedesDocumentId: null,
     })
   })
 
@@ -183,6 +238,16 @@ describe('toChecklistUpload', () => {
       uploadedAt: '2026-02-01T10:00:00Z',
       verifiedAt: '2026-02-02T11:00:00Z',
       rejectionReason: 'Please re-upload with a scanned signature.',
+      supersedesDocumentId: null,
     })
+  })
+
+  it('propagates supersedes_id on the projected shape (E31; Journey J24)', () => {
+    const reupload: StudentDocumentUploadResponse = {
+      ...mockUploadResponse,
+      id: 100,
+      supersedes_id: 99,
+    }
+    expect(toChecklistUpload(reupload).supersedesDocumentId).toBe(99)
   })
 })

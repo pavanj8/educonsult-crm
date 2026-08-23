@@ -29,6 +29,7 @@ const baseItems: ChecklistItem[] = [
       uploadedAt: '2026-02-01T10:00:00Z',
       verifiedAt: '2026-02-02T11:00:00Z',
       rejectionReason: null,
+      supersedesDocumentId: null,
     },
   },
   {
@@ -45,6 +46,7 @@ const baseItems: ChecklistItem[] = [
       uploadedAt: '2026-02-03T09:00:00Z',
       verifiedAt: '2026-02-03T10:00:00Z',
       rejectionReason: 'Please re-upload with a scanned signature.',
+      supersedesDocumentId: null,
     },
   },
   {
@@ -61,6 +63,7 @@ const baseItems: ChecklistItem[] = [
       uploadedAt: '2026-02-04T12:00:00Z',
       verifiedAt: null,
       rejectionReason: null,
+      supersedesDocumentId: null,
     },
   },
 ]
@@ -212,15 +215,30 @@ describe('ChecklistView', () => {
   it('renders an upload control for items without an upload (E27; Journey J20)', () => {
     renderView()
 
-    // Only the not-uploaded item (templateId 10) gets the upload UI.
+    // Only the not-uploaded item (templateId 10) gets the initial-upload UI.
     expect(screen.getByTestId('checklist-item-upload-10')).toBeInTheDocument()
     expect(screen.getByTestId('checklist-item-upload-trigger-10')).toBeInTheDocument()
     expect(screen.getByTestId('checklist-item-upload-input-10')).toBeInTheDocument()
 
-    // Items with an upload (approved / rejected / pending) do NOT show
-    // the upload UI — that re-upload path is owned by E31.
+    // Approved / pending uploads do NOT show the upload UI — the file is
+    // already submitted and only a rejected upload can be replaced (E31).
     expect(screen.queryByTestId('checklist-item-upload-11')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('checklist-item-upload-12')).not.toBeInTheDocument()
     expect(screen.queryByTestId('checklist-item-upload-13')).not.toBeInTheDocument()
+  })
+
+  it('renders a re-upload control alongside the rejection block for rejected items (E31; Journey J24)', () => {
+    renderView()
+
+    // The rejected item (templateId 12) gets the re-upload UI under
+    // its own test-id prefix so it is distinguishable from the
+    // initial-upload UI.
+    expect(screen.getByTestId('checklist-item-reupload-12')).toBeInTheDocument()
+    expect(screen.getByTestId('checklist-item-reupload-12-trigger')).toBeInTheDocument()
+    expect(screen.getByTestId('checklist-item-reupload-12-input')).toBeInTheDocument()
+    // The initial-upload control is still scoped to the not-uploaded
+    // item only.
+    expect(screen.queryByTestId('checklist-item-reupload-10')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('checklist-item-reupload-11')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('checklist-item-reupload-13')).not.toBeInTheDocument()
   })
 })

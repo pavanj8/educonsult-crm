@@ -3,6 +3,7 @@ import {
   type ChecklistItem,
   type ChecklistUpload,
 } from '../../types/checklist'
+import ChecklistItemReupload from './ChecklistItemReupload'
 import ChecklistItemUpload from './ChecklistItemUpload'
 
 /**
@@ -159,6 +160,14 @@ export default function ChecklistView({
                         </span>{' '}
                         {item.upload.rejectionReason}
                       </p>
+                    ) : null}
+                    {item.upload.status === 'rejected' ? (
+                      <ChecklistItemReupload
+                        applicationId={applicationId}
+                        checklistItemTemplateId={item.templateId}
+                        supersedesDocumentId={item.upload.id}
+                        onUploaded={onReload}
+                      />
                     ) : null}
                   </div>
                 ) : (
