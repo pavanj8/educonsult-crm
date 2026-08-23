@@ -1,12 +1,23 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
 import AppLayout from './AppLayout'
+import { initI18n, resetI18nForTests } from '../i18n'
 import { AuthProvider } from '../store/authStore'
 import { BrandingProvider } from '../store/brandingStore'
 import { I18nProvider } from '../store/i18nStore'
+
+// Seed i18next before the first render so the first ``useTranslation()``
+// call inside ``AppLayout`` (which runs in the layout's render, before
+// the provider's ``useEffect`` initialiser) sees a fully-loaded
+// resource bundle. ``AppLayout`` consumes the platform wordmark and the
+// nav labels via ``t('app.platformName')`` / ``t('app.nav.*')`` — these
+// keys are populated by ticket #239.
+beforeAll(() => {
+  initI18n('en')
+})
 
 const superAdminUser = {
   id: 1,
@@ -99,9 +110,10 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch')
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore()
     document.documentElement.removeAttribute('style')
+    await resetI18nForTests()
   })
 
   it('falls back to the default wordmark when no tenant branding is available', async () => {

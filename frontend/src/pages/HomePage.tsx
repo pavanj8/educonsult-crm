@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next'
+
 export default function HomePage() {
-  return <p>Welcome to EduConsult CRM</p>
+  const { t } = useTranslation()
+  return <p>{t('home.welcome')}</p>
 }
