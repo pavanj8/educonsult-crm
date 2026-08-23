@@ -8,36 +8,47 @@ even know they exist" (Requirements §5 "Internal notes: Staff-only
 comment thread per student (counselor/verifier/branch manager visible),
 hidden from student").
 
-Permission grants are wired through ``NOTE_READ`` and ``NOTE_CREATE``:
+Permission grants are wired through ``NOTE_READ`` / ``NOTE_CREATE`` /
+``NOTE_UPDATE`` / ``NOTE_DELETE`` so the role+permission split is
+visible at the OpenAPI layer:
 
-* ``NOTE_READ`` is granted to consultancy owner, branch manager,
-  counselor, document verifier, and receptionist (front-desk
+* ``NOTE_READ`` is granted to super admin, consultancy owner, branch
+  manager, counselor, document verifier, and receptionist (front-desk
   read-only visibility is appropriate; receptionist does not get
-  ``NOTE_CREATE`` because they don't author internal notes — they
-  only intake students per Requirements §3).
-* ``NOTE_CREATE`` is granted to consultancy owner, branch manager,
-  and counselor (the three roles the spec explicitly calls out as
-  note authors).
-* The student role is not granted either permission, which is how the
-  "hidden from student" requirement is enforced at the dependency
+  ``NOTE_CREATE`` because they don't author internal notes — they only
+  intake students per Requirements §3).
+* ``NOTE_CREATE`` / ``NOTE_UPDATE`` / ``NOTE_DELETE`` are granted to
+  super admin, consultancy owner, branch manager, and counselor (the
+  roles the spec explicitly calls out as note authors). Note that
+  ``NOTE_UPDATE`` / ``NOTE_DELETE`` are NOT granted to document
+  verifier or receptionist — every PATCH/DELETE is additionally gated
+  on ``author_user_id == current_user.id`` so only the original author
+  can edit/delete. Splitting create from update/delete at the
+  permission layer means a future ticket that wants to grant branch
+  managers the right to edit a counselor's note can grant
+  ``NOTE_UPDATE`` to a new role without weakening the
+  create-vs-edit distinction (security analyst finding on iteration
+  #1).
+* The student role is not granted any note permission, which is how
+  the "hidden from student" requirement is enforced at the dependency
   layer.
 
 Branch scoping follows ADR-0004 + the rest of the counseling domain
-(``apply_tenant_scope`` + ``apply_branch_scope``):
+(``apply_tenant_scope`` + manual JOIN through ``User.branch_id`` since
+``Note`` is not branch-scoped at the schema level — see the
+"_BRANCH_SCOPED_NOTE_ROLES" frozenset below):
 
 * Super Admin: platform-wide, unfiltered.
 * Consultancy Owner: tenant-wide, unfiltered by branch.
-* Branch Manager / Counselor: tenant + branch scoped.
-* Document Verifier / Receptionist: tenant scoped; ``apply_branch_scope``
-  is not applied because they are not branch-scoped roles per ADR-0004
-  (verifier and receptionist are present in every branch).
-
-Counselors are additionally restricted to notes whose student they are
-currently the assigned counselor on (i.e. at least one ``Application``
-row for that student in the counselor's branch has
-``assigned_counselor_id == counselor.id``). This mirrors the
-``GET /applications/assigned-to-me`` shape and prevents a counselor
-from peeking at notes for students they aren't assigned to.
+* Branch Manager / Counselor: tenant + branch scoped; counselors are
+  additionally restricted to notes for students they are the assigned
+  counselor on (mirrors ``GET /applications/assigned-to-me`` from E21).
+* Document Verifier / Receptionist: tenant scoped only (they are
+  present in every branch and the role-switch no longer special-cases
+  them with a "no further branch filter" comment — there is no
+  unreachable verifier/receptionist branch in this module; the
+  frozenset at module top is the single source of truth, mirroring
+  ``_CROSS_BRANCH_ROLES`` in ``app/db/branch_scope.py``).
 """
 
 from datetime import datetime, timezone
@@ -71,6 +82,15 @@ _BRANCH_ACCESS_DENIED_DETAIL = "User has no access to this resource"
 _COUNSELOR_NOT_ASSIGNED_DETAIL = (
     "Counselor is not assigned to this student; cannot view notes"
 )
+_AUTHOR_ONLY_EDIT_DETAIL = "Only the note's author may edit it"
+_AUTHOR_ONLY_DELETE_DETAIL = "Only the note's author may delete it"
+
+# Roles whose notes view must be filtered to the caller's branch (ADR-0004).
+# Single source of truth for "who is branch-scoped on /notes", mirroring the
+# frozenset convention used in ``app/db/branch_scope.py``. Keep this list in
+# lock-step with ``_BRANCH_SCOPED_ROLES`` in tests/db/test_access_denial_matrix.py
+# and with any future role that needs branch-scoped note visibility.
+_BRANCH_SCOPED_NOTE_ROLES = frozenset({Role.BRANCH_MANAGER, Role.COUNSELOR})
 
 
 def _utc_now() -> datetime:
@@ -97,24 +117,32 @@ def _handle_db_error(
 
 
 def _load_student(db: Session, user: AuthenticatedUser, student_id: int) -> User:
-    """Load the student User row, enforcing tenant scope (404 for cross-tenant)."""
+    """Load the student User row, enforcing tenant scope and student role.
+
+    Returns 404 for:
+
+    * a row that does not exist,
+    * a cross-tenant row,
+    * a row whose role is not ``STUDENT`` (e.g. the caller probes a
+      ``users`` id that resolves to a non-student row).
+
+    The 404 collapses the "missing row" and "wrong-role row" failure
+    modes into a single, indistinguishable response so a probe cannot
+    enumerate non-student user ids by status-code differential
+    (security analyst finding on iteration #1).
+    """
     try:
         student = db.get(User, student_id)
     except OperationalError as exc:
         _handle_db_error(exc, rollback=False)
 
-    if student is None or student.tenant_id != user.tenant_id:
+    if (
+        student is None
+        or student.tenant_id != user.tenant_id
+        or student.role != Role.STUDENT
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=_STUDENT_NOT_FOUND_DETAIL,
-        )
-
-    if student.role != Role.STUDENT:
-        # The note spec is "comment thread per student" -- a note
-        # about a non-student user is meaningless. Refuse early so the
-        # caller gets a useful error rather than an FK violation.
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=_STUDENT_NOT_FOUND_DETAIL,
         )
 
@@ -153,33 +181,35 @@ def _load_application(
 def _enforce_branch_scope_on_student(
     db: Session, user: AuthenticatedUser, student: User
 ) -> None:
-    """Branch-scope a single student for branch-scoped staff roles.
+    """Branch-scope a single student for branch-scoped note roles.
+
+    Roles not in ``_BRANCH_SCOPED_NOTE_ROLES`` (super admin, consultancy
+    owner, document verifier, receptionist, visa processor, student)
+    bypass this guard — super admin and consultancy owner are
+    platform/tenant-wide by design, and verifier/receptionist are
+    present in every branch (no branch filter applies to them in the
+    list endpoint either; the canonical scope helper ``apply_branch_scope``
+    would block them with a ``BranchScopeError`` because they lack
+    branch_id, which is the wrong outcome for notes).
 
     Counselors are further restricted to students they are currently
     the assigned counselor on (i.e. there exists at least one
     ``Application`` row for the student in the caller's branch with
     ``assigned_counselor_id == caller.id``). This matches the
-    counselor's "assigned-to-me" application queue shape (J14) and
-    is the same authorization model the meetings router uses for
+    counselor's "assigned-to-me" application queue shape (J14) and is
+    the same authorization model the meetings router uses for
     counselors in E22.
     """
-    if user.role in (Role.SUPER_ADMIN, Role.CONSULTANCY_OWNER):
+    if user.role not in _BRANCH_SCOPED_NOTE_ROLES:
         return
 
-    if user.role == Role.BRANCH_MANAGER:
-        if user.branch_id is None or student.branch_id != user.branch_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=_BRANCH_ACCESS_DENIED_DETAIL,
-            )
-        return
+    if user.branch_id is None or student.branch_id != user.branch_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_BRANCH_ACCESS_DENIED_DETAIL,
+        )
 
     if user.role == Role.COUNSELOR:
-        if user.branch_id is None or student.branch_id != user.branch_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=_BRANCH_ACCESS_DENIED_DETAIL,
-            )
         # Counselors must be the assigned counselor on at least one
         # of the student's applications in this branch. We check via
         # the SQLAlchemy ``exists()`` subquery against ``Application``
@@ -203,11 +233,6 @@ def _enforce_branch_scope_on_student(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=_COUNSELOR_NOT_ASSIGNED_DETAIL,
             )
-        return
-
-    # Document Verifier / Receptionist / others with NOTE_READ: tenant
-    # scope is already enforced above; no further branch filter applies
-    # (they are present in every branch).
 
 
 def _scoped_notes_query(
@@ -217,11 +242,12 @@ def _scoped_notes_query(
 
     * Super Admin: unfiltered (platform-wide).
     * Consultancy Owner: tenant-scoped, all branches.
-    * Branch Manager: tenant + branch scoped.
-    * Document Verifier / Receptionist: tenant scoped (no branch filter,
-      they are present in every branch).
+    * Branch Manager: tenant + branch scoped (joined through
+      ``User.branch_id`` since ``Note`` has no branch column).
     * Counselor: tenant + branch scoped, AND restricted to notes for
       students they are the assigned counselor on.
+    * Document Verifier / Receptionist / Visa Processor: tenant scoped
+      only (no branch filter — they are present in every branch).
     """
     statement: Select[tuple[Note]] = apply_tenant_scope(select(Note), Note, user)
 
@@ -326,25 +352,9 @@ def create_note(
     student = _load_student(db, current_user, payload.student_id)
 
     if payload.application_id is not None:
-        application = _load_application(
+        _load_application(
             db, current_user, payload.application_id, payload.student_id
         )
-        # Branch scope on the application matches the student's branch
-        # in practice (the application's branch_id mirrors the student's
-        # at creation time), but we re-check explicitly so a future
-        # ticket that decouples student.branch_id from application.branch_id
-        # does not silently break this.
-        if (
-            current_user.role not in (Role.SUPER_ADMIN, Role.CONSULTANCY_OWNER)
-            and current_user.branch_id is not None
-            and application.branch_id != current_user.branch_id
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=_BRANCH_ACCESS_DENIED_DETAIL,
-            )
-    else:
-        application = None
 
     _enforce_branch_scope_on_student(db, current_user, student)
 
@@ -384,6 +394,13 @@ def list_notes(
     :func:`_scoped_notes_query`. Optional filters narrow the list by
     ``student_id`` or ``application_id`` for the notes-thread UI
     (E24 frontend ticket #166).
+
+    Newest-first ordering (``Note.created_at DESC``) matches how the
+    notes-thread UI renders the conversation — a chat-style thread is
+    read top-to-bottom with the most recent message first, mirroring
+    the consumer expectation rather than forcing the frontend to
+    reverse the list client-side (UX architect finding on iteration
+    #1).
     """
     if current_user.tenant_id is None:
         raise HTTPException(
@@ -394,10 +411,14 @@ def list_notes(
     try:
         statement = _scoped_notes_query(db, current_user)
 
-        # If the caller is branch-scoped and supplies student_id, the
-        # student must be in the caller's branch (and a counselor must
-        # be assigned to them). This catches a "probe" attempt where a
-        # branch-scoped user guesses another branch's student id.
+        # If the caller is branch-scoped and supplies ``student_id``, we
+        # reject the request rather than silently returning ``[]``: a
+        # branch-scoped user that probes another branch's student id
+        # should not be able to distinguish "no notes exist for this
+        # student" from "the student is out of scope". The single-note
+        # GET endpoint already returns 403 for the same probe via
+        # :func:`_load_note`; the list endpoint mirrors that for
+        # consistency (senior developer finding on iteration #1).
         if student_id is not None and current_user.role in (
             Role.BRANCH_MANAGER,
             Role.COUNSELOR,
@@ -406,25 +427,37 @@ def list_notes(
                 student = db.get(User, student_id)
             except OperationalError as exc:
                 _handle_db_error(exc, rollback=False)
-            if student is None or student.tenant_id != current_user.tenant_id:
-                # Treat unknown / cross-tenant student as a hard not-found
-                # so the response shape is predictable.
-                return []
             if (
-                student.branch_id is None
-                or current_user.branch_id is None
-                or student.branch_id != current_user.branch_id
+                student is None
+                or student.tenant_id != current_user.tenant_id
+                or student.role != Role.STUDENT
             ):
-                return []
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=_BRANCH_ACCESS_DENIED_DETAIL,
+                )
             if current_user.role == Role.COUNSELOR:
                 _enforce_branch_scope_on_student(db, current_user, student)
+            else:
+                # Branch manager: enforce the student's branch match
+                # without running the counselor-specific assigned-counselor
+                # check.
+                if (
+                    current_user.branch_id is None
+                    or student.branch_id != current_user.branch_id
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=_BRANCH_ACCESS_DENIED_DETAIL,
+                    )
 
         if student_id is not None:
             statement = statement.where(Note.student_id == student_id)
         if application_id is not None:
             statement = statement.where(Note.application_id == application_id)
 
-        statement = statement.order_by(Note.created_at)
+        # Newest-first: chat-style notes thread reads top-to-bottom.
+        statement = statement.order_by(Note.created_at.desc(), Note.id.desc())
         return list(db.scalars(statement).all())
     except (TenantScopeError, BranchScopeError):
         raise HTTPException(
@@ -459,16 +492,24 @@ def update_note(
     payload: NoteUpdate,
     current_user: Annotated[
         AuthenticatedUser,
-        Depends(require_permission(Permission.NOTE_CREATE)),
+        Depends(require_permission(Permission.NOTE_UPDATE)),
     ],
     db: Session = Depends(get_db),
 ) -> Note:
     """Update a note's body (J17).
 
-    Only the author of the note may edit it; the spec describes notes
-    as a per-author "comment" and Requirements §8 audit trail integrity
-    means we must not silently rewrite another staff member's note.
-    Tenant + branch + role scoping is enforced in :func:`_load_note`.
+    Two-layer authorization:
+
+    * The dependency on ``NOTE_UPDATE`` rejects callers whose role
+      does not have edit privileges (e.g. document verifier /
+      receptionist have ``NOTE_READ`` but not ``NOTE_UPDATE``).
+    * After the note is loaded with full tenant + branch scoping,
+      an inline ``author_user_id == current_user.id`` check enforces
+      "only the author may edit". A future ticket that wants to grant
+      branch managers edit-on-behalf-of-counselor can grant
+      ``NOTE_UPDATE`` to the branch manager role *and* relax (or
+      replace) the inline check; the OpenAPI contract now exposes the
+      role distinction at the dependency layer.
     """
     if current_user.tenant_id is None or current_user.id is None:
         raise HTTPException(
@@ -479,7 +520,7 @@ def update_note(
     if note.author_user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the note's author may edit it",
+            detail=_AUTHOR_ONLY_EDIT_DETAIL,
         )
 
     note.body = payload.body
@@ -498,17 +539,20 @@ def delete_note(
     note_id: int,
     current_user: Annotated[
         AuthenticatedUser,
-        Depends(require_permission(Permission.NOTE_CREATE)),
+        Depends(require_permission(Permission.NOTE_DELETE)),
     ],
     db: Session = Depends(get_db),
 ) -> None:
     """Delete a note (J17).
 
-    Only the author of the note may delete it. The spec describes a
-    comment thread per student where the staff are the authors; letting
-    a peer silently remove another staff's note would break the audit
-    trail (Requirements §8). Tenant + branch + role scoping is enforced
-    in :func:`_load_note`.
+    Two-layer authorization, mirroring :func:`update_note`:
+
+    * ``NOTE_DELETE`` dependency rejects callers whose role does not
+      have delete privileges (e.g. document verifier / receptionist).
+    * Inline ``author_user_id == current_user.id`` check enforces
+      "only the author may delete" (Requirements §8 audit trail:
+      letting a peer silently remove another staff's note would break
+      the audit trail).
     """
     if current_user.tenant_id is None or current_user.id is None:
         raise HTTPException(
@@ -519,7 +563,7 @@ def delete_note(
     if note.author_user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the note's author may delete it",
+            detail=_AUTHOR_ONLY_DELETE_DETAIL,
         )
 
     db.delete(note)

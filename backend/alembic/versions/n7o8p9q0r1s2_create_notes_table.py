@@ -8,16 +8,7 @@ Internal counseling notes for E24 (Journey J17; Requirements §5:
 "Internal notes: Staff-only comment thread per student
 (counselor/verifier/branch manager visible), hidden from student").
 
-<<<<<<< HEAD
-* ``notes`` -- one row per staff-authored note attached to a
-  student (and optionally to one of the student's applications).
-  Tenant-scoped (ADR-0001). The student FK and the application FK
-  both cascade on delete so cleanup of a student (or an application)
-  also clears their internal notes.
-=======
-This migration only owns the persisted shape. The CRUD API and the
-student-isolation visibility check land in the sibling E24 task
-#165; this migration makes the table, columns, and indexes available
+this migration makes the table, columns, and indexes available
 so the API can be wired up against it.
 
 * ``notes`` -- one row per staff-authored note attached to a
@@ -27,7 +18,6 @@ so the API can be wired up against it.
   a student. The student FK and the application FK both cascade on
   delete so cleanup of a student (or an application) also clears
   their internal notes.
->>>>>>> origin/main
 
 Indexes target the two primary access patterns:
 
@@ -111,8 +101,4 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_notes_application_id"), table_name="notes")
     op.drop_index(op.f("ix_notes_student_id"), table_name="notes")
     op.drop_index(op.f("ix_notes_tenant_id"), table_name="notes")
-<<<<<<< HEAD
     op.drop_table("notes")
-=======
-    op.drop_table("notes")
->>>>>>> origin/main
