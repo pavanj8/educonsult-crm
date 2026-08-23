@@ -7,6 +7,11 @@ export {
   updateAdminChecklistItemTemplate,
 } from './checklist'
 export { fetchCountries, fetchPrograms, fetchUniversities } from './masterData'
+export {
+  listMeetingsForApplication,
+  scheduleMeeting,
+  updateMeeting,
+} from './meetings'
 export { registerStudent } from './students'
 export {
   toChecklistUpload,
