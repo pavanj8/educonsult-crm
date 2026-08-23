@@ -379,22 +379,42 @@ def test_all_send_functions_carry_from_header(send_fn):
     assert mock_send.call_args.kwargs["to"] == "x@example.test"
 
 
-def test_email_package_reexports_new_helpers():
-    """The package-level ``__init__`` must expose the new templates.
+def test_notifications_submodule_exposes_new_helpers():
+    """The ``app.email.notifications`` submodule exposes the four key-event
+    templates so the wire-up ticket (#234) can import them from a single,
+    well-named location.
 
-    Guards against a refactor that forgets to surface the helpers at
-    the package root -- the wire-up ticket (#234) imports them from
-    ``app.email`` rather than the submodule so the public surface has
-    to actually expose them.
+    Note: per the contract pinned in ``test_e49_abstraction.py``, the
+    top-level ``app.email`` package deliberately exposes *only*
+    ``send_email`` and ``EmailDeliveryError`` -- the templates live in
+    their submodule by design, mirroring how ``password_reset`` and
+    ``owner_invite`` are organised. This test guards against either:
+    (a) the helpers disappearing from ``app.email.notifications`` (a
+        refactor regression), or
+    (b) someone accidentally broadening the package surface and
+        shadowing the abstraction's two-symbol contract.
     """
     import app.email as email_pkg
+    import app.email.notifications as notifications_submodule
 
+    # The package surface stays exactly two names, as #232 pinned.
+    assert set(email_pkg.__all__) == {"EmailDeliveryError", "send_email"}
+
+    # The four new helpers live on the notifications submodule and are
+    # the import target for the wire-up ticket (#234).
     expected = {
+        "build_stage_changed_body",
+        "build_document_approved_body",
+        "build_document_rejected_body",
+        "build_meeting_scheduled_body",
         "send_stage_changed_email",
         "send_document_approved_email",
         "send_document_rejected_email",
         "send_meeting_scheduled_email",
     }
-    assert expected.issubset(set(email_pkg.__all__))
+    exported = set(getattr(notifications_submodule, "__all__", ()))
+    missing = expected - exported
+    assert not missing, f"app.email.notifications missing exports: {missing}"
+
     for name in expected:
-        assert callable(getattr(email_pkg, name))
+        assert callable(getattr(notifications_submodule, name))

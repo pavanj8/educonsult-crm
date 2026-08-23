@@ -1,35 +1,15 @@
-"""SMTP email delivery and key-event email templates (E49 / Journey J42).
+"""SMTP email delivery seam (E49 / Journey J42; issue #232).
 
-The package exposes the low-level SMTP seam, existing owner-invite and
-password-reset senders, and issue #233's stage-change, document-review,
-and meeting-scheduled templates.
+The public surface of this package is intentionally minimal: the
+low-level :func:`send_email` chokepoint and the :class:`EmailDeliveryError`
+sentinel. Per the contract pinned by
+``tests/email/test_e49_abstraction.py``, ``__all__`` is exactly these
+two names; anything else (the key-event templates, owner-invite
+senders, password-reset senders) lives in a dedicated submodule
+(``app.email.notifications``, ``app.email.owner_invite``,
+``app.email.password_reset``) and is imported from there.
 """
 
-from app.email.notifications import (
-    build_document_approved_body,
-    build_document_rejected_body,
-    build_meeting_scheduled_body,
-    build_stage_changed_body,
-    send_document_approved_email,
-    send_document_rejected_email,
-    send_meeting_scheduled_email,
-    send_stage_changed_email,
-)
-from app.email.owner_invite import send_owner_invite_email
-from app.email.password_reset import send_password_reset_email
 from app.email.service import EmailDeliveryError, send_email
 
-__all__ = [
-    "EmailDeliveryError",
-    "build_document_approved_body",
-    "build_document_rejected_body",
-    "build_meeting_scheduled_body",
-    "build_stage_changed_body",
-    "send_document_approved_email",
-    "send_document_rejected_email",
-    "send_email",
-    "send_meeting_scheduled_email",
-    "send_owner_invite_email",
-    "send_password_reset_email",
-    "send_stage_changed_email",
-]
+__all__ = ["EmailDeliveryError", "send_email"]
