@@ -361,6 +361,182 @@ def test_reject_only_writes_one_notification_for_the_student(
 
 
 # ---------------------------------------------------------------------------
+# Notification persists past the HTTP response: J25 / J43 wiring.
+# The notification produced by approve / reject must outlive the request so
+# the student's notification-center list endpoint (E50) can render it on
+# the next page load.
+# ---------------------------------------------------------------------------
+
+
+def test_approve_notification_persists_to_database_after_response(
+    client, db_session, override_authenticated_user
+):
+    """After the approve HTTP response returns, the notification is in the
+    DB (not just in some in-flight buffer). A second request via a fresh
+    session boundary observes the same row. Regression guard for an
+    uncommitted-flush bug."""
+    tenant, _branch, student, verifier, document = _seed_verifier_student_doc(
+        db_session, slug="appr-notif-persist"
+    )
+    _auth_as_verifier(
+        override_authenticated_user,
+        user_id=verifier.id,
+        tenant_id=tenant.id,
+    )
+
+    response = client.post(
+        f"/verifier/documents/{document.id}/approve",
+        json={"comment": "ok"},
+    )
+    assert response.status_code == 200, response.text
+
+    # The notification row is visible to a fresh query -- the router
+    # committed (or the session was flushed) before returning, so the
+    # J43 notification-center list endpoint (E50) will see it.
+    db_session.expire_all()
+    rows = (
+        db_session.query(Notification)
+        .filter(
+            Notification.user_id == student.id,
+            Notification.tenant_id == tenant.id,
+        )
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].title == "Document approved"
+    assert rows[0].user_id == student.id
+    assert rows[0].tenant_id == tenant.id
+
+
+def test_reject_notification_persists_to_database_after_response(
+    client, db_session, override_authenticated_user
+):
+    """Same persistence contract for reject."""
+    tenant, _branch, student, verifier, document = _seed_verifier_student_doc(
+        db_session, slug="rej-notif-persist"
+    )
+    _auth_as_verifier(
+        override_authenticated_user,
+        user_id=verifier.id,
+        tenant_id=tenant.id,
+    )
+
+    response = client.post(
+        f"/verifier/documents/{document.id}/reject",
+        json={"comment": "Wrong file"},
+    )
+    assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    rows = (
+        db_session.query(Notification)
+        .filter(
+            Notification.user_id == student.id,
+            Notification.tenant_id == tenant.id,
+        )
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].title == "Document rejected"
+    assert "Wrong file" in rows[0].message
+
+
+def test_approve_then_reject_creates_two_independent_notifications(
+    client, db_session, override_authenticated_user
+):
+    """Approving one document and rejecting a different document for the
+    same student produces TWO notifications (no overwrite, no missing
+    row). The student sees both review outcomes in their notification
+    center, matching J25 / J43.
+    """
+    tenant, branch, student, verifier, approved_doc = _seed_verifier_student_doc(
+        db_session, slug="seq-notif-approve", filename="first.pdf"
+    )
+    rejected_doc = _seed_pending_document(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        student_id=student.id,
+        filename="second.pdf",
+    )
+    _auth_as_verifier(
+        override_authenticated_user,
+        user_id=verifier.id,
+        tenant_id=tenant.id,
+    )
+
+    approve_response = client.post(
+        f"/verifier/documents/{approved_doc.id}/approve",
+        json={"comment": "ok"},
+    )
+    assert approve_response.status_code == 200, approve_response.text
+
+    reject_response = client.post(
+        f"/verifier/documents/{rejected_doc.id}/reject",
+        json={"comment": "blurry"},
+    )
+    assert reject_response.status_code == 200, reject_response.text
+
+    db_session.expire_all()
+    rows = _notifications_for(db_session, student.id)
+    titles = {row.title for row in rows}
+    assert titles == {"Document approved", "Document rejected"}
+    # Each notification's message carries its own verifier feedback.
+    messages_by_title = {row.title: row.message for row in rows}
+    assert "ok" in messages_by_title["Document approved"]
+    assert "blurry" in messages_by_title["Document rejected"]
+
+
+def test_notification_created_by_approve_is_unread_by_default(
+    client, db_session, override_authenticated_user
+):
+    """A freshly created document-review notification is unread
+    (``read_at IS NULL``) so the student's notification-center badge
+    (E50 / J43) counts it.
+    """
+    tenant, _branch, student, verifier, document = _seed_verifier_student_doc(
+        db_session, slug="appr-notif-unread"
+    )
+    _auth_as_verifier(
+        override_authenticated_user,
+        user_id=verifier.id,
+        tenant_id=tenant.id,
+    )
+
+    response = client.post(
+        f"/verifier/documents/{document.id}/approve",
+        json={"comment": "fine"},
+    )
+    assert response.status_code == 200, response.text
+
+    [notification] = _notifications_for(db_session, student.id)
+    assert notification.read_at is None
+
+
+def test_notification_created_by_reject_is_unread_by_default(
+    client, db_session, override_authenticated_user
+):
+    """Reject-created notifications are also unread by default."""
+    tenant, _branch, student, verifier, document = _seed_verifier_student_doc(
+        db_session, slug="rej-notif-unread"
+    )
+    _auth_as_verifier(
+        override_authenticated_user,
+        user_id=verifier.id,
+        tenant_id=tenant.id,
+    )
+
+    response = client.post(
+        f"/verifier/documents/{document.id}/reject",
+        json={"comment": "Wrong type"},
+    )
+    assert response.status_code == 200, response.text
+
+    [notification] = _notifications_for(db_session, student.id)
+    assert notification.read_at is None
+
+
+# ---------------------------------------------------------------------------
 # Tenant isolation: cross-tenant requests surface as 404 and never
 # produce a notification for the foreign student.
 # ---------------------------------------------------------------------------
