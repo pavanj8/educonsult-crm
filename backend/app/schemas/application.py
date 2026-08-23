@@ -143,3 +143,15 @@ class MarkWithdrawnRequest(BaseModel):
             raise ValueError("reason is required")
         self.reason = trimmed
         return self
+
+
+class ReassignCounselorRequest(BaseModel):
+    """Body for ``PATCH /applications/{id}/counselor`` (E20; Journey J13; issue #153).
+
+    The new counselor's user id. ``None`` unassigns the application's current
+    counselor (explicit unassign by a manager is recorded; the route does not
+    silently no-op). The endpoint's permission + tenant/branch scoping
+    guarantees are documented on the route function.
+    """
+
+    counselor_id: int | None = Field(default=None, ge=1)
