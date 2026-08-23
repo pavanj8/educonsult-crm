@@ -47,6 +47,21 @@ const mockApplications = [
   },
 ]
 
+const futureIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+const mockUpcomingMeeting = {
+  id: 501,
+  tenant_id: 10,
+  application_id: 1,
+  counselor_id: 7,
+  student_id: 42,
+  scheduled_at: futureIso,
+  duration_minutes: 30,
+  location: 'Room 2',
+  notes: 'Bring documents',
+  created_at: '2026-04-01T09:00:00Z',
+  updated_at: '2026-04-01T09:00:00Z',
+}
+
 function renderStudentDashboard() {
   return render(
     <AuthProvider>
@@ -74,6 +89,13 @@ describe('StudentDashboardPage', () => {
           ok: true,
           status: 200,
           json: async () => mockApplications,
+        } as Response
+      }
+      if (url.endsWith('/me/meetings')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [mockUpcomingMeeting],
         } as Response
       }
       return {
@@ -350,5 +372,53 @@ describe('StudentDashboardPage', () => {
 
     expect(screen.getByTestId('application-stage-1')).toHaveTextContent('Registered')
     expect(screen.getByTestId('application-stage-2')).toHaveTextContent('Document Verification')
+  })
+
+  it('renders the upcoming meetings widget populated from /me/meetings', async () => {
+    renderStudentDashboard()
+
+    expect(await screen.findByTestId('upcoming-meetings-widget')).toBeInTheDocument()
+    expect(await screen.findByTestId('upcoming-meeting-501')).toBeInTheDocument()
+    expect(screen.getByTestId('upcoming-meeting-501')).toHaveTextContent('Room 2')
+    expect(screen.getByTestId('upcoming-meeting-501')).toHaveTextContent('Bring documents')
+    expect(screen.getByTestId('upcoming-meeting-501')).toHaveTextContent(/30 min/)
+  })
+
+  it('renders the upcoming meetings widget empty state when no meetings exist', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString()
+      if (url.endsWith('/auth/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockStudent,
+        } as Response
+      }
+      if (url.endsWith('/applications')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockApplications,
+        } as Response
+      }
+      if (url.endsWith('/me/meetings')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [],
+        } as Response
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: 'Not found' }),
+      } as Response
+    }) as typeof fetch
+
+    renderStudentDashboard()
+
+    expect(await screen.findByTestId('upcoming-meetings-empty')).toHaveTextContent(
+      /no upcoming meetings/i,
+    )
   })
 })

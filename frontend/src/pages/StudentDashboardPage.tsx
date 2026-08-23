@@ -10,6 +10,7 @@ import {
 import { useApplications } from '../hooks/useApplications'
 import { useCreateApplication } from '../hooks/useCreateApplication'
 import ApplicationRow from '../components/documents/ApplicationRow'
+import UpcomingMeetings from '../components/meetings/UpcomingMeetings'
 
 function formatStageLabel(stage: string): string {
   return stage
@@ -138,6 +139,13 @@ export default function StudentDashboardPage() {
             </table>
           </div>
         )}
+      </section>
+
+      <section
+        className="student-dashboard__section"
+        aria-labelledby="upcoming-meetings-heading"
+      >
+        <UpcomingMeetings />
       </section>
 
       <section

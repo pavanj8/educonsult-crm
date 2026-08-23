@@ -1381,3 +1381,91 @@ body {
   font-size: 0.75rem;
   color: #b91c1c;
 }
+
+/* Upcoming meetings widget (E23; Journey J16; student dashboard) */
+.upcoming-meetings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.upcoming-meetings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.upcoming-meetings__header h3 {
+  margin: 0;
+}
+
+.upcoming-meetings__reload {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.upcoming-meetings__reload:hover {
+  background: #f9fafb;
+}
+
+.upcoming-meetings__reload:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.upcoming-meetings__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.upcoming-meetings__status--error {
+  color: #dc2626;
+}
+
+.upcoming-meetings__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.upcoming-meetings__item {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.upcoming-meetings__when {
+  font-weight: 600;
+  color: #111827;
+  font-size: 0.875rem;
+}
+
+.upcoming-meetings__duration {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.upcoming-meetings__location,
+.upcoming-meetings__notes {
+  font-size: 0.8125rem;
+  color: #374151;
+}
+
+.upcoming-meetings__label {
+  font-weight: 600;
+  color: #374151;
+}

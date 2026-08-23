@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   listMeetingsForApplication,
+  listMyMeetings,
   scheduleMeeting,
   updateMeeting,
 } from './meetings'
@@ -134,6 +135,37 @@ describe('meetings API client', () => {
     await expect(updateMeeting(99, { notes: 'x' })).rejects.toMatchObject({
       message: 'Meeting not found',
       status: 404,
+    })
+  })
+
+  it('listMyMeetings hits /me/meetings with the bearer token', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [baseMeeting],
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const result = await listMyMeetings()
+
+    expect(result).toEqual([baseMeeting])
+    expect(fetchMock).toHaveBeenCalledWith('/me/meetings', {
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+    })
+  })
+
+  it('listMyMeetings surfaces backend error detail on failure', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ detail: 'Insufficient permissions' }),
+    }) as typeof fetch
+
+    await expect(listMyMeetings()).rejects.toMatchObject({
+      message: 'Insufficient permissions',
+      status: 403,
     })
   })
 })
