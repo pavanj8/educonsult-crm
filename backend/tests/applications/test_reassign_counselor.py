@@ -816,6 +816,126 @@ def test_reassign_rejects_negative_counselor_id_at_schema(
     assert response.status_code == 422
 
 
+def test_branch_manager_cannot_assign_branch_less_counselor(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """Branch-scoped actors cannot assign a counselor whose own ``branch_id`` is NULL.
+
+    A branch-less counselor (``branch_id IS NULL``) is an unusual state in
+    production but is allowed by the ``User`` model. A branch manager /
+    receptionist is bound to a single branch and the branch-id equality
+    check (``counselor.branch_id != application.branch_id``) treats
+    ``None`` as not-equal to a non-null branch, so the assignment is
+    rejected with 422 ``Target counselor not found``. The endpoint does
+    NOT treat branch-less counselors as auto-eligible.
+    """
+    tenant = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    manager = make_db_user(
+        db_session, Role.BRANCH_MANAGER, tenant_id=tenant.id, branch_id=branch.id
+    )
+    branch_less_counselor = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        tenant_id=tenant.id,
+        branch_id=None,
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        assigned_counselor_id=None,
+    )
+    override_authenticated_user(_auth_for(manager))
+
+    response = client.patch(
+        f"/applications/{application.id}/counselor",
+        json={"counselor_id": branch_less_counselor.id},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Target counselor not found"
+
+
+def test_receptionist_cannot_assign_branch_less_counselor(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """A receptionist (also branch-scoped) cannot assign a branch-less counselor (422)."""
+    tenant = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    receptionist = make_db_user(
+        db_session, Role.RECEPTIONIST, tenant_id=tenant.id, branch_id=branch.id
+    )
+    branch_less_counselor = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        tenant_id=tenant.id,
+        branch_id=None,
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        assigned_counselor_id=None,
+    )
+    override_authenticated_user(_auth_for(receptionist))
+
+    response = client.patch(
+        f"/applications/{application.id}/counselor",
+        json={"counselor_id": branch_less_counselor.id},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Target counselor not found"
+
+
+def test_consultancy_owner_can_assign_branch_less_counselor(
+    client: TestClient,
+    db_session: Session,
+    override_authenticated_user,
+) -> None:
+    """Consultancy owners (cross-branch by design) CAN assign a branch-less counselor.
+
+    The branch-equality check is skipped for owners (because
+    ``_target_branch_scope`` returns ``None`` for them), so a branch-less
+    counselor in the same tenant is accepted. This is consistent with
+    owners being able to assign across any branch in the tenant.
+    """
+    tenant = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    branch = seed_branch(db_session, tenant_id=tenant.id)
+    owner = make_db_user(
+        db_session, Role.CONSULTANCY_OWNER, tenant_id=tenant.id, branch_id=None
+    )
+    branch_less_counselor = make_db_user(
+        db_session,
+        Role.COUNSELOR,
+        tenant_id=tenant.id,
+        branch_id=None,
+    )
+    application = seed_application(
+        db_session,
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        assigned_counselor_id=None,
+    )
+    override_authenticated_user(_auth_consultancy_owner(owner))
+
+    response = client.patch(
+        f"/applications/{application.id}/counselor",
+        json={"counselor_id": branch_less_counselor.id},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["assigned_counselor_id"] == branch_less_counselor.id
+
+
 # ---------------------------------------------------------------------------
 # Operational-error coverage
 # ---------------------------------------------------------------------------
