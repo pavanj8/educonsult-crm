@@ -3,6 +3,7 @@ from app.models.base import Base, TenantScopedBase
 from app.models.branch import Branch
 from app.models.checklist_item_template import ChecklistItemTemplate
 from app.models.country import Country
+from app.models.meeting import Meeting
 from app.models.notification import Notification
 from app.models.password_reset_token import PasswordResetToken
 from app.models.program import Program
@@ -20,6 +21,7 @@ __all__ = [
     "Branch",
     "ChecklistItemTemplate",
     "Country",
+    "Meeting",
     "Notification",
     "PasswordResetToken",
     "Program",
