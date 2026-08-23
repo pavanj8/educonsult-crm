@@ -29,6 +29,7 @@ const mockResponse = {
         uploadedAt: '2026-02-01T10:00:00Z',
         verifiedAt: '2026-02-02T11:00:00Z',
         rejectionReason: null,
+        supersedesDocumentId: null,
       },
     },
   ],

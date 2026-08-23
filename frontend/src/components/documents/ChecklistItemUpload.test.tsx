@@ -15,6 +15,7 @@ vi.mock('../../api/studentDocuments', () => ({
     uploadedAt: '2026-02-01T10:00:00Z',
     verifiedAt: null,
     rejectionReason: null,
+    supersedesDocumentId: null,
   }),
 }))
 

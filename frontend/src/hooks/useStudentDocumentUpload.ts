@@ -30,7 +30,8 @@ export interface UseStudentDocumentUploadResult {
 }
 
 /**
- * Upload a document against a checklist item (E27; Journey J20).
+ * Upload a document against a checklist item (E27; Journey J20; E31
+ * / Journey J24 re-upload support added in issue #188).
  *
  * Mirrors the conventions used by the other resource hooks in this
  * codebase (``useCreateApplication`` for the success-failure pattern,
@@ -45,10 +46,23 @@ export interface UseStudentDocumentUploadResult {
  * stale upload can never overwrite the error state of a fresher one
  * (Requirements §8: no race-induced UI confusion around document
  * state).
+ *
+ * When ``supersedesDocumentId`` is supplied, the hook forwards it to
+ * the backend's ``POST /applications/{application_id}/documents``
+ * ``supersedes_document_id`` form field so the new row's
+ * ``supersedes_id`` FK points at the rejected predecessor (E31 /
+ * Journey J24 / sibling backend ticket #187). The rejected row
+ * itself is never mutated by the upload endpoint.
  */
 export function useStudentDocumentUpload(params: {
   applicationId: number
   checklistItemTemplateId: number | null
+  /**
+   * Optional id of a rejected :class:`StudentDocument` this upload
+   * replaces (E31; Journey J24). Pass ``null`` (the default) for
+   * initial uploads.
+   */
+  supersedesDocumentId?: number | null
 }): UseStudentDocumentUploadResult {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +78,7 @@ export function useStudentDocumentUpload(params: {
           applicationId: params.applicationId,
           file,
           checklistItemTemplateId: params.checklistItemTemplateId,
+          supersedesDocumentId: params.supersedesDocumentId,
         })
         if (token !== requestTokenRef.current) {
           // A newer upload has started; drop this stale success on the
@@ -91,7 +106,11 @@ export function useStudentDocumentUpload(params: {
         }
       }
     },
-    [params.applicationId, params.checklistItemTemplateId],
+    [
+      params.applicationId,
+      params.checklistItemTemplateId,
+      params.supersedesDocumentId,
+    ],
   )
 
   const clearError = useCallback(() => {

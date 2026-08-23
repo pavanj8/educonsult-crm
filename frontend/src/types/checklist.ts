@@ -52,6 +52,13 @@ export interface ChecklistUpload {
   uploadedAt: string
   verifiedAt: string | null
   rejectionReason: string | null
+  /**
+   * Self-FK to the previously-rejected upload this row replaced
+   * (E31; Journey J24). ``null`` on every initial upload; populated
+   * on the re-upload path so the checklist view can show a
+   * "re-uploaded" hint and the audit-trail link in future iterations.
+   */
+  supersedesDocumentId: number | null
 }
 
 /**
