@@ -73,6 +73,7 @@ def test_student_document_model_has_required_columns():
         "verified_at",
         "rejection_reason",
         "approval_comment",
+        "supersedes_id",
         "created_at",
         "updated_at",
     }

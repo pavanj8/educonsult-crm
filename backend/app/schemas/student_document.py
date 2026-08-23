@@ -1,8 +1,10 @@
-"""Pydantic schemas for student document endpoints (E27; Journey J20).
+"""Pydantic schemas for student document endpoints (E27; Journey J20;
+E31 / Journey J24 ``supersedes_id`` field added in issue #187).
 
 The E27 student-document upload API exposes a single endpoint
 (``POST /applications/{application_id}/documents``) whose request is a
-multipart form (``file`` + optional ``checklist_item_template_id``) and
+multipart form (``file`` + optional ``checklist_item_template_id`` +
+optional ``supersedes_document_id`` for the E31 re-upload flow) and
 whose response is a :class:`StudentDocumentUploadResponse` carrying
 the persisted :class:`StudentDocument` row's metadata.
 
@@ -27,6 +29,11 @@ class StudentDocumentUploadResponse(BaseModel):
     round-trip. ``storage_path`` is the object key on the S3-compatible
     store; it is server-internal and is not meant for client display —
     a future download/serve endpoint will turn it into a presigned URL.
+
+    ``supersedes_id`` is the self-FK to the previously-rejected
+    :class:`StudentDocument` this row replaced (E31; Journey J24;
+    issue #187). ``None`` on every initial upload; populated only on
+    the re-upload path.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -44,6 +51,7 @@ class StudentDocumentUploadResponse(BaseModel):
     uploaded_at: datetime
     verified_at: Optional[datetime]
     rejection_reason: Optional[str]
+    supersedes_id: Optional[int]
     created_at: datetime
     updated_at: datetime
 
@@ -56,6 +64,9 @@ class StudentDocumentUploadResponse(BaseModel):
 # reference the same constants in its OpenAPI examples and tests.
 FILE_FORM_FIELD = "file"
 CHECKLIST_ITEM_TEMPLATE_ID_FORM_FIELD = "checklist_item_template_id"
+# E31 / Journey J24 (issue #187): optional id of the rejected
+# StudentDocument this upload replaces. Omitted for initial uploads.
+SUPERSEDES_DOCUMENT_ID_FORM_FIELD = "supersedes_document_id"
 
 # ``checklist_item_template_id`` is optional (ad-hoc uploads with no
 # checklist template are still persisted with the FK set to NULL). When
@@ -74,5 +85,6 @@ __all__ = [
     "CHECKLIST_ITEM_TEMPLATE_ID_FIELD",
     "CHECKLIST_ITEM_TEMPLATE_ID_FORM_FIELD",
     "FILE_FORM_FIELD",
+    "SUPERSEDES_DOCUMENT_ID_FORM_FIELD",
     "StudentDocumentUploadResponse",
 ]

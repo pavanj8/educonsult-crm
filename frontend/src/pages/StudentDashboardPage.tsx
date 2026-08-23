@@ -10,6 +10,7 @@ import {
 import { useApplications } from '../hooks/useApplications'
 import { useCreateApplication } from '../hooks/useCreateApplication'
 import ApplicationRow from '../components/documents/ApplicationRow'
+import UpcomingMeetings from '../components/meetings/UpcomingMeetings'
 
 function formatStageLabel(stage: string): string {
   return stage
@@ -139,6 +140,17 @@ export default function StudentDashboardPage() {
           </div>
         )}
       </section>
+
+      {/*
+        The UpcomingMeetings widget renders its own <section> with an
+        internally-generated heading id (via useId()) so the section
+        landmark + accessible name are owned by the widget itself.
+        Wrapping it in another labelled section here would reference a
+        phantom id and leave the section unlabeled for screen readers.
+      */}
+      <div className="student-dashboard__section">
+        <UpcomingMeetings />
+      </div>
 
       <section
         className="student-dashboard__section"

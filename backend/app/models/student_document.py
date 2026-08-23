@@ -1,5 +1,6 @@
 """Student document upload model (E27 schema + E26 read model; issue #174;
-E29 / J22 ``approval_comment`` column added in issue #181).
+E29 / J22 ``approval_comment`` column added in issue #181;
+E31 / J24 ``supersedes_id`` column added in issue #187).
 
 This module owns the *upload status* half of the E26
 ``GET /applications/{application_id}/checklist`` endpoint ("merges
@@ -10,7 +11,8 @@ land in sibling tickets #175 / #176; here we only need the persisted
 shape so the read API can report each upload's status and the upload
 API can persist new rows against a checklist item.
 
-Design (Requirements §5; Journey J19–J24; Epic E27; Epic E26; Epic E29):
+Design (Requirements §5; Journey J19–J24; Epic E27; Epic E26; Epic E29;
+Epic E31):
 
 * Tenant-scoped (ADR-0001: every table has ``tenant_id``). Inherited
   from :class:`TenantScopedBase`.
@@ -46,6 +48,17 @@ Design (Requirements §5; Journey J19–J24; Epic E27; Epic E26; Epic E29):
   from ``rejection_reason`` so the two audit trails remain distinct
   and the model keeps an obvious 1:1 mapping between status value and
   comment column.
+* ``supersedes_id`` is a nullable self-FK to another
+  :class:`StudentDocument` row (ON DELETE SET NULL). Non-NULL only
+  when this upload was created as a *re-upload* of a previously
+  rejected document (Journey J24 / Epic E31 / issue #187). The link
+  is what turns the re-upload from "yet another pending row" into a
+  versioned replacement with a preserved audit trail (Requirements
+  §8 — audit log on key actions such as document approvals); the
+  superseded row stays in the table with its original
+  ``status='rejected'`` so the verifier's earlier decision and
+  ``rejection_reason`` are not lost. The column is nullable because
+  initial uploads have no predecessor.
 """
 
 from datetime import datetime
@@ -75,7 +88,12 @@ class StudentDocumentStatus(StrEnum):
 
 
 class StudentDocument(TenantScopedBase):
-    """A student's uploaded document (E27; E26 read model; Journey J20)."""
+    """A student's uploaded document (E27; E26 read model; Journey J20).
+
+    The ``supersedes_id`` column (added by issue #187 / E31) links a
+    re-upload to the rejected :class:`StudentDocument` it replaces;
+    see the module docstring for the full design.
+    """
 
     __tablename__ = "student_documents"
 
@@ -127,3 +145,13 @@ class StudentDocument(TenantScopedBase):
     )
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     approval_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # E31 / issue #187: nullable self-FK for re-upload audit trail.
+    # ON DELETE SET NULL so deleting a previously-rejected row does not
+    # cascade-delete the re-upload that replaced it (an admin action on
+    # one row must not destroy the next version's audit chain).
+    supersedes_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("student_documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
