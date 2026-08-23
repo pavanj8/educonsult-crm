@@ -6,16 +6,18 @@ import type {
 } from '../types/meeting'
 
 /**
- * Meetings client for the counselor-side scheduling UI (E22; Journey J15;
- * frontend ticket #161). Mirrors the #160 backend endpoints:
+ * Meetings client. Mirrors the backend endpoints:
  *
- *   * ``POST /applications/{id}/meetings``  - schedule a new meeting
- *   * ``GET  /applications/{id}/meetings``  - list meetings for an application
- *   * ``PATCH /meetings/{id}``             - update an existing meeting
- *
- * These endpoints are currently being merged under ticket #160; the
- * frontend uses the published contract (model + migration in #159) so
- * the UI lands ready to call the API the moment #160 merges.
+ *   * ``POST /applications/{id}/meetings``  - schedule a new meeting (E22; J15)
+ *   * ``GET  /applications/{id}/meetings``  - list meetings for an application (E22; J15)
+ *   * ``PATCH /meetings/{id}``             - update an existing meeting (E22; J15)
+ *   * ``GET  /me/meetings``                 - list meetings for the authenticated
+ *                                            student (E23; J16; ticket #162).
+ *                                            The backend scopes the result to
+ *                                            the authenticated student's
+ *                                            ``student_id``; the widget itself
+ *                                            filters to upcoming (``scheduled_at
+ *                                            >= now``) client-side.
  */
 
 export async function listMeetingsForApplication(
@@ -56,4 +58,15 @@ export async function updateMeeting(
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
+}
+
+/**
+ * List the meetings that belong to the authenticated student (E23;
+ * Journey J16; frontend ticket #162). The backend is expected to scope
+ * the result to the caller's ``student_id``; this client does not
+ * accept an application id because the student dashboard surfaces
+ * meetings across all of the student's applications.
+ */
+export async function listMyMeetings(): Promise<Meeting[]> {
+  return apiFetch<Meeting[]>(`/me/meetings`)
 }
