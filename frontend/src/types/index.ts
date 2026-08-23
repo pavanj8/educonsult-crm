@@ -6,6 +6,11 @@ export type {
   UpdateMeetingRequest,
 } from './meeting'
 export type {
+  Note,
+  NoteCreateRequest,
+  NoteUpdateRequest,
+} from './note'
+export type {
   ChecklistItem,
   ChecklistItemTemplate,
   ChecklistItemTemplateCreateRequest,
