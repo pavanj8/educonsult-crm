@@ -61,27 +61,16 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.main import app
-from app.models.tenant import Tenant
 from app.rbac.roles import Role
 from tests.applications.helpers import seed_application
 from tests.branches.helpers import seed_branch
-from tests.counseling.note_helpers import seed_note
+from tests.counseling.note_helpers import create_tenant, seed_note
 from tests.factories.users import make_authenticated_user, make_db_user
 
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
-
-
-def _create_tenant(
-    db_session: Session, *, name: str = "EduConsult Test", slug: str = "educonsult"
-) -> Tenant:
-    tenant = Tenant(name=name, slug=slug)
-    db_session.add(tenant)
-    db_session.commit()
-    db_session.refresh(tenant)
-    return tenant
 
 
 def _auth_for(user: Any) -> Any:
@@ -133,7 +122,7 @@ def test_counselor_creates_note_for_assigned_student(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -170,7 +159,7 @@ def test_counselor_creates_note_with_application_anchor(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -204,7 +193,7 @@ def test_branch_manager_creates_note_in_branch(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     manager = make_db_user(
         db_session, Role.BRANCH_MANAGER, tenant_id=tenant.id, branch_id=branch.id
@@ -239,7 +228,7 @@ def test_consultancy_owner_creates_note(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     owner = make_db_user(
         db_session, Role.CONSULTANCY_OWNER, tenant_id=tenant.id, branch_id=None
@@ -274,7 +263,7 @@ def test_super_admin_creates_note_for_any_tenant(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     super_admin = make_db_user(
         db_session, Role.SUPER_ADMIN, tenant_id=None, branch_id=None
@@ -315,8 +304,8 @@ def test_post_returns_404_for_cross_tenant_student(
     override_authenticated_user,
 ) -> None:
     """A counselor in tenant A cannot anchor a note to a student in tenant B."""
-    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
-    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    tenant_a = create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = create_tenant(db_session, name="Tenant B", slug="tenant-b")
     branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
     counselor_a = make_db_user(
@@ -352,7 +341,7 @@ def test_post_returns_404_for_missing_student(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -374,7 +363,7 @@ def test_post_returns_404_when_student_id_references_non_student_user(
     override_authenticated_user,
 ) -> None:
     """Probing a staff id must NOT reveal the user's role -- collapse to 404."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -399,7 +388,7 @@ def test_counselor_cannot_post_for_student_in_other_branch(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     counselor_a = make_db_user(
@@ -434,7 +423,7 @@ def test_branch_manager_cannot_post_for_student_in_other_branch(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     manager_a = make_db_user(
@@ -470,7 +459,7 @@ def test_counselor_cannot_post_for_unassigned_student(
     override_authenticated_user,
 ) -> None:
     """A counselor can only post notes for students they are the assigned counselor on."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -509,7 +498,7 @@ def test_post_returns_422_for_student_mismatch_with_application(
     override_authenticated_user,
 ) -> None:
     """A different ``student_id`` than the application's student surfaces as 422."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -546,7 +535,7 @@ def test_post_returns_404_for_missing_application(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -583,7 +572,7 @@ def test_post_rejects_blank_body(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -614,7 +603,7 @@ def test_post_rejects_zero_student_id(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -635,7 +624,7 @@ def test_post_rejects_zero_application_id(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -666,7 +655,7 @@ def test_post_rejects_missing_student_id(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -705,7 +694,7 @@ def test_post_rejects_roles_without_note_create_permission(
     """Roles without ``NOTE_CREATE`` are rejected (403). Verifier and
     receptionist have NOTE_READ (read-only visibility) but cannot author
     notes per Requirements §5."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     actor = make_db_user(
         db_session, actor_role, tenant_id=tenant.id, branch_id=branch.id
@@ -742,7 +731,7 @@ def test_post_returns_503_when_commit_fails(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -816,7 +805,7 @@ def test_counselor_list_returns_only_notes_for_assigned_students(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -874,7 +863,7 @@ def test_branch_manager_list_returns_branch_scoped_notes(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     manager_a = make_db_user(
@@ -922,7 +911,7 @@ def test_consultancy_owner_list_returns_all_notes_in_tenant(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     owner = make_db_user(
@@ -969,8 +958,8 @@ def test_super_admin_list_returns_all_notes(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
-    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    tenant_a = create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = create_tenant(db_session, name="Tenant B", slug="tenant-b")
     branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
     super_admin = make_db_user(
@@ -1013,7 +1002,7 @@ def test_document_verifier_can_list_notes_tenant_wide(
 ) -> None:
     """Document verifier has NOTE_READ per Requirements §5 — they see all
     notes in their tenant (across branches) for context during verification."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     verifier = make_db_user(
@@ -1061,7 +1050,7 @@ def test_receptionist_can_list_notes_tenant_wide(
     override_authenticated_user,
 ) -> None:
     """Receptionist has NOTE_READ for front-desk caller-context visibility."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     receptionist = make_db_user(
@@ -1109,7 +1098,7 @@ def test_student_cannot_list_notes(
     override_authenticated_user,
 ) -> None:
     """A student must NEVER be able to list notes — Requirements §5 'hidden from student'."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1139,8 +1128,8 @@ def test_list_excludes_cross_tenant_notes(
     override_authenticated_user,
 ) -> None:
     """A counselor in tenant A does not see notes from tenant B."""
-    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
-    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    tenant_a = create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = create_tenant(db_session, name="Tenant B", slug="tenant-b")
     branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
     counselor_a = make_db_user(
@@ -1174,7 +1163,7 @@ def test_list_filters_by_student_id(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     owner = make_db_user(
         db_session, Role.CONSULTANCY_OWNER, tenant_id=tenant.id, branch_id=None
@@ -1217,7 +1206,7 @@ def test_list_filters_by_application_id(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     owner = make_db_user(
         db_session, Role.CONSULTANCY_OWNER, tenant_id=tenant.id, branch_id=None
@@ -1274,7 +1263,7 @@ def test_branch_manager_list_rejects_cross_branch_student_id_probe(
     override_authenticated_user,
 ) -> None:
     """Branch manager must NOT probe a student in another branch via the list endpoint."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     manager_a = make_db_user(
@@ -1308,8 +1297,8 @@ def test_branch_manager_list_rejects_cross_tenant_student_id_probe(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
-    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    tenant_a = create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = create_tenant(db_session, name="Tenant B", slug="tenant-b")
     branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
     manager_a = make_db_user(
@@ -1333,7 +1322,7 @@ def test_list_rejects_zero_student_id(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1353,7 +1342,7 @@ def test_list_rejects_zero_application_id(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1384,7 +1373,7 @@ def test_list_returns_newest_first(
     """Notes thread reads top-to-bottom in the UI; the API returns DESC."""
     from datetime import datetime, timedelta, timezone
 
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     owner = make_db_user(
         db_session, Role.CONSULTANCY_OWNER, tenant_id=tenant.id, branch_id=None
@@ -1431,7 +1420,7 @@ def test_get_note_happy_path(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1468,7 +1457,7 @@ def test_get_note_returns_404_for_missing(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1488,8 +1477,8 @@ def test_get_note_returns_404_for_cross_tenant(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
-    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    tenant_a = create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = create_tenant(db_session, name="Tenant B", slug="tenant-b")
     branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
     counselor_a = make_db_user(
@@ -1522,7 +1511,7 @@ def test_get_note_returns_403_for_cross_branch(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     manager_a = make_db_user(
@@ -1555,7 +1544,7 @@ def test_get_note_returns_403_for_counselor_not_assigned(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1596,7 +1585,7 @@ def test_student_cannot_get_note(
     override_authenticated_user,
 ) -> None:
     """A student must NEVER be able to read notes — Requirements §5 'hidden from student'."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1630,7 +1619,7 @@ def test_counselor_updates_own_note(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1671,7 +1660,7 @@ def test_branch_manager_updates_own_note(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     manager = make_db_user(
         db_session, Role.BRANCH_MANAGER, tenant_id=tenant.id, branch_id=branch.id
@@ -1713,7 +1702,7 @@ def test_owner_cannot_update_counselor_note(
     override_authenticated_user,
 ) -> None:
     """Even consultancy owners cannot edit another author's note — author-only enforcement."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     owner = make_db_user(
         db_session, Role.CONSULTANCY_OWNER, tenant_id=tenant.id, branch_id=None
@@ -1754,7 +1743,7 @@ def test_peer_counselor_cannot_update_others_note(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1787,7 +1776,7 @@ def test_patch_returns_404_for_missing_note(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1808,8 +1797,8 @@ def test_patch_returns_404_for_cross_tenant(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
-    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    tenant_a = create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = create_tenant(db_session, name="Tenant B", slug="tenant-b")
     branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
     counselor_a = make_db_user(
@@ -1843,7 +1832,7 @@ def test_branch_manager_cannot_patch_note_in_other_branch(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     manager_a = make_db_user(
@@ -1889,7 +1878,7 @@ def test_patch_rejects_roles_without_note_update_permission(
 ) -> None:
     """Roles without ``NOTE_UPDATE`` are rejected (403). Verifier and
     receptionist can read notes but cannot edit them."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     actor = make_db_user(
         db_session, actor_role, tenant_id=tenant.id, branch_id=branch.id
@@ -1901,7 +1890,7 @@ def test_patch_rejects_roles_without_note_update_permission(
         db_session,
         tenant_id=tenant.id,
         student_id=student.id,
-        author_user_id=actor.id if actor_role != Role.STUDENT else actor.id,
+        author_user_id=actor.id,
     )
     override_authenticated_user(_auth_for(actor))
 
@@ -1919,7 +1908,7 @@ def test_patch_rejects_blank_body(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -1962,7 +1951,7 @@ def test_counselor_deletes_own_note(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -2004,7 +1993,7 @@ def test_owner_cannot_delete_counselor_note(
     override_authenticated_user,
 ) -> None:
     """Even consultancy owners cannot delete another author's note."""
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     owner = make_db_user(
         db_session, Role.CONSULTANCY_OWNER, tenant_id=tenant.id, branch_id=None
@@ -2037,7 +2026,7 @@ def test_branch_manager_cannot_delete_note_in_other_branch(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch_a = seed_branch(db_session, tenant_id=tenant.id, name="A", city="Mumbai")
     branch_b = seed_branch(db_session, tenant_id=tenant.id, name="B", city="Pune")
     manager_a = make_db_user(
@@ -2080,7 +2069,7 @@ def test_delete_rejects_roles_without_note_delete_permission(
     override_authenticated_user,
     actor_role: Role,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     actor = make_db_user(
         db_session, actor_role, tenant_id=tenant.id, branch_id=branch.id
@@ -2109,7 +2098,7 @@ def test_delete_returns_404_for_missing_note(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -2129,8 +2118,8 @@ def test_delete_returns_404_for_cross_tenant(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant_a = _create_tenant(db_session, name="Tenant A", slug="tenant-a")
-    tenant_b = _create_tenant(db_session, name="Tenant B", slug="tenant-b")
+    tenant_a = create_tenant(db_session, name="Tenant A", slug="tenant-a")
+    tenant_b = create_tenant(db_session, name="Tenant B", slug="tenant-b")
     branch_a = seed_branch(db_session, tenant_id=tenant_a.id)
     branch_b = seed_branch(db_session, tenant_id=tenant_b.id)
     counselor_a = make_db_user(
@@ -2171,7 +2160,7 @@ def test_delete_returns_503_when_commit_fails(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id
@@ -2253,7 +2242,7 @@ def test_get_note_returns_503_when_db_fails(
     db_session: Session,
     override_authenticated_user,
 ) -> None:
-    tenant = _create_tenant(db_session)
+    tenant = create_tenant(db_session)
     branch = seed_branch(db_session, tenant_id=tenant.id)
     counselor = make_db_user(
         db_session, Role.COUNSELOR, tenant_id=tenant.id, branch_id=branch.id

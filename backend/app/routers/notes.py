@@ -90,6 +90,19 @@ _AUTHOR_ONLY_DELETE_DETAIL = "Only the note's author may delete it"
 # frozenset convention used in ``app/db/branch_scope.py``. Keep this list in
 # lock-step with ``_BRANCH_SCOPED_ROLES`` in tests/db/test_access_denial_matrix.py
 # and with any future role that needs branch-scoped note visibility.
+#
+# The complementary set is ``_CROSS_BRANCH_ROLES`` in ``app/db/branch_scope.py``
+# (super admin + consultancy owner are platform/tenant-wide). Every other role
+# (counselor, branch manager, document verifier, receptionist, visa processor,
+# student) is intended to be either branch-scoped on /notes or excluded from
+# the endpoint entirely by the ``NOTE_READ`` permission grant — so this
+# frozenset currently lists only the two roles that are scoped at the
+# branch level here, while verifier/receptionist/visa_processor are NOT
+# scoped at the branch level on /notes because they are tenant-wide
+# read-only staff (mirrors how meetings.py handles them). Adding a new
+# branch-scoped role on /notes requires updating both this frozenset and
+# the matching set in ``app/db/branch_scope.py`` so the role policy
+# stays canonical (software architect finding on iteration #1).
 _BRANCH_SCOPED_NOTE_ROLES = frozenset({Role.BRANCH_MANAGER, Role.COUNSELOR})
 
 
@@ -183,7 +196,11 @@ def _load_application(
 
 
 def _enforce_branch_scope_on_student(
-    db: Session, user: AuthenticatedUser, student: User
+    db: Session,
+    user: AuthenticatedUser,
+    student: User,
+    *,
+    enforce_assigned: bool = True,
 ) -> None:
     """Branch-scope a single student for branch-scoped note roles.
 
@@ -199,10 +216,25 @@ def _enforce_branch_scope_on_student(
     Counselors are further restricted to students they are currently
     the assigned counselor on (i.e. there exists at least one
     ``Application`` row for the student in the caller's branch with
-    ``assigned_counselor_id == caller.id``). This matches the
-    counselor's "assigned-to-me" application queue shape (J14) and is
-    the same authorization model the meetings router uses for
-    counselors in E22.
+    ``assigned_counselor_id == caller.id``). The ``enforce_assigned``
+    flag (default ``True``) lets callers that already know the
+    caller's role is branch manager (e.g. the list endpoint's branch
+    manager probe path) skip the counselor-specific check; passing
+    ``enforce_assigned=False`` is a no-op for non-counselor callers
+    because they have no assigned-counselor constraint to apply. This
+    matches the counselor's "assigned-to-me" application queue shape
+    (J14) and is the same authorization model the meetings router
+    uses for counselors in E22.
+
+    The note ``Note`` schema has no ``branch_id`` column (notes are
+    student-anchored), so the canonical ``apply_branch_scope`` helper
+    in ``app/db/branch_scope.py`` cannot apply directly — that helper
+    expects ``model.branch_id`` on the queried model. Instead, branch
+    scoping for ``Note`` is enforced via a JOIN through ``User`` on
+    ``Note.student_id`` (see :func:`_scoped_notes_query`) and on the
+    per-note path via this helper, which checks the student's
+    ``branch_id``. Keep both code paths in sync if branch-scoping
+    rules ever change (software architect finding on iteration #1).
     """
     if user.role not in _BRANCH_SCOPED_NOTE_ROLES:
         return
@@ -213,7 +245,7 @@ def _enforce_branch_scope_on_student(
             detail=_BRANCH_ACCESS_DENIED_DETAIL,
         )
 
-    if user.role == Role.COUNSELOR:
+    if enforce_assigned and user.role == Role.COUNSELOR:
         # Counselors must be the assigned counselor on at least one
         # of the student's applications in this branch. We check via
         # the SQLAlchemy ``exists()`` subquery against ``Application``
@@ -472,20 +504,20 @@ def list_notes(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=_BRANCH_ACCESS_DENIED_DETAIL,
                 )
-            if current_user.role == Role.COUNSELOR:
-                _enforce_branch_scope_on_student(db, current_user, student)
-            else:
-                # Branch manager: enforce the student's branch match
-                # without running the counselor-specific assigned-counselor
-                # check.
-                if (
-                    current_user.branch_id is None
-                    or student.branch_id != current_user.branch_id
-                ):
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=_BRANCH_ACCESS_DENIED_DETAIL,
-                    )
+            # Reuse the same helper as the per-note path so the
+            # branch-match (and counselor-assigned-to-student) rules
+            # stay in one place. Branch managers do not have an
+            # assigned-counselor constraint, so we explicitly disable
+            # the counselor-specific check for that role
+            # (``enforce_assigned=False`` is a no-op for non-counselor
+            # callers — only counselors have the assigned-to-student
+            # constraint to apply).
+            _enforce_branch_scope_on_student(
+                db,
+                current_user,
+                student,
+                enforce_assigned=(current_user.role == Role.COUNSELOR),
+            )
 
         if student_id is not None:
             statement = statement.where(Note.student_id == student_id)

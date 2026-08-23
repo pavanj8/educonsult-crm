@@ -12,6 +12,15 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Cap the note body so a single runaway entry cannot bloat the row
+# (senior developer / UX architect finding on iteration #3). The value
+# is intentionally generous — counselors may paste long verbatim
+# transcripts or pasted-up document excerpts — but bounded so the
+# notes table cannot be abused as a generic blob store. Tightening or
+# loosening this is a one-line schema change; downstream UIs (E24
+# frontend ticket #166) hard-cap their ``<textarea>`` to match.
+NOTE_BODY_MAX_LENGTH = 10_000
+
 
 class NoteCreate(BaseModel):
     """Payload for ``POST /notes`` (Journey J17).
@@ -24,14 +33,14 @@ class NoteCreate(BaseModel):
     detail view in #166) or record a general counseling note at the
     student level (e.g. before an application exists).
 
-    ``body`` is the free-text content. It is required and may not be
-    blank; a blank note is meaningless and would let an actor stuff
-    the thread with empty rows.
+    ``body`` is the free-text content. It is required, may not be
+    blank, and is bounded by ``NOTE_BODY_MAX_LENGTH`` so a single
+    entry cannot bloat the row.
     """
 
     student_id: int = Field(gt=0)
     application_id: int | None = Field(default=None, gt=0)
-    body: str = Field(min_length=1)
+    body: str = Field(min_length=1, max_length=NOTE_BODY_MAX_LENGTH)
 
 
 class NoteUpdate(BaseModel):
@@ -39,10 +48,11 @@ class NoteUpdate(BaseModel):
 
     Only ``body`` is mutable: the student/application anchors and the
     authorship are intrinsic to the note and cannot be changed after
-    creation (Requirements §8: audit trail integrity).
+    creation (Requirements §8: audit trail integrity). The same
+    ``NOTE_BODY_MAX_LENGTH`` cap as create applies.
     """
 
-    body: str = Field(min_length=1)
+    body: str = Field(min_length=1, max_length=NOTE_BODY_MAX_LENGTH)
 
 
 class NoteResponse(BaseModel):
