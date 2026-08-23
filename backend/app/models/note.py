@@ -1,10 +1,13 @@
-"""Internal counseling note model (E24 schema; Journey J17).
+"""Internal counseling note model (E24; Journey J17).
 
 A staff-only comment thread row attached to a student (and optionally
 to one of the student's applications). Authored by a staff user and
-hidden from the student — the read/write API and any student-facing
-visibility checks land in the sibling E24 task #165; here we only own
-the persisted shape.
+hidden from the student — the read/write API in this ticket enforces
+that the author is a staff role (counselor / verifier / branch manager /
+owner / super admin) and that the student role is blocked at every
+endpoint. The model itself does not encode the staff/student split
+because it would couple the schema to RBAC; the constraint lives in
+``app/rbac/permissions.py`` + ``app/routers/notes.py``.
 
 Design (Requirements §5 "Internal notes: Staff-only comment thread
 per student (counselor/verifier/branch manager visible), hidden from
@@ -25,11 +28,12 @@ E24; ADR-0001):
   recorded at the student level (e.g. a general counseling note that
   pre-dates an application).
 * ``author_user_id`` is the FK to ``users`` (the staff who wrote the
-  note: counselor / verifier / branch manager per Requirements §5).
-  Required for audit (Requirements §8: "Audit log: basic trail on
-  key actions"). The staff/student separation is enforced at the API
-  layer in #165; the model itself does not encode that constraint
-  because it would couple the schema to RBAC.
+  note: counselor / verifier / branch manager / owner / super admin
+  per Requirements §5 + §3). Required for audit (Requirements §8:
+  "Audit log: basic trail on key actions"). The staff/student
+  separation is enforced at the API layer in #165; the model itself
+  does not encode that constraint because it would couple the schema
+  to RBAC.
 * ``body`` is the free-text content of the note (Requirements §5:
   internal comment). ``Text`` with no length cap to allow long-form
   counseling notes.

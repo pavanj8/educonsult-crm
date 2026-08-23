@@ -52,6 +52,8 @@ class Permission(StrEnum):
     MEETING_READ = "meeting:read"
     NOTE_CREATE = "note:create"
     NOTE_READ = "note:read"
+    NOTE_UPDATE = "note:update"
+    NOTE_DELETE = "note:delete"
 
     # Visa processing (J26–J28)
     VISA_MANAGE = "visa:manage"
@@ -84,6 +86,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.BILLING_PLATFORM,
             Permission.ANALYTICS_PLATFORM,
             Permission.NOTIFICATION_READ,
+            # NOTE_CREATE / NOTE_READ so Super Admins can author
+            # platform-level audit notes on any tenant's student.
+            Permission.NOTE_READ,
+            Permission.NOTE_CREATE,
+            Permission.NOTE_UPDATE,
+            Permission.NOTE_DELETE,
         }
     ),
     Role.CONSULTANCY_OWNER: frozenset(
@@ -120,6 +128,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.MEETING_READ,
             Permission.NOTE_CREATE,
             Permission.NOTE_READ,
+            Permission.NOTE_UPDATE,
+            Permission.NOTE_DELETE,
             Permission.VISA_MANAGE,
             Permission.LOAN_UPDATE,
             Permission.ANALYTICS_TENANT,
@@ -149,6 +159,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.MEETING_READ,
             Permission.NOTE_CREATE,
             Permission.NOTE_READ,
+            Permission.NOTE_UPDATE,
+            Permission.NOTE_DELETE,
             Permission.LOAN_UPDATE,
             Permission.ANALYTICS_BRANCH,
             Permission.REPORT_EXPORT,
@@ -165,6 +177,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.MEETING_READ,
             Permission.NOTE_CREATE,
             Permission.NOTE_READ,
+            Permission.NOTE_UPDATE,
+            Permission.NOTE_DELETE,
             Permission.NOTIFICATION_READ,
         }
     ),
@@ -172,6 +186,15 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.DOCUMENT_READ,
             Permission.DOCUMENT_VERIFY,
+            # NOTE_READ per Requirements §5: "Internal notes: Staff-only
+            # comment thread per student (counselor/verifier/branch
+            # manager visible), hidden from student". The verifier is
+            # explicitly named as a visible-staff role; they need
+            # context (counseling notes) when approving/rejecting
+            # documents. NOTE_CREATE/UPDATE/DELETE are intentionally
+            # NOT granted -- the verifier verifies documents, they do
+            # not author internal counseling notes.
+            Permission.NOTE_READ,
             Permission.NOTIFICATION_READ,
         }
     ),
@@ -188,6 +211,16 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.STUDENT_READ,
             Permission.APPLICATION_READ,
             Permission.APPLICATION_REASSIGN_COUNSELOR,
+            # NOTE_READ is intentionally NOT granted. Requirements §5
+            # names the staff-only note thread visibility set as
+            # "counselor/verifier/branch manager visible, hidden from
+            # student"; the receptionist is not in that set, so they
+            # must NOT see internal counseling notes (E24 / J17
+            # black-box finding on iteration #4). If a future ticket
+            # wants to grant receptionist front-desk caller-context
+            # visibility, it should add a narrower permission
+            # (e.g. ``NOTE_READ_FRONTDESK``) and update the
+            # requirements/journey contract first.
             Permission.NOTIFICATION_READ,
         }
     ),

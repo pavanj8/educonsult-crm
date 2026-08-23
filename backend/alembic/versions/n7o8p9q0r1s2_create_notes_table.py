@@ -8,9 +8,7 @@ Internal counseling notes for E24 (Journey J17; Requirements §5:
 "Internal notes: Staff-only comment thread per student
 (counselor/verifier/branch manager visible), hidden from student").
 
-This migration only owns the persisted shape. The CRUD API and the
-student-isolation visibility check land in the sibling E24 task
-#165; this migration makes the table, columns, and indexes available
+this migration makes the table, columns, and indexes available
 so the API can be wired up against it.
 
 * ``notes`` -- one row per staff-authored note attached to a
