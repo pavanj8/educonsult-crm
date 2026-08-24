@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth.password import hash_password
 from app.db.database import get_db
@@ -162,6 +162,23 @@ def list_tenants(
     """List all consultancy tenants (super admin only)."""
     try:
         return db.query(Tenant).order_by(Tenant.id).all()
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+
+@router.get("/plans", response_model=list[PlanResponse])
+def list_plans(
+    _current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.BILLING_PLATFORM))
+    ],
+    db: Session = Depends(get_db),
+) -> list[Plan]:
+    """List platform plans in seed order, including retired tiers."""
+    try:
+        return db.query(Plan).order_by(Plan.id).all()
     except OperationalError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -464,36 +481,6 @@ _PLAN_NOT_FOUND_DETAIL = "Plan not found"
 _PLAN_RETIRED_DETAIL = "Plan is no longer active"
 
 
-@router.get("/plans", response_model=list[PlanResponse])
-def list_plans(
-    _current_user: Annotated[
-        AuthenticatedUser, Depends(require_permission(Permission.BILLING_PLATFORM))
-    ],
-    db: Session = Depends(get_db),
-) -> list[Plan]:
-    """List the platform-level subscription plan catalog (E9; Journey J2).
-
-    Returns every plan in the catalog ordered by ``id`` so the response
-    is stable across calls. The endpoint is gated by ``billing:platform``
-    (super admin only) -- the plan catalog is platform-level reference
-    data, not a per-tenant resource, and the cross-tenant probe surface
-    it opens (a list of tier names + limits) is meant for the platform
-    admin UI in E47 / J40, not for individual tenant owners.
-
-    The list intentionally includes retired (``is_active=False``) plans
-    so a platform admin can still see a tier that has been retired out
-    of the active-picker -- the picker (a future UI in E45 / J38) is the
-    one that filters on ``is_active``.
-    """
-    try:
-        return db.query(Plan).order_by(Plan.id).all()
-    except OperationalError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_DB_UNAVAILABLE_DETAIL,
-        ) from None
-
-
 def _resolve_plan_for_assignment(plan_code: str, db: Session) -> Plan:
     """Resolve a ``plan_code`` payload to a catalog row, or raise 404/409.
 
@@ -636,8 +623,14 @@ def assign_tenant_plan(
             detail=_DB_UNAVAILABLE_DETAIL,
         ) from None
 
-    db.refresh(tenant)
-    return tenant
+    db.expire_all()
+    refreshed = (
+        db.query(Tenant)
+        .options(selectinload(Tenant.plan))
+        .filter(Tenant.id == tenant.id)
+        .one()
+    )
+    return refreshed
 
 
 __all__ = ["router"]

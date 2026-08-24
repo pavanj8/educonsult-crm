@@ -106,7 +106,7 @@ class AssignPlanRequest(BaseModel):
     tolerate the case a JSON client might use.
     """
 
-    plan_code: str = Field(min_length=1, max_length=32)
+    plan_code: str = Field()
 
     @field_validator("plan_code", mode="before")
     @classmethod
@@ -118,10 +118,8 @@ class AssignPlanRequest(BaseModel):
         candidate = value.strip().lower()
         if not candidate:
             raise ValueError("plan_code must not be empty")
-        # Reject unknown codes at the schema layer so the endpoint can
-        # distinguish "caller did not pass a valid PlanTier" (422) from
-        # "the plan exists but is retired" (409) or "the tenant does
-        # not exist" (404).
+        if len(candidate) > 32:
+            raise ValueError("plan_code must be one of: enterprise, growth, starter")
         valid_codes = {member.value for member in PlanTier}
         if candidate not in valid_codes:
             raise ValueError(
@@ -141,11 +139,9 @@ class TenantResponse(BaseModel):
     # E10 task #109: ``currency`` is NOT NULL on the row (server default
     # ``"INR"``) and is therefore always populated on the response.
     currency: str
-    # E9 task #106: nested plan payload (None when no plan has been
-    # assigned yet). Built from the relationship lazy-load in
-    # ``app.routers.tenants`` -- the endpoint passes the freshly
-    # refreshed ``Plan`` row in via ``_plan_response_for`` so the
-    # response does not need an extra round-trip after the commit.
+    # E9 task #106: populated via the SQLAlchemy ``Tenant.plan``
+    # relationship after the assignment endpoint opts in with
+    # ``selectinload``; this keeps ordinary tenant queries unjoined.
     plan: PlanResponse | None = None
     created_at: datetime
     updated_at: datetime

@@ -56,7 +56,7 @@ class Tenant(Base):
     # after the FK change commits; this relationship is for the
     # ``from_attributes=True`` Pydantic response shape on the GET
     # endpoints.
-    plan = relationship("Plan", lazy="joined", foreign_keys=[plan_id])
+    plan = relationship("Plan", foreign_keys=[plan_id])
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
