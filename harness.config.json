@@ -23,12 +23,20 @@
     "phase": "phase-3"
   },
   "models": {
-    "dev": "MiniMax-M3",
-    "verify": "MiniMax-M3",
-    "planner": "MiniMax-M3"
+    "dev": "glm-4.6",
+    "verify": "glm-4.6",
+    "planner": "glm-4.6"
   },
   "llm": {
-    "base_url": "https://api.minimax.io/anthropic"
+    "provider": "zai",
+    "providers": {
+      "zai": {
+        "api": "anthropic",
+        "base_url": "https://api.z.ai/api/anthropic",
+        "auth_env": "ANTHROPIC_AUTH_TOKEN",
+        "auth_scheme": "bearer"
+      }
+    }
   },
   "protected_paths": ["docs/", "agents/", ".github/", ".cursor/", "scripts/"]
 }
