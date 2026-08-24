@@ -16,6 +16,7 @@ from app.models.tenant import Tenant
 from app.models.university import University
 from app.models.user import User
 from app.models.visa_detail import VisaDetail
+from app.models.visa_outcome import VisaOutcome
 
 __all__ = [
     "Application",
@@ -40,4 +41,5 @@ __all__ = [
     "University",
     "User",
     "VisaDetail",
+    "VisaOutcome",
 ]

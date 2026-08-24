@@ -20,6 +20,7 @@ from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
+from app.routers._application_lookup import get_tenant_application
 from app.schemas.application import (
     AdvanceStageRequest,
     AdvanceStageResponse,
@@ -119,42 +120,6 @@ def _validate_university_and_program(
         )
 
 
-def _get_tenant_application(
-    application_id: int,
-    current_user: AuthenticatedUser,
-    db: Session,
-) -> Application:
-    """Load an application belonging to the caller's tenant, or raise 404.
-
-    Used by the E25 advance-stage endpoint (issue #169). Mirrors the
-    tenant-scoping convention used by the E11/E12 routers so cross-tenant
-    requests surface as 404 (never 403) -- prevents tenant-id enumeration.
-
-    Note on OperationalError handling: this helper performs a single
-    ``db.get`` (read-only) and therefore never has pending mutations to
-    roll back; the bare ``raise HTTPException`` without ``db.rollback()``
-    is intentional and consistent with the read-only nature of the
-    query. The handlers below add ``db.rollback()`` before raising 503
-    because they may have pending writes.
-    """
-    try:
-        application = db.get(Application, application_id)
-    except OperationalError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_DB_UNAVAILABLE_DETAIL,
-        ) from None
-
-    if application is None or (
-        current_user.tenant_id is not None
-        and application.tenant_id != current_user.tenant_id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found",
-        )
-
-    return application
 
 
 def _enforce_branch_scope(
@@ -397,7 +362,7 @@ def advance_application_stage(
             detail="Insufficient permissions",
         )
 
-    application = _get_tenant_application(application_id, current_user, db)
+    application = get_tenant_application(application_id, current_user, db)
     _enforce_branch_scope(application, current_user)
 
     from_stage = PipelineStage(application.stage)
@@ -485,7 +450,7 @@ def mark_application_enrolled(
             detail="Insufficient permissions",
         )
 
-    application = _get_tenant_application(application_id, current_user, db)
+    application = get_tenant_application(application_id, current_user, db)
     _enforce_branch_scope(application, current_user)
 
     from_stage = PipelineStage(application.stage)
@@ -571,7 +536,7 @@ def mark_application_rejected(
             detail="Insufficient permissions",
         )
 
-    application = _get_tenant_application(application_id, current_user, db)
+    application = get_tenant_application(application_id, current_user, db)
     _enforce_branch_scope(application, current_user)
 
     from_stage = PipelineStage(application.stage)
@@ -656,7 +621,7 @@ def mark_application_withdrawn(
             detail="Insufficient permissions",
         )
 
-    application = _get_tenant_application(application_id, current_user, db)
+    application = get_tenant_application(application_id, current_user, db)
     _enforce_branch_scope(application, current_user)
 
     from_stage = PipelineStage(application.stage)
@@ -859,7 +824,7 @@ def reassign_application_counselor(
             detail="Insufficient permissions",
         )
 
-    application = _get_tenant_application(application_id, current_user, db)
+    application = get_tenant_application(application_id, current_user, db)
     _enforce_branch_scope(application, current_user)
 
     if payload.counselor_id is not None:
