@@ -1,5 +1,38 @@
-import { apiFetch } from './client'
-import type { UpdateVisaOutcomePayload, VisaOutcome, VisaStageQueue } from '../types/visa'
+/** Visa API client (E33 read-side queue, E34 detail update, E35 outcome update).
+
+Mirrors the backend endpoints in the visa stage area:
+
+* ``GET /visa/applications/queue`` — paginated list of applications at
+  the visa processing stage. E33; Journey J26; frontend ticket #192.
+  Backed by sibling backend ticket #191.
+* ``GET /visa/applications/{id}/details`` — load the current visa
+  detail (server returns 404 when none has been recorded yet). E34;
+  Journey J27; frontend ticket #194. The update form pre-fills its
+  inputs from this endpoint so the visa processor can edit an
+  existing entry rather than start from blank.
+* ``PUT /visa/applications/{id}/details`` — record or update the
+  visa type and embassy interview date for an application at the
+  visa processing stage. E34; Journey J27; frontend ticket #194.
+  Gated on ``visa:manage`` (granted to ``VISA_PROCESSOR``,
+  ``CONSULTANCY_OWNER`` per
+  :data:`app.rbac.permissions.ROLE_PERMISSIONS`). Backed by the E34
+  backend endpoint that lands in parallel with this frontend ticket;
+  ticket #193 landed the persisted model + migration on the backend
+  side.
+* ``PATCH /visa/applications/{id}/outcome`` — record or update the
+  visa outcome/status for an application at the visa stage. E35;
+  Journey J28; frontend ticket #196. Backed by sibling backend
+  ticket #195.
+*/
+
+import { apiFetch, isApiError } from './client'
+import type {
+  UpdateVisaDetailRequest,
+  UpdateVisaOutcomePayload,
+  VisaDetail,
+  VisaOutcome,
+  VisaStageQueue,
+} from '../types/visa'
 
 export interface VisaStageQueueParams {
   limit?: number
@@ -28,6 +61,63 @@ export async function fetchVisaStageQueue(
   }
   const suffix = query.toString() ? `?${query.toString()}` : ''
   return apiFetch<VisaStageQueue>(`/visa/applications/queue${suffix}`)
+}
+
+/**
+ * Load the visa detail recorded for an application (E34; Journey J27;
+ * #194). Backed by ``GET /visa/applications/{id}/details``.
+ *
+ * Returns ``null`` when the backend responds with 404 — the visa
+ * processor has not recorded a detail for this application yet, so
+ * the form should start blank rather than treat the absence as an
+ * error. Any other non-2xx response raises an :class:`ApiError` like
+ * every other call through :func:`apiFetch`.
+ */
+export async function fetchVisaDetail(applicationId: number): Promise<VisaDetail | null> {
+  try {
+    return await apiFetch<VisaDetail>(`/visa/applications/${applicationId}/details`)
+  } catch (err) {
+    // Surface 404 as "no detail recorded yet" so the caller can decide
+    // whether to render an empty form (record-new flow) or a populated
+    // form (edit flow). All other errors propagate. ``isApiError`` is
+    // the project's standard discriminator for ``ApiError`` instances
+    // raised by :func:`apiFetch`.
+    if (isApiError(err) && err.status === 404) {
+      return null
+    }
+    throw err
+  }
+}
+
+/**
+ * Record or update the visa type and embassy interview date for an
+ * application (E34; Journey J27; frontend #194). Backed by
+ * ``PUT /visa/applications/{id}/details``.
+ *
+ * The backend enforces:
+ *
+ * * ``visa:manage`` permission (visa processor / consultancy owner).
+ * * The application must be in the caller's tenant (cross-tenant
+ *   access surfaces as 404 — never 403 — to prevent enumeration).
+ * * ``visa_type`` is required and must be a non-empty trimmed string
+ *   within the column's 100-char ceiling.
+ * * ``interview_date``, when supplied, is timezone-aware and the
+ *   blank / null case clears the previously-recorded date.
+ *
+ * Returns the freshly-persisted :ts:type:`VisaDetail` row so the host
+ * page can re-render without an extra GET round-trip.
+ */
+export async function updateVisaDetail(
+  applicationId: number,
+  payload: UpdateVisaDetailRequest,
+): Promise<VisaDetail> {
+  return apiFetch<VisaDetail>(`/visa/applications/${applicationId}/details`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      visa_type: payload.visa_type.trim(),
+      interview_date: payload.interview_date,
+    }),
+  })
 }
 
 /**
