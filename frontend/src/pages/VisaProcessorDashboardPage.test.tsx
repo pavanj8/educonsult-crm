@@ -26,7 +26,18 @@ const mockApplication = {
   updated_at: '2026-02-02T10:00:00Z',
 }
 
-type Handlers = { queueStatus?: number; items?: unknown[]; total?: number }
+type Handlers = {
+  queueStatus?: number
+  items?: unknown[]
+  total?: number
+  /**
+   * ``fetchVisaDetail`` response when the toggle opens the editor:
+   * ``null`` (default) means "no detail recorded yet — empty form",
+   * any other value is returned as the detail body. Pass an
+   * ``{ status }`` to simulate a non-404 load error.
+   */
+  detail?: unknown | null | { status: number; detail?: string }
+}
 
 function createFetchMock(handlers: Handlers = {}) {
   return vi.fn(async (url: RequestInfo | URL) => {
@@ -40,6 +51,24 @@ function createFetchMock(handlers: Handlers = {}) {
       }
       const items = handlers.items ?? [mockApplication]
       return { ok: true, status: 200, json: async () => ({ items, total: handlers.total ?? items.length, limit: 50, offset: 0 }) }
+    }
+    // The form's GET /visa/applications/{id}/details: default to
+    // 404 -> null (i.e. "no detail recorded yet"), matching the
+    // happy path the toggle tests assume (the form mounts in its
+    // empty state). Callers can pass a real detail body to exercise
+    // the edit path, or an error object to exercise the load-error
+    // banner.
+    if (/^\/?visa\/applications\/\d+\/details$/.test(path)) {
+      const d = handlers.detail
+      if (d && typeof d === 'object' && 'status' in d) {
+        const status = (d as { status: number }).status
+        const detail = (d as { detail?: string }).detail ?? 'detail error'
+        return { ok: false, status, json: async () => ({ detail }) }
+      }
+      if (d === null || d === undefined) {
+        return { ok: false, status: 404, json: async () => ({ detail: 'Not Found' }) }
+      }
+      return { ok: true, status: 200, json: async () => d }
     }
     throw new Error(`Unhandled fetch: ${path}`)
   }) as unknown as typeof fetch

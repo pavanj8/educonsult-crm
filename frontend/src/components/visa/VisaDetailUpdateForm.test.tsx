@@ -278,14 +278,22 @@ describe('VisaDetailUpdateForm date helpers', () => {
     // The round-trip invariant ("localDateTimeToIsoUtc(isoUtcToLocalDateTime(iso)) === iso")
     // holds regardless of the runner's timezone: the local helpers
     // preserve the exact UTC instant, just re-rendering it in the
-    // runner's wall-clock form. We therefore assert the invariant for
-    // several UTC instants so a regression in the timezone math (e.g.
-    // dropping the ``Z`` suffix or mis-applying the offset) shows up
-    // here even when the test runner happens to be UTC.
+    // runner's wall-clock form. The HTML <input type="datetime-local">
+    // is *minute-precision* by spec, so ``isoUtcToLocalDateTime``
+    // truncates the rendered wall clock to the minute via
+    // ``.slice(0, 16)`` (see ``VisaDetailUpdateForm.tsx``). Sub-minute
+    // precision (e.g. ``…23:59:59.999Z``) therefore cannot survive the
+    // round-trip — the seconds field is dropped on the way in and
+    // re-emitted as ``:00`` on the way out. This is intentional and
+    // is the contract the form actually exposes to the operator; the
+    // test pins it down for several *minute-aligned* UTC instants so a
+    // regression in the timezone math (e.g. dropping the ``Z`` suffix
+    // or mis-applying the offset) still trips this test even when the
+    // runner happens to be UTC.
     const instants = [
       '2026-11-05T09:00:00.000Z',
       '2026-01-01T00:00:00.000Z',
-      '2026-06-15T23:59:59.999Z',
+      '2026-06-15T23:59:00.000Z',
       '2026-12-31T12:00:00.000Z',
     ]
     for (const utc of instants) {
