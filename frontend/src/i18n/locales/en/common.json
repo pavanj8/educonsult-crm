@@ -18,7 +18,8 @@
       "dashboard": "Dashboard",
       "verifierQueue": "Verifier queue",
       "myApplications": "My applications",
-      "intake": "Intake"
+      "intake": "Intake",
+      "visaQueue": "Visa queue"
     }
   },
   "home": {
