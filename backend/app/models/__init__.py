@@ -15,6 +15,7 @@ from app.models.student_document import StudentDocument, StudentDocumentStatus
 from app.models.tenant import Tenant
 from app.models.university import University
 from app.models.user import User
+from app.models.visa_detail import VisaDetail
 
 __all__ = [
     "Application",
@@ -38,4 +39,5 @@ __all__ = [
     "TenantScopedBase",
     "University",
     "User",
+    "VisaDetail",
 ]
