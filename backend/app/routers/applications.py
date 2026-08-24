@@ -32,6 +32,8 @@ from app.schemas.application import (
     ReassignCounselorRequest,
     SetLoanOptInRequest,
     StageHistoryEntry,
+    UpdateLoanRequest,
+    UpdateLoanResponse,
 )
 from app.services.counselor_assignment import assign_counselor_round_robin
 from app.services.notifications import notify_application_stage_changed
@@ -749,6 +751,137 @@ def _target_branch_scope(
     if current_user.role == Role.CONSULTANCY_OWNER:
         return None
     return application.branch_id
+
+
+@router.patch("/{application_id}/loan", response_model=UpdateLoanResponse)
+def update_application_loan(
+    application_id: int,
+    payload: UpdateLoanRequest,
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.LOAN_UPDATE)),
+    ],
+    db: Session = Depends(get_db),
+) -> UpdateLoanResponse:
+    """Record or update the loan tracking fields on an application (E37; J30; #200).
+
+    Lets staff record the loan status, lender, and amount against an
+    application (Requirements §5: "Loans: Tracking-only fields
+    (opted-in, status, amount, lender) — no separate loan officer
+    workflow for v1"). The endpoint is the write-side counterpart
+    to the E36 ``loan_opt_in`` flag (Journey J29): a student opts
+    in, then staff capture the lender / amount / status as the loan
+    progresses through the optional ``loan_processing`` pipeline
+    stage.
+
+    Behavior:
+
+    * Gated on ``loan:update`` (granted to ``CONSULTANCY_OWNER`` and
+      ``BRANCH_MANAGER`` per
+      :data:`app.rbac.permissions.ROLE_PERMISSIONS`). Roles that do
+      not hold this permission — STUDENT, COUNSELOR, RECEPTIONIST,
+      DOCUMENT_VERIFIER, VISA_PROCESSOR, SUPER_ADMIN — are blocked
+      at the dependency layer (403 ``Insufficient permissions``)
+      before any DB query runs.
+
+      ``SUPER_ADMIN`` is intentionally NOT granted ``loan:update``:
+      the Super Admin oversees platform-wide tenants / billing
+      (Requirements §3 + §4) and is not a tenant-scoped staff
+      role. Cross-tenant write attempts by Super Admins would also
+      fail the tenant-scope check on the caller's
+      ``current_user.tenant_id``, but we block earlier at the
+      dependency layer for a clean 403.
+
+    * Tenant scoping is enforced via
+      :func:`get_tenant_application`: cross-tenant requests surface
+      as 404, never 403, to prevent tenant enumeration — same
+      convention as the E20 / E25 / E35 endpoints.
+
+    * Branch scoping for branch managers is enforced via
+      :func:`_enforce_branch_scope`: branch managers can only
+      update loan tracking fields on applications in their own
+      branch. Consultancy owners keep cross-branch visibility by
+      design (ADR-0004).
+
+    * Each PATCH field is independently optional so staff can record
+      them progressively (status first, lender next, amount last)
+      and refine any single field later. An explicit ``null`` in the
+      body CLEARS the corresponding previously-recorded value
+      rather than silently preserving it. An empty PATCH body
+      (no fields supplied) is a no-op write that still 200s (the
+      application row is unchanged).
+
+    * The endpoint does NOT require the application's pipeline
+      stage to be ``loan_processing`` (or any particular stage).
+      Loan tracking is a side-channel of the application: staff
+      may capture the lender / amount before the application
+      enters ``loan_processing`` (e.g. immediately after the
+      student opts in via E36) and may refine the recorded values
+      after the application returns from ``loan_processing`` to
+      ``visa_processing``. The E25 stage-progression flow owns
+      the pipeline stage; this endpoint owns the loan tracking
+      fields.
+
+    * The endpoint does NOT write a :class:`StageHistory` row and
+      does NOT trigger an in-app notification. Recording loan
+      tracking fields is a status-capture side-channel, not a
+      pipeline-stage transition. Future notification wiring for
+      loan-tracking events is out of scope and tracked as a
+      separate ticket.
+
+    Errors:
+
+    * 401 -- caller is not authenticated.
+    * 403 -- caller lacks ``loan:update``, has no tenant scope, or
+      (branch manager) is in a different branch than the
+      application.
+    * 404 -- application does not exist or belongs to a different
+      tenant.
+    * 422 -- the request body fails Pydantic validation
+      (``loan_status`` over 32 chars / ``loan_lender`` over 120
+      chars / negative ``loan_amount``).
+    * 503 -- database unavailable while loading / writing the
+      application.
+    """
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+    application = get_tenant_application(application_id, current_user, db)
+    _enforce_branch_scope(application, current_user)
+
+    if "loan_status" in payload.model_fields_set:
+        # ``payload.loan_status`` may be a string OR None depending on
+        # whether the caller wanted to record a value or clear a
+        # previously-recorded one; both intents must be honored. The
+        # Pydantic field setter trims whitespace, so a value of "" or
+        # "   " collapses to "" -- treat an empty trimmed string as
+        # an explicit clear so staff can ``PATCH {"loan_status":
+        # " "}`` to undo a bad value (mirrors the visa detail
+        # whitespace-only-status behavior).
+        application.loan_status = payload.loan_status or None
+    if "loan_lender" in payload.model_fields_set:
+        application.loan_lender = payload.loan_lender or None
+    if "loan_amount" in payload.model_fields_set:
+        # ``loan_amount`` is a ``Decimal | None`` -- either record a
+        # non-negative amount or explicitly clear the field.
+        application.loan_amount = payload.loan_amount
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(application)
+    return UpdateLoanResponse(
+        application=ApplicationResponse.model_validate(application),
+    )
 
 
 @router.patch("/{application_id}/counselor", response_model=ApplicationResponse)

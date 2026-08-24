@@ -1,6 +1,7 @@
-"""Pydantic schemas for application endpoints (E18; E21; E25; Journey J11; J14; J18)."""
+"""Pydantic schemas for application endpoints (E18; E21; E25; Journey J11; J14; J18; E37; J30)."""
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -27,8 +28,72 @@ class ApplicationResponse(BaseModel):
     program_id: int
     stage: ApplicationStageEnum
     loan_opt_in: bool
+    # E37 task #200 (Journey J30): the three loan-tracking fields
+    # staff record via ``PATCH /applications/{id}/loan``. Nullable so a
+    # brand-new application (and pre-E37 rows that pre-date the
+    # migration) return nulls until staff record something.
+    loan_status: str | None
+    loan_lender: str | None
+    loan_amount: Decimal | None
     created_at: datetime
     updated_at: datetime
+
+
+class UpdateLoanRequest(BaseModel):
+    """Body for ``PATCH /applications/{id}/loan`` (E37; Journey J30; issue #200).
+
+    Lets staff record or update the loan tracking fields on an
+    application (Requirements §5: "Loans: Tracking-only fields
+    (opted-in, status, amount, lender) — no separate loan officer
+    workflow for v1"). All three fields are individually optional so
+    staff can record them progressively: status first, lender next,
+    amount last, then refine any individual field later.
+
+    Each field is independently nullable so an explicit ``null`` in
+    the PATCH body CLEARS that previously-recorded field rather than
+    silently preserving it. The E37 update API applies only the
+    fields the caller supplied, so a PATCH of just ``{"loan_status":
+    "approved"}`` updates the status while leaving the lender and
+    amount untouched.
+
+    ``loan_status`` is trimmed of surrounding whitespace so callers
+    cannot smuggle " " as a non-empty label. The 32-char ceiling
+    matches the persisted column length on
+    :class:`app.models.application.Application`.
+
+    ``loan_lender`` is trimmed the same way; the 120-char ceiling
+    matches the persisted column length and is comfortably larger than
+    any realistic lender label.
+
+    ``loan_amount`` must be a non-negative decimal; zero is allowed
+    (a fully scholarshipped loan is a real edge case). The Pydantic
+    ``Decimal`` type round-trips through the ``Numeric(12, 2)``
+    column without precision loss for the realistic loan-amount
+    range.
+    """
+
+    loan_status: str | None = Field(default=None, max_length=32)
+    loan_lender: str | None = Field(default=None, max_length=120)
+    loan_amount: Decimal | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _trim_loan_strings(self) -> "UpdateLoanRequest":
+        if self.loan_status is not None:
+            self.loan_status = self.loan_status.strip()
+        if self.loan_lender is not None:
+            self.loan_lender = self.loan_lender.strip()
+        return self
+
+
+class UpdateLoanResponse(BaseModel):
+    """Response for ``PATCH /applications/{id}/loan`` (E37; Journey J30; issue #200).
+
+    Returns the full updated :class:`ApplicationResponse` so the
+    frontend can re-hydrate its application detail view from one
+    round-trip without a separate GET.
+    """
+
+    application: ApplicationResponse
 
 
 class AdvanceStageRequest(BaseModel):
