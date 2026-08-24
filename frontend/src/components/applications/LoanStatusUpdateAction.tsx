@@ -288,30 +288,34 @@ export default function LoanStatusUpdateAction({
   // We compare the operator's *current* entry against the initial
   // snapshot to decide whether the field changed:
   //
-  // * If the field is unchanged (operator left it alone), omit it.
-  //   This is how the form achieves the partial-update contract: a
-  //   PATCH that only changes ``loan_status`` does not resend
-  //   ``loan_lender`` / ``loan_amount`` (the backend treats them
-  //   as no-ops and preserves the persisted values).
-  // * If the field is now non-empty after trim, send the trimmed
-  //   value (the operator either corrected whitespace or typed a
-  //   new value).
-  // * If the field is now empty/whitespace-only after trim, send
-  //   ``null`` so the backend clears it — the operator explicitly
-  //   wiped the value, which is different from "left it alone".
+  // * If the field is byte-identical to the initial raw value
+  //   (operator left it alone), omit it. This is how the form
+  //   achieves the partial-update contract: a PATCH that only
+  //   changes ``loan_status`` does not resend ``loan_lender`` /
+  //   ``loan_amount`` (the backend treats them as no-ops and
+  //   preserves the persisted values).
+  // * Otherwise the operator typed something different (a real
+  //   value, a corrected whitespace, or a single-space-to-empty
+  //   clear), so we send the trimmed value (``null`` when the
+  //   trimmed result is empty so the backend clears the
+  //   persisted column).
   //
-  // The status / lender are normalized to ``null`` when
-  // whitespace-trimmed empty so an operator clearing a field with
-  // a single space gets the same behavior as clearing with the
-  // empty string (matches the visa detail contract on E34).
+  // Comparing the *raw* form value (not the trimmed one) is
+  // important: an operator who types a single space into a
+  // previously-empty field has actively expressed an intent to
+  // interact with it, and the backend's own whitespace validator
+  // strips whitespace-only strings to ``null`` — so the
+  // round-tripped clear lands on the persisted column. Comparing
+  // trimmed values (as the previous iteration did) silently
+  // dropped that intent.
   const body: UpdateLoanRequest = {}
-  if (form.loan_status.trim() !== (initialLoan.loan_status ?? '')) {
+  if (form.loan_status !== (initialLoan.loan_status ?? '')) {
     body.loan_status = trimmedStatus === '' ? null : trimmedStatus
   }
-  if (form.loan_lender.trim() !== (initialLoan.loan_lender ?? '')) {
+  if (form.loan_lender !== (initialLoan.loan_lender ?? '')) {
     body.loan_lender = trimmedLender === '' ? null : trimmedLender
   }
-  if (form.loan_amount.trim() !== (initialLoan.loan_amount ?? '')) {
+  if (form.loan_amount !== (initialLoan.loan_amount ?? '')) {
     body.loan_amount = amountValue
   }
 

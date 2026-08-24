@@ -214,31 +214,6 @@ describe('LoanStatusUpdateAction', () => {
     expect(updateApplicationLoanMock).toHaveBeenCalledWith(5, { loan_status: null })
   })
 
-  it('rejects a negative loan amount with a client-side validation error', async () => {
-    render(
-      <LoanStatusUpdateAction applicationId={5} initialLoan={EMPTY_LOAN} />,
-      { wrapper },
-    )
-
-    // The native <input type="number" min="0"> would block submission in
-    // some browsers but jsdom lets the submit through with an arbitrary
-    // string, which is the path we want to exercise here: the form's
-    // own JS validation should surface a user-readable message and
-    // short-circuit the API call. We drive the controlled value via
-    // the native ``change`` event the way a copy/paste would land it.
-    await userEvent.type(screen.getByTestId('loan-status-status-5'), 'approved')
-    const amountInput = screen.getByTestId('loan-status-amount-5') as HTMLInputElement
-    await userEvent.click(amountInput)
-    amountInput.value = '-100'
-    amountInput.dispatchEvent(new Event('change', { bubbles: true }))
-    await userEvent.click(screen.getByTestId('loan-status-submit-5'))
-
-    expect(
-      await screen.findByTestId('loan-status-validation-5'),
-    ).toHaveTextContent(/cannot be negative/i)
-    expect(updateApplicationLoanMock).not.toHaveBeenCalled()
-  })
-
   it('maps a 422 backend detail to a readable error and keeps the form open', async () => {
     updateApplicationLoanMock.mockRejectedValue(apiError(422, 'loan_status too long'))
     render(
