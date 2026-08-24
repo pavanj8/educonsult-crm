@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-/** Visa API client (E33 read-side queue + E34 detail update).
+/** Visa API client (E33 read-side queue, E34 detail update, E35 outcome update).
 
 Mirrors the backend endpoints in the visa stage area:
 
@@ -15,19 +14,25 @@ Mirrors the backend endpoints in the visa stage area:
   visa type and embassy interview date for an application at the
   visa processing stage. E34; Journey J27; frontend ticket #194.
   Gated on ``visa:manage`` (granted to ``VISA_PROCESSOR``,
-  ``CONSULTANCY_OWNER``, and ``SUPER_ADMIN`` per
+  ``CONSULTANCY_OWNER`` per
   :data:`app.rbac.permissions.ROLE_PERMISSIONS`). Backed by the E34
   backend endpoint that lands in parallel with this frontend ticket;
   ticket #193 landed the persisted model + migration on the backend
   side.
+* ``PATCH /visa/applications/{id}/outcome`` — record or update the
+  visa outcome/status for an application at the visa stage. E35;
+  Journey J28; frontend ticket #196. Backed by sibling backend
+  ticket #195.
 */
 
 import { apiFetch, isApiError } from './client'
-import type { UpdateVisaDetailRequest, VisaDetail, VisaStageQueue } from '../types/visa'
-=======
-import { apiFetch } from './client'
-import type { UpdateVisaOutcomePayload, VisaOutcome, VisaStageQueue } from '../types/visa'
->>>>>>> origin/main
+import type {
+  UpdateVisaDetailRequest,
+  UpdateVisaOutcomePayload,
+  VisaDetail,
+  VisaOutcome,
+  VisaStageQueue,
+} from '../types/visa'
 
 export interface VisaStageQueueParams {
   limit?: number
@@ -59,7 +64,6 @@ export async function fetchVisaStageQueue(
 }
 
 /**
-<<<<<<< HEAD
  * Load the visa detail recorded for an application (E34; Journey J27;
  * #194). Backed by ``GET /visa/applications/{id}/details``.
  *
@@ -92,8 +96,7 @@ export async function fetchVisaDetail(applicationId: number): Promise<VisaDetail
  *
  * The backend enforces:
  *
- * * ``visa:manage`` permission (visa processor / consultancy owner /
- *   super admin).
+ * * ``visa:manage`` permission (visa processor / consultancy owner).
  * * The application must be in the caller's tenant (cross-tenant
  *   access surfaces as 404 — never 403 — to prevent enumeration).
  * * ``visa_type`` is required and must be a non-empty trimmed string
@@ -114,7 +117,10 @@ export async function updateVisaDetail(
       visa_type: payload.visa_type.trim(),
       interview_date: payload.interview_date,
     }),
-=======
+  })
+}
+
+/**
  * Record or update the visa outcome for an application at the visa
  * stage (E35; Journey J28; #196). Backed by
  * ``PATCH /visa/applications/{id}/outcome`` — the write-side of the
@@ -141,6 +147,5 @@ export async function updateVisaOutcome(
   return apiFetch<VisaOutcome>(`/visa/applications/${applicationId}/outcome`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
->>>>>>> origin/main
   })
 }

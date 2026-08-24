@@ -1,10 +1,7 @@
-<<<<<<< HEAD
 import { useState } from 'react'
 
 import VisaDetailUpdateForm from '../components/visa/VisaDetailUpdateForm'
-=======
 import VisaOutcomeAction from '../components/visa/VisaOutcomeAction'
->>>>>>> origin/main
 import { useVisaQueue } from '../hooks/useVisaQueue'
 import { PIPELINE_STAGE_LABELS } from '../types/application'
 
@@ -17,29 +14,35 @@ function formatDate(iso: string): string {
  * Visa processor dashboard — the visa-stage applications queue view
  * (E33; Journey J26; #192). Lists applications currently in the
  * ``visa_processing`` pipeline stage so the visa processor can pick
-<<<<<<< HEAD
- * the next application to work on. Visa detail recording (E34,
- * Journey J27, frontend #194) is exposed per row via a toggle that
- * mounts :component:`VisaDetailUpdateForm` below the row; the form
- * is the write-side of J27, while this page stays the read-side of
- * J26.
- */
-export default function VisaProcessorDashboardPage() {
-  const { applications, total, loading, error, reload } = useVisaQueue()
-  // Only one row's editor is open at a time; keeps the screen
-  // compact and avoids juggling many in-flight visa detail GETs.
-  const [editingApplicationId, setEditingApplicationId] = useState<number | null>(null)
-=======
- * the next application to work on, and surfaces a per-row
- * :ts:comp:`VisaOutcomeAction` (E35; Journey J28; #196) so the visa
- * processor can record or update the visa outcome/status from this
- * dashboard directly. Visa detail recording (E34) is out of scope for
- * this ticket.
+ * the next application to work on. The page is the integration
+ * point for the two visa-stage write actions:
+ *
+ * * :ts:comp:`VisaOutcomeAction` per row (E35; Journey J28; #196) —
+ *   record or update the visa outcome/status.
+ * * :ts:comp:`VisaDetailUpdateForm` mounted below the row when the
+ *   per-row toggle is opened (E34; Journey J27; #194) — record the
+ *   visa type and embassy interview date.
+ *
+ * Both actions require ``visa:manage`` (granted to
+ * ``VISA_PROCESSOR``, ``CONSULTANCY_OWNER`` per
+ * :data:`app.rbac.permissions.ROLE_PERMISSIONS`) and share the same
+ * tenant-scoped :ts:func:`useVisaQueue` data source so a single queue
+ * fetch backs both columns.
  */
 export default function VisaProcessorDashboardPage() {
   const { applications, total, outcomes, loading, error, reload, rememberOutcome } =
     useVisaQueue()
->>>>>>> origin/main
+  // Only one row's detail editor is open at a time; keeps the screen
+  // compact and avoids juggling many in-flight visa detail GETs.
+  const [editingApplicationId, setEditingApplicationId] = useState<number | null>(null)
+  // After a successful visa detail save we keep the row in
+  // "saved just now" state for a few seconds so the visa processor
+  // can see positive feedback even though the panel closes (the
+  // toggle reverts to "Update visa detail" immediately). This is
+  // the dashboard's answer to the UX-architect finding that the
+  // form's success branch is otherwise hidden by the synchronous
+  // panel close in onSaved.
+  const [recentlySaved, setRecentlySaved] = useState<Record<number, number>>({})
 
   return (
     <section
@@ -98,9 +101,9 @@ export default function VisaProcessorDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-<<<<<<< HEAD
                 {applications.map((app) => {
                   const isEditing = editingApplicationId === app.id
+                  const justSaved = recentlySaved[app.id]
                   return (
                     <tr key={app.id} data-testid={`visa-queue-row-${app.id}`}>
                       <td>#{app.id}</td>
@@ -118,54 +121,47 @@ export default function VisaProcessorDashboardPage() {
                         {PIPELINE_STAGE_LABELS[app.stage as keyof typeof PIPELINE_STAGE_LABELS] ??
                           app.stage}
                       </td>
+                      <td>
+                        <VisaOutcomeAction
+                          applicationId={app.id}
+                          initialOutcome={outcomes[app.id] ?? null}
+                          onUpdated={(_id, outcome) => {
+                            rememberOutcome(outcome)
+                          }}
+                        />
+                      </td>
                       <td>{formatDate(app.created_at)}</td>
                       <td>
-                        <button
-                          type="button"
-                          aria-expanded={isEditing}
-                          aria-controls={`visa-detail-panel-${app.id}`}
-                          onClick={() =>
-                            setEditingApplicationId(isEditing ? null : app.id)
-                          }
-                          data-testid={`visa-queue-edit-toggle-${app.id}`}
+                        <span
+                          className="visa-detail-actions"
+                          data-testid={`visa-detail-actions-${app.id}`}
                         >
-                          {isEditing ? 'Close' : 'Update visa detail'}
-                        </button>
+                          <button
+                            type="button"
+                            aria-expanded={isEditing}
+                            aria-controls={`visa-detail-panel-${app.id}`}
+                            onClick={() =>
+                              setEditingApplicationId(isEditing ? null : app.id)
+                            }
+                            data-testid={`visa-queue-edit-toggle-${app.id}`}
+                          >
+                            {isEditing ? 'Close' : 'Update visa detail'}
+                          </button>
+                          {justSaved ? (
+                            <span
+                              className="visa-detail-saved-indicator"
+                              role="status"
+                              aria-live="polite"
+                              data-testid={`visa-detail-saved-${app.id}`}
+                            >
+                              Saved
+                            </span>
+                          ) : null}
+                        </span>
                       </td>
                     </tr>
                   )
                 })}
-=======
-                {applications.map((app) => (
-                  <tr key={app.id} data-testid={`visa-queue-row-${app.id}`}>
-                    <td>#{app.id}</td>
-                    <td>#{app.student_id}</td>
-                    <td>{app.branch_id == null ? '—' : `#${app.branch_id}`}</td>
-                    <td>
-                      {app.assigned_counselor_id == null
-                        ? '—'
-                        : `#${app.assigned_counselor_id}`}
-                    </td>
-                    <td>
-                      #{app.university_id} / #{app.program_id}
-                    </td>
-                    <td>
-                      {PIPELINE_STAGE_LABELS[app.stage as keyof typeof PIPELINE_STAGE_LABELS] ??
-                        app.stage}
-                    </td>
-                    <td>
-                      <VisaOutcomeAction
-                        applicationId={app.id}
-                        initialOutcome={outcomes[app.id] ?? null}
-                        onUpdated={(_id, outcome) => {
-                          rememberOutcome(outcome)
-                        }}
-                      />
-                    </td>
-                    <td>{formatDate(app.created_at)}</td>
-                  </tr>
-                ))}
->>>>>>> origin/main
               </tbody>
             </table>
             {/*
@@ -190,6 +186,21 @@ export default function VisaProcessorDashboardPage() {
                     applicationId={app.id}
                     onSaved={() => {
                       setEditingApplicationId(null)
+                      // Show a brief "Saved" indicator beside the row
+                      // toggle so the visa processor gets positive
+                      // feedback that the write succeeded, even though
+                      // the form's own success state is hidden by the
+                      // synchronous panel close.
+                      const now = Date.now()
+                      setRecentlySaved((prev) => ({ ...prev, [app.id]: now }))
+                      window.setTimeout(() => {
+                        setRecentlySaved((prev) => {
+                          if (prev[app.id] !== now) return prev
+                          const next = { ...prev }
+                          delete next[app.id]
+                          return next
+                        })
+                      }, 4000)
                     }}
                   />
                 </div>
