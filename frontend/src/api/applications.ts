@@ -110,3 +110,25 @@ export async function reassignCounselor(
     body: JSON.stringify({ counselor_id: counselorId }),
   })
 }
+
+/**
+ * Set the student's loan-tracking opt-in flag on an application (E36;
+ * Journey J29; frontend #199). Backed by the future
+ * ``PATCH /applications/{id}/loan-opt-in`` endpoint (the backend
+ * endpoint itself is a follow-up to issue #199 and is not yet
+ * implemented — see ``docs/epics.md`` E36 / E37).
+ *
+ * The frontend UI exposes this toggle today so the student application
+ * flow has a working control surface; the call is wrapped to surface a
+ * readable error when the backend endpoint is not yet wired up. Pass
+ * ``true`` to opt in, ``false`` to opt out.
+ */
+export async function setLoanOptIn(
+  applicationId: number,
+  loanOptIn: boolean,
+): Promise<Application> {
+  return apiFetch<Application>(`/applications/${applicationId}/loan-opt-in`, {
+    method: 'PATCH',
+    body: JSON.stringify({ loan_opt_in: loanOptIn }),
+  })
+}

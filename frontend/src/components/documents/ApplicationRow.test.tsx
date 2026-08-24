@@ -12,6 +12,7 @@ const mockApplication: Application = {
   university_id: 1,
   program_id: 10,
   stage: 'document_verification',
+  loan_opt_in: false,
   created_at: '2026-01-15T10:00:00Z',
   updated_at: '2026-01-15T10:00:00Z',
 }
