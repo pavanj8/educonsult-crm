@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider } from '../store/authStore'
 import VisaProcessorDashboardPage from './VisaProcessorDashboardPage'
+import type { VisaOutcome } from '../types/visa'
 
 const mockVisaProcessor = {
   id: 91,
@@ -26,6 +27,7 @@ const mockApplication = {
   updated_at: '2026-02-02T10:00:00Z',
 }
 
+<<<<<<< HEAD
 type Handlers = {
   queueStatus?: number
   items?: unknown[]
@@ -37,10 +39,18 @@ type Handlers = {
    * ``{ status }`` to simulate a non-404 load error.
    */
   detail?: unknown | null | { status: number; detail?: string }
+=======
+interface Handlers {
+  queueStatus?: number
+  items?: unknown[]
+  total?: number
+  /** Per-application outcome persistence (E35; #196). */
+  onOutcome?: (applicationId: number, body: unknown) => VisaOutcome | null
+>>>>>>> origin/main
 }
 
 function createFetchMock(handlers: Handlers = {}) {
-  return vi.fn(async (url: RequestInfo | URL) => {
+  return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     const path = String(url)
     if (path.includes('/auth/me')) {
       return { ok: true, status: 200, json: async () => mockVisaProcessor }
@@ -52,6 +62,7 @@ function createFetchMock(handlers: Handlers = {}) {
       const items = handlers.items ?? [mockApplication]
       return { ok: true, status: 200, json: async () => ({ items, total: handlers.total ?? items.length, limit: 50, offset: 0 }) }
     }
+<<<<<<< HEAD
     // The form's GET /visa/applications/{id}/details: default to
     // 404 -> null (i.e. "no detail recorded yet"), matching the
     // happy path the toggle tests assume (the form mounts in its
@@ -69,6 +80,33 @@ function createFetchMock(handlers: Handlers = {}) {
         return { ok: false, status: 404, json: async () => ({ detail: 'Not Found' }) }
       }
       return { ok: true, status: 200, json: async () => d }
+=======
+    const outcomeMatch = path.match(/\/visa\/applications\/(\d+)\/outcome$/)
+    if (outcomeMatch && init?.method === 'PATCH') {
+      const [, idStr] = outcomeMatch
+      const applicationId = Number(idStr)
+      const body = init.body ? JSON.parse(String(init.body)) : {}
+      if (handlers.onOutcome) {
+        const outcome = handlers.onOutcome(applicationId, body)
+        if (outcome) {
+          return { ok: true, status: 200, json: async () => outcome }
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 11,
+          tenant_id: 10,
+          application_id: applicationId,
+          status: body.status ?? 'approved',
+          outcome_date: body.outcome_date ?? null,
+          notes: body.notes ?? null,
+          created_at: '2026-02-03T10:00:00Z',
+          updated_at: '2026-02-03T10:00:00Z',
+        }),
+      }
+>>>>>>> origin/main
     }
     throw new Error(`Unhandled fetch: ${path}`)
   }) as unknown as typeof fetch
@@ -182,6 +220,7 @@ describe('VisaProcessorDashboardPage', () => {
     ).toHaveLength(0)
   })
 
+<<<<<<< HEAD
   it('renders an "Update visa detail" toggle on every row, initially collapsed', async () => {
     globalThis.fetch = createFetchMock({ items: [mockApplication], total: 1 })
     renderPage()
@@ -225,5 +264,107 @@ describe('VisaProcessorDashboardPage', () => {
       expect(screen.queryByTestId('visa-detail-panel-101')).not.toBeInTheDocument()
     })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
+=======
+  it('renders a Record outcome action on every visa-queue row by default', async () => {
+    globalThis.fetch = createFetchMock({ items: [mockApplication], total: 1 })
+    renderPage()
+
+    await screen.findByTestId('visa-queue-row-101')
+
+    // The dashboard now embeds the E35 VisaOutcomeAction control on
+    // every row (frontend ticket #196). Before any outcome is
+    // recorded in this session it MUST show the create-mode label.
+    expect(screen.getByTestId('visa-queue-row-101')).toHaveTextContent(
+      /record outcome/i,
+    )
+  })
+
+  it('drives the PATCH and switches the row button to Update outcome on success', async () => {
+    const user = userEvent.setup()
+    const seenBodies: unknown[] = []
+    globalThis.fetch = createFetchMock({
+      items: [mockApplication],
+      total: 1,
+      onOutcome: (applicationId, body) => {
+        seenBodies.push(body)
+        return {
+          id: 11,
+          tenant_id: 10,
+          application_id: applicationId,
+          status: 'approved',
+          outcome_date: null,
+          notes: 'OK',
+          created_at: '2026-02-03T10:00:00Z',
+          updated_at: '2026-02-03T10:00:00Z',
+        }
+      },
+    })
+    renderPage()
+    const row = await screen.findByTestId('visa-queue-row-101')
+    expect(row).toHaveTextContent(/record outcome/i)
+
+    await user.click(screen.getByTestId('visa-outcome-open-101'))
+    await user.type(screen.getByTestId('visa-outcome-status-101'), 'Approved')
+    await user.type(screen.getByTestId('visa-outcome-notes-101'), 'OK')
+    await user.click(screen.getByTestId('visa-outcome-submit-101'))
+
+    // Success state appears in place of the form. The row mirrors
+    // ``VisaOutcomeAction``'s mode (create vs update) -- on first
+    // record the message is "Outcome recorded."
+    expect(await screen.findByTestId('visa-outcome-success-101')).toBeInTheDocument()
+
+    // Exactly one PATCH went out, with the user-entered payload.
+    const outcomeCalls = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([url]) => String(url).includes('/visa/applications/101/outcome'),
+    )
+    expect(outcomeCalls).toHaveLength(1)
+    const [, init] = outcomeCalls[0] as [string, RequestInit]
+    expect(init.method).toBe('PATCH')
+    const body = JSON.parse(String(init.body))
+    expect(body.status).toBe('Approved')
+    expect(body.notes).toBe('OK')
+    expect(seenBodies).toHaveLength(1)
+  })
+
+  it('keeps the form open and surfaces a 422 detail inside the row', async () => {
+    const user = userEvent.setup()
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url)
+      if (path.includes('/auth/me')) {
+        return { ok: true, status: 200, json: async () => mockVisaProcessor }
+      }
+      if (path.includes('/visa/applications/queue')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ items: [mockApplication], total: 1, limit: 50, offset: 0 }),
+        }
+      }
+      const outcomeMatch = path.match(/\/visa\/applications\/(\d+)\/outcome$/)
+      if (outcomeMatch && init?.method === 'PATCH') {
+        return {
+          ok: false,
+          status: 422,
+          json: async () => ({
+            detail:
+              "Application in stage 'enrolled' cannot have its visa outcome updated. The application must be in the 'visa_processing' stage.",
+          }),
+        }
+      }
+      throw new Error(`Unhandled fetch: ${path}`)
+    }) as unknown as typeof fetch
+
+    renderPage()
+    await screen.findByTestId('visa-queue-row-101')
+
+    await user.click(screen.getByTestId('visa-outcome-open-101'))
+    await user.type(screen.getByTestId('visa-outcome-status-101'), 'Approved')
+    await user.click(screen.getByTestId('visa-outcome-submit-101'))
+
+    expect(await screen.findByTestId('visa-outcome-error-101')).toHaveTextContent(
+      /visa_processing/i,
+    )
+    expect(screen.getByTestId('visa-outcome-form-101')).toBeInTheDocument()
+>>>>>>> origin/main
   })
 })

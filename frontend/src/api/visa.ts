@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /** Visa API client (E33 read-side queue + E34 detail update).
 
 Mirrors the backend endpoints in the visa stage area:
@@ -23,6 +24,10 @@ Mirrors the backend endpoints in the visa stage area:
 
 import { apiFetch, isApiError } from './client'
 import type { UpdateVisaDetailRequest, VisaDetail, VisaStageQueue } from '../types/visa'
+=======
+import { apiFetch } from './client'
+import type { UpdateVisaOutcomePayload, VisaOutcome, VisaStageQueue } from '../types/visa'
+>>>>>>> origin/main
 
 export interface VisaStageQueueParams {
   limit?: number
@@ -54,6 +59,7 @@ export async function fetchVisaStageQueue(
 }
 
 /**
+<<<<<<< HEAD
  * Load the visa detail recorded for an application (E34; Journey J27;
  * #194). Backed by ``GET /visa/applications/{id}/details``.
  *
@@ -108,5 +114,33 @@ export async function updateVisaDetail(
       visa_type: payload.visa_type.trim(),
       interview_date: payload.interview_date,
     }),
+=======
+ * Record or update the visa outcome for an application at the visa
+ * stage (E35; Journey J28; #196). Backed by
+ * ``PATCH /visa/applications/{id}/outcome`` — the write-side of the
+ * visa outcome flow (sibling backend ticket #195).
+ *
+ * The payload field shape mirrors
+ * :class:`app.schemas.visa.UpdateVisaOutcomeRequest`: ``status`` is
+ * the only required input on first creation, ``outcome_date`` and
+ * ``notes`` are optional context. A PATCH with none of the three
+ * fields is rejected at 422 — the caller has to be intentional.
+ *
+ * Server-side the endpoint enforces that the application is in the
+ * ``visa_processing`` stage (any other stage, including the three
+ * terminal states, is rejected with 422) and that
+ * :class:`UpdateVisaOutcomeRequest` validation passes (status trim,
+ * max-length caps). Errors propagate via the standard
+ * :class:`ApiError` shape so the calling component can map them
+ * to user-readable messages.
+ */
+export async function updateVisaOutcome(
+  applicationId: number,
+  payload: UpdateVisaOutcomePayload,
+): Promise<VisaOutcome> {
+  return apiFetch<VisaOutcome>(`/visa/applications/${applicationId}/outcome`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+>>>>>>> origin/main
   })
 }

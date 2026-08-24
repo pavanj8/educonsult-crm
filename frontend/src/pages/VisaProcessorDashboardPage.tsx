@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 import { useState } from 'react'
 
 import VisaDetailUpdateForm from '../components/visa/VisaDetailUpdateForm'
+=======
+import VisaOutcomeAction from '../components/visa/VisaOutcomeAction'
+>>>>>>> origin/main
 import { useVisaQueue } from '../hooks/useVisaQueue'
 import { PIPELINE_STAGE_LABELS } from '../types/application'
 
@@ -13,6 +17,7 @@ function formatDate(iso: string): string {
  * Visa processor dashboard — the visa-stage applications queue view
  * (E33; Journey J26; #192). Lists applications currently in the
  * ``visa_processing`` pipeline stage so the visa processor can pick
+<<<<<<< HEAD
  * the next application to work on. Visa detail recording (E34,
  * Journey J27, frontend #194) is exposed per row via a toggle that
  * mounts :component:`VisaDetailUpdateForm` below the row; the form
@@ -24,6 +29,17 @@ export default function VisaProcessorDashboardPage() {
   // Only one row's editor is open at a time; keeps the screen
   // compact and avoids juggling many in-flight visa detail GETs.
   const [editingApplicationId, setEditingApplicationId] = useState<number | null>(null)
+=======
+ * the next application to work on, and surfaces a per-row
+ * :ts:comp:`VisaOutcomeAction` (E35; Journey J28; #196) so the visa
+ * processor can record or update the visa outcome/status from this
+ * dashboard directly. Visa detail recording (E34) is out of scope for
+ * this ticket.
+ */
+export default function VisaProcessorDashboardPage() {
+  const { applications, total, outcomes, loading, error, reload, rememberOutcome } =
+    useVisaQueue()
+>>>>>>> origin/main
 
   return (
     <section
@@ -76,11 +92,13 @@ export default function VisaProcessorDashboardPage() {
                   <th scope="col">Counselor</th>
                   <th scope="col">University / Program</th>
                   <th scope="col">Stage</th>
+                  <th scope="col">Outcome</th>
                   <th scope="col">Created</th>
                   <th scope="col">Visa detail</th>
                 </tr>
               </thead>
               <tbody>
+<<<<<<< HEAD
                 {applications.map((app) => {
                   const isEditing = editingApplicationId === app.id
                   return (
@@ -117,6 +135,37 @@ export default function VisaProcessorDashboardPage() {
                     </tr>
                   )
                 })}
+=======
+                {applications.map((app) => (
+                  <tr key={app.id} data-testid={`visa-queue-row-${app.id}`}>
+                    <td>#{app.id}</td>
+                    <td>#{app.student_id}</td>
+                    <td>{app.branch_id == null ? '—' : `#${app.branch_id}`}</td>
+                    <td>
+                      {app.assigned_counselor_id == null
+                        ? '—'
+                        : `#${app.assigned_counselor_id}`}
+                    </td>
+                    <td>
+                      #{app.university_id} / #{app.program_id}
+                    </td>
+                    <td>
+                      {PIPELINE_STAGE_LABELS[app.stage as keyof typeof PIPELINE_STAGE_LABELS] ??
+                        app.stage}
+                    </td>
+                    <td>
+                      <VisaOutcomeAction
+                        applicationId={app.id}
+                        initialOutcome={outcomes[app.id] ?? null}
+                        onUpdated={(_id, outcome) => {
+                          rememberOutcome(outcome)
+                        }}
+                      />
+                    </td>
+                    <td>{formatDate(app.created_at)}</td>
+                  </tr>
+                ))}
+>>>>>>> origin/main
               </tbody>
             </table>
             {/*
