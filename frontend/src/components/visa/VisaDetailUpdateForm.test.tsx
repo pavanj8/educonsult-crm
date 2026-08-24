@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import VisaDetailUpdateForm from './VisaDetailUpdateForm'
+import VisaDetailUpdateForm, { __testing } from './VisaDetailUpdateForm'
 import { fetchVisaDetail, updateVisaDetail } from '../../api/visa'
 
 vi.mock('../../api/visa', () => ({
@@ -233,5 +233,78 @@ describe('VisaDetailUpdateForm', () => {
 
     expect(screen.getByTestId('visa-detail-form-5')).toBeInTheDocument()
     expect((screen.getByTestId('visa-detail-type-5') as HTMLInputElement).value).toBe('F-1 Student')
+  })
+
+  it('maps a 401 backend detail to the session-expired copy', async () => {
+    updateVisaDetailMock.mockRejectedValue(apiError(401, 'Not authenticated'))
+    render(<VisaDetailUpdateForm applicationId={5} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('visa-detail-form-5')).toBeInTheDocument()
+    })
+
+    await userEvent.type(screen.getByTestId('visa-detail-type-5'), 'F-1 Student')
+    await userEvent.click(screen.getByTestId('visa-detail-submit-5'))
+
+    expect(await screen.findByTestId('visa-detail-submit-error-5')).toHaveTextContent(
+      /session has expired/i,
+    )
+  })
+
+  it('maps a 500 backend detail to the generic failure copy', async () => {
+    updateVisaDetailMock.mockRejectedValue(apiError(500, 'Internal Server Error'))
+    render(<VisaDetailUpdateForm applicationId={5} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('visa-detail-form-5')).toBeInTheDocument()
+    })
+
+    await userEvent.type(screen.getByTestId('visa-detail-type-5'), 'F-1 Student')
+    await userEvent.click(screen.getByTestId('visa-detail-submit-5'))
+
+    expect(await screen.findByTestId('visa-detail-submit-error-5')).toHaveTextContent(
+      /failed to save the visa detail/i,
+    )
+    expect(screen.getByTestId('visa-detail-form-5')).toBeInTheDocument()
+  })
+})
+
+describe('VisaDetailUpdateForm date helpers', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('round-trips a UTC ISO timestamp through the local datetime picker', () => {
+    // The round-trip invariant ("localDateTimeToIsoUtc(isoUtcToLocalDateTime(iso)) === iso")
+    // holds regardless of the runner's timezone: the local helpers
+    // preserve the exact UTC instant, just re-rendering it in the
+    // runner's wall-clock form. We therefore assert the invariant for
+    // several UTC instants so a regression in the timezone math (e.g.
+    // dropping the ``Z`` suffix or mis-applying the offset) shows up
+    // here even when the test runner happens to be UTC.
+    const instants = [
+      '2026-11-05T09:00:00.000Z',
+      '2026-01-01T00:00:00.000Z',
+      '2026-06-15T23:59:59.999Z',
+      '2026-12-31T12:00:00.000Z',
+    ]
+    for (const utc of instants) {
+      const local = __testing.isoUtcToLocalDateTime(utc)
+      expect(local).not.toBe('')
+      // The local form must be a valid "YYYY-MM-DDTHH:mm" prefix.
+      expect(local).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+      const back = __testing.localDateTimeToIsoUtc(local)
+      expect(back).toBe(utc)
+    }
+  })
+
+  it('returns null for an empty picker and an unparseable picker value', () => {
+    expect(__testing.localDateTimeToIsoUtc('')).toBeNull()
+    expect(__testing.localDateTimeToIsoUtc('not-a-date')).toBeNull()
+  })
+
+  it('returns an empty string for null / unparseable input to isoUtcToLocalDateTime', () => {
+    expect(__testing.isoUtcToLocalDateTime(null)).toBe('')
+    expect(__testing.isoUtcToLocalDateTime('not-a-date')).toBe('')
   })
 })

@@ -27,4 +27,9 @@ export {
   type StudentDocumentUploadResponse,
   type UploadStudentDocumentParams,
 } from './studentDocuments'
-export { fetchVisaDetail, updateVisaDetail } from './visa'
+export {
+  fetchVisaDetail,
+  fetchVisaStageQueue,
+  updateVisaDetail,
+  type VisaStageQueueParams,
+} from './visa'

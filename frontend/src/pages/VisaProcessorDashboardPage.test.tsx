@@ -152,4 +152,49 @@ describe('VisaProcessorDashboardPage', () => {
       ),
     ).toHaveLength(0)
   })
+
+  it('renders an "Update visa detail" toggle on every row, initially collapsed', async () => {
+    globalThis.fetch = createFetchMock({ items: [mockApplication], total: 1 })
+    renderPage()
+
+    const toggle = await screen.findByTestId('visa-queue-edit-toggle-101')
+    expect(toggle).toHaveTextContent(/update visa detail/i)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('visa-detail-panel-101')).not.toBeInTheDocument()
+  })
+
+  it('opens the visa detail update form when the per-row toggle is clicked', async () => {
+    const user = userEvent.setup()
+    globalThis.fetch = createFetchMock({ items: [mockApplication], total: 1 })
+    renderPage()
+
+    const toggle = await screen.findByTestId('visa-queue-edit-toggle-101')
+    await user.click(toggle)
+
+    const panel = await screen.findByTestId('visa-detail-panel-101')
+    expect(panel).toBeInTheDocument()
+    // The form mounts and goes through its loading -> empty state
+    // (no detail recorded yet -> 404 from fetchVisaDetail). The
+    // dashboard wires the form's `onSaved` to close the panel.
+    expect(await screen.findByTestId('visa-detail-form-101')).toBeInTheDocument()
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(toggle).toHaveTextContent(/close/i)
+  })
+
+  it('closes the visa detail update form when the toggle is clicked a second time', async () => {
+    const user = userEvent.setup()
+    globalThis.fetch = createFetchMock({ items: [mockApplication], total: 1 })
+    renderPage()
+
+    const toggle = await screen.findByTestId('visa-queue-edit-toggle-101')
+    await user.click(toggle)
+    await screen.findByTestId('visa-detail-form-101')
+
+    await user.click(toggle)
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('visa-detail-panel-101')).not.toBeInTheDocument()
+    })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
 })
