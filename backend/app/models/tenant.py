@@ -24,6 +24,11 @@ class Tenant(Base):
       because the home market is India; the helper in :mod:`app.i18n.currency`
       validates the shape when callers (the future PATCH endpoint, task #110)
       need to write to it.
+    * ``plan_id`` -- nullable FK to ``plans.id`` set by the E9 task #106
+      super-admin assign/change-plan API. Nullable so a brand-new tenant
+      exists with no assigned plan until the Super Admin explicitly picks
+      one; the J38 owner plan-usage view treats ``NULL`` as "no plan yet,
+      please contact the platform".
     """
 
     __tablename__ = "tenants"
@@ -36,6 +41,7 @@ class Tenant(Base):
     currency: Mapped[str] = mapped_column(
         String(3), nullable=False, server_default="INR"
     )
+<<<<<<< HEAD
     # E9 task #107: nullable FK to the platform-level plans catalog
     # (E9 task #105). E9 task #106 (assign/change plan API) owns the
     # write side; this module only consumes the column to enforce
@@ -47,11 +53,26 @@ class Tenant(Base):
     # students without errors. ON DELETE RESTRICT matches the
     # catalog row's lifecycle (active tiers cannot be removed while
     # tenants still reference them).
+=======
+    # E9 task #106: nullable FK to the platform-level plans catalog
+    # (E9 task #105). A tenant exists before any plan is chosen; the
+    # super-admin assign/change-plan endpoint sets this. ON DELETE is
+    # left to the database default (RESTRICT) so an active tier cannot
+    # be removed while tenants still reference it.
+>>>>>>> origin/main
     plan_id: Mapped[int | None] = mapped_column(
         ForeignKey("plans.id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
     )
+<<<<<<< HEAD
+=======
+    # SQLAlchemy relationship used by the ``TenantResponse.plan`` nested
+    # field (E9 task #106). The endpoint typically re-fetches the plan
+    # after the FK change commits; this relationship is for the
+    # ``from_attributes=True`` Pydantic response shape on the GET
+    # endpoints.
+>>>>>>> origin/main
     plan = relationship("Plan", foreign_keys=[plan_id])
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
