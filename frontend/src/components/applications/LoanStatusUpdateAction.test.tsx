@@ -211,6 +211,7 @@ describe('LoanStatusUpdateAction', () => {
     await waitFor(() => {
       expect(updateApplicationLoanMock).toHaveBeenCalledTimes(1)
     })
+    // Whitespace-only input is trimmed to empty string, which becomes null
     expect(updateApplicationLoanMock).toHaveBeenCalledWith(5, { loan_status: null })
   })
 

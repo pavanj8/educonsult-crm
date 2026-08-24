@@ -59,6 +59,20 @@ interface LoanFormState {
   loan_amount: string
 }
 
+/**
+ * Tracks the initial raw form values when the component mounts or
+ * re-syncs from an updated ``initialLoan`` prop. We use these to
+ * detect which fields the operator has actively touched, so we can
+ * distinguish "user typed whitespace into an empty field" (an
+ * explicit clear that should send ``null``) from "user left the field
+ * alone" (omit from the PATCH body).
+ */
+interface InitialRawValues {
+  loan_status: string
+  loan_lender: string
+  loan_amount: string
+}
+
 const EMPTY_LOAN = {
   loan_status: null,
   loan_lender: null,
@@ -224,6 +238,11 @@ export default function LoanStatusUpdateAction({
   readOnly = false,
 }: LoanStatusUpdateActionProps) {
   const [form, setForm] = useState<LoanFormState>(() => formFromLoan(initialLoan))
+  const [initialRawValues, setInitialRawValues] = useState<InitialRawValues>(() => ({
+    loan_status: initialLoan.loan_status ?? '',
+    loan_lender: initialLoan.loan_lender ?? '',
+    loan_amount: initialLoan.loan_amount ?? '',
+  }))
   const [submitting, setSubmitting] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -247,7 +266,13 @@ export default function LoanStatusUpdateAction({
   // This keeps the form in step with the host without forcing the
   // parent to imperatively reset our local state.
   useEffect(() => {
-    setForm(formFromLoan(initialLoan))
+    const newForm = formFromLoan(initialLoan)
+    setForm(newForm)
+    setInitialRawValues({
+      loan_status: initialLoan.loan_status ?? '',
+      loan_lender: initialLoan.loan_lender ?? '',
+      loan_amount: initialLoan.loan_amount ?? '',
+    })
     setDone(false)
     setSubmitError(null)
     setValidationError(null)
@@ -285,37 +310,36 @@ export default function LoanStatusUpdateAction({
   // field is a no-op; a present field with ``null`` clears the
   // persisted value; a present field with a string updates it.
   //
-  // We compare the operator's *current* entry against the initial
-  // snapshot to decide whether the field changed:
+  // We compare the operator's *current* entry against the *initial
+  // raw value at mount/re-sync time* to decide whether the field
+  // changed:
   //
   // * If the field is byte-identical to the initial raw value
-  //   (operator left it alone), omit it. This is how the form
-  //   achieves the partial-update contract: a PATCH that only
-  //   changes ``loan_status`` does not resend ``loan_lender`` /
-  //   ``loan_amount`` (the backend treats them as no-ops and
-  //   preserves the persisted values).
+  //   (operator left it alone since mount or the last re-sync),
+  //   omit it. This achieves the partial-update contract: a PATCH
+  //   that only changes ``loan_status`` does not resend
+  //   ``loan_lender`` / ``loan_amount`` (the backend treats them as
+  //   no-ops and preserves the persisted values).
   // * Otherwise the operator typed something different (a real
-  //   value, a corrected whitespace, or a single-space-to-empty
-  //   clear), so we send the trimmed value (``null`` when the
-  //   trimmed result is empty so the backend clears the
-  //   persisted column).
+  //   value, a corrected whitespace, or whitespace into an empty
+  //   field), so we send the trimmed value (``null`` when the
+  //   trimmed result is empty so the backend clears the persisted
+  //   column).
   //
-  // Comparing the *raw* form value (not the trimmed one) is
-  // important: an operator who types a single space into a
-  // previously-empty field has actively expressed an intent to
-  // interact with it, and the backend's own whitespace validator
-  // strips whitespace-only strings to ``null`` — so the
-  // round-tripped clear lands on the persisted column. Comparing
-  // trimmed values (as the previous iteration did) silently
-  // dropped that intent.
+  // We track ``initialRawValues`` separately from ``initialLoan``
+  // because the latter is nullable while the form always uses
+  // empty strings. Comparing against ``initialRawValues`` correctly
+  // detects when the operator typed whitespace into a field that
+  // was previously ``null`` — the raw comparison differs (``"  "``
+  // !== ``""``), so we send ``null`` as an explicit clear.
   const body: UpdateLoanRequest = {}
-  if (form.loan_status !== (initialLoan.loan_status ?? '')) {
+  if (form.loan_status !== initialRawValues.loan_status) {
     body.loan_status = trimmedStatus === '' ? null : trimmedStatus
   }
-  if (form.loan_lender !== (initialLoan.loan_lender ?? '')) {
+  if (form.loan_lender !== initialRawValues.loan_lender) {
     body.loan_lender = trimmedLender === '' ? null : trimmedLender
   }
-  if (form.loan_amount !== (initialLoan.loan_amount ?? '')) {
+  if (form.loan_amount !== initialRawValues.loan_amount) {
     body.loan_amount = amountValue
   }
 
