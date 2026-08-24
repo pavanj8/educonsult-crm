@@ -16,6 +16,7 @@ def test_tenant_model_has_required_columns():
         "logo_url",
         "brand_color",
         "currency",
+        "plan_id",
         "created_at",
         "updated_at",
     }

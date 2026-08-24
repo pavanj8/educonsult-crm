@@ -1,4 +1,4 @@
-"""Tenant management routes (E8; Journey J1; E10 logo upload + branding PATCH)."""
+"""Tenant management routes (E8; Journey J1; E10 logo upload + branding PATCH; E9 plan assignment)."""
 
 import secrets
 from typing import Annotated
@@ -6,12 +6,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth.password import hash_password
 from app.db.database import get_db
 from app.email.owner_invite import send_owner_invite_email
 from app.email.service import EmailDeliveryError
+from app.models.plan import Plan, PlanTier
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.rbac import Permission
@@ -19,6 +20,8 @@ from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.tenant import (
+    AssignPlanRequest,
+    PlanResponse,
     TenantBrandingUpdateRequest,
     TenantCreateRequest,
     TenantResponse,
@@ -159,6 +162,23 @@ def list_tenants(
     """List all consultancy tenants (super admin only)."""
     try:
         return db.query(Tenant).order_by(Tenant.id).all()
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+
+@router.get("/plans", response_model=list[PlanResponse])
+def list_plans(
+    _current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.BILLING_PLATFORM))
+    ],
+    db: Session = Depends(get_db),
+) -> list[Plan]:
+    """List platform plans in seed order, including retired tiers."""
+    try:
+        return db.query(Plan).order_by(Plan.id).all()
     except OperationalError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -442,6 +462,175 @@ async def upload_tenant_logo(
 
     db.refresh(tenant)
     return tenant
+
+
+#: Stable 404 detail used by the assign/change-plan endpoint when the
+#: target tenant does not exist. Shared with the existing tenant-detail
+#: endpoint so a probe cannot tell "tenant id used to exist" from "tenant
+#: id was never valid".
+_PLAN_TENANT_NOT_FOUND_DETAIL = TENANT_NOT_FOUND_DETAIL
+#: Stable 404 detail for "the requested plan code does not exist in the
+#: catalog". Surfaced as 404 (not 400) because a stale plan code on a
+#: retired tier is semantically the same as "this row is not in the
+#: catalog right now".
+_PLAN_NOT_FOUND_DETAIL = "Plan not found"
+#: Stable 409 detail for "the requested plan exists but is retired
+#: (``is_active=False``)". We do not allow re-activating retired tiers
+#: via this endpoint -- that is a platform-admin concern, not a
+#: super-admin tenant-management one.
+_PLAN_RETIRED_DETAIL = "Plan is no longer active"
+
+
+def _resolve_plan_for_assignment(plan_code: str, db: Session) -> Plan:
+    """Resolve a ``plan_code`` payload to a catalog row, or raise 404/409.
+
+    Failure modes (in order of preference):
+
+    * Unknown code -- 404 ``_PLAN_NOT_FOUND_DETAIL``. The schema's
+      ``plan_code`` validator already rejects *malformed* codes
+      (anything outside the three ``PlanTier`` values) as 422; this
+      branch handles the "schema-valid but the catalog row was
+      removed" case.
+    * Retired tier (``is_active=False``) -- 409 ``_PLAN_RETIRED_DETAIL``.
+      A retired plan is a *known* tier, just not currently sellable;
+      the assign endpoint must not silently re-activate it.
+
+    The endpoint is super-admin only, so a 404 here is honest about
+    plan-code existence (cross-tenant probing is not a concern -- the
+    platform has exactly one catalog).
+    """
+    try:
+        plan = (
+            db.query(Plan)
+            .filter(Plan.code == PlanTier(plan_code))
+            .one_or_none()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_PLAN_NOT_FOUND_DETAIL,
+        )
+
+    if not plan.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_PLAN_RETIRED_DETAIL,
+        )
+
+    return plan
+
+
+@router.post(
+    "/{tenant_id}/plan",
+    response_model=TenantResponse,
+    status_code=status.HTTP_200_OK,
+)
+def assign_tenant_plan(
+    tenant_id: int,
+    payload: AssignPlanRequest,
+    _current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.BILLING_PLATFORM))
+    ],
+    db: Session = Depends(get_db),
+) -> Tenant:
+    """Assign or change a tenant's subscription plan (E9 task #106; Journey J2).
+
+    Super-admin only (``billing:platform`` permission, which is granted
+    to ``SUPER_ADMIN`` and to no other role). The endpoint:
+
+    1. Loads the target tenant (404 ``_PLAN_TENANT_NOT_FOUND_DETAIL``
+       if missing).
+    2. Resolves the requested ``plan_code`` against the platform-level
+       catalog (404 if unknown, 409 if retired) via
+       :func:`_resolve_plan_for_assignment`.
+    3. Writes ``Tenant.plan_id`` (replacing any previous value --
+       "assign or change" in the epic language) and commits.
+    4. Refreshes the tenant and returns the updated
+       :class:`TenantResponse` (with the nested ``plan`` payload).
+
+    The endpoint is idempotent in the sense that calling it twice with
+    the same ``plan_code`` does not raise -- it just re-writes the same
+    FK. A change to a *different* plan is a real write and updates
+    ``Tenant.updated_at`` via the standard SQLAlchemy ``onupdate``
+    hook. There is no "unset plan" body (the column is nullable but
+    removing a plan is a platform-admin operation, not a super-admin
+    tenant-management one).
+
+    Errors
+    ------
+    * 401 -- caller is not authenticated.
+    * 403 -- caller lacks ``billing:platform``.
+    * 404 -- tenant does not exist, or ``plan_code`` is unknown.
+    * 409 -- plan exists but is retired (``is_active=False``).
+    * 422 -- ``plan_code`` is missing, empty, or not one of the three
+      ``PlanTier`` values (schema-layer validation).
+    * 503 -- database is unavailable.
+
+    Traceability
+    ------------
+    * Requirements §4 (Billing & Subscription: 3 tiers, super-admin
+      platform-level).
+    * Journey J2 (Super Admin sets/updates a tenant's subscription
+      plan).
+    * Epic E9 (Subscription Plan Assignment); sibling ticket #105 owns
+      the catalog itself and #107 owns the per-tier limit enforcement
+      (a tenant cannot be assigned a tier that would immediately be
+      over its limits -- the assign endpoint deliberately does NOT
+      enforce that here; the limit checks live in their own endpoint
+      so the assign/change API stays a pure state-change surface).
+    """
+    try:
+        tenant = db.get(Tenant, tenant_id)
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_PLAN_TENANT_NOT_FOUND_DETAIL,
+        )
+
+    plan = _resolve_plan_for_assignment(payload.plan_code, db)
+
+    tenant.plan_id = plan.id
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # The only realistic FK violation here would be a race where
+        # the plan row was deleted between the resolution above and
+        # the commit. The schema has ``ondelete="RESTRICT"`` so a
+        # concurrent delete would fail with IntegrityError; we treat
+        # that the same as a 404 on the plan code.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_PLAN_NOT_FOUND_DETAIL,
+        ) from None
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.expire_all()
+    refreshed = (
+        db.query(Tenant)
+        .options(selectinload(Tenant.plan))
+        .filter(Tenant.id == tenant.id)
+        .one()
+    )
+    return refreshed
 
 
 __all__ = ["router"]

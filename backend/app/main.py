@@ -24,6 +24,7 @@ from app.routers.student_documents import router as student_documents_router
 from app.routers.students import router as students_router
 from app.routers.tenants import router as tenants_router
 from app.routers.verifier import router as verifier_router
+from app.seed.plans import seed_default_plans_if_empty
 from app.seed.runner import seed_demo_data_if_empty
 
 
@@ -53,6 +54,12 @@ def _ensure_sqlite_schema() -> None:
     if _owns_schema_lifecycle():
         Base.metadata.create_all(bind=engine)
         with SessionLocal() as session:
+            # E9 task #106: the plans catalog must exist before the very
+            # first tenant is created (otherwise ``POST /tenants/{id}/plan``
+            # cannot resolve a ``plan_code`` against any row). The
+            # platform-level seed runs unconditionally; the seeder is
+            # idempotent so a populated DB is a no-op.
+            seed_default_plans_if_empty(session)
             seed_demo_data_if_empty(session)
 
 
