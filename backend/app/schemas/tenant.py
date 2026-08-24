@@ -1,4 +1,4 @@
-"""Pydantic schemas for tenant management endpoints (E8; Journey J1; E10 branding).
+"""Pydantic schemas for tenant management endpoints (E8; Journey J1; E10 branding; E9 plan assignment).
 
 * E10 task #109 owns the three new columns on ``Tenant``
   (``logo_url`` / ``brand_color`` / ``currency``) and surfaces them
@@ -7,6 +7,11 @@
   ``PATCH /tenants/{id}/branding`` endpoint that consumes it.
 * E10 task #111 owns the separate logo-upload endpoint and the
   storage backend that hands back a signed URL for ``logo_url``.
+* E9 task #106 owns the ``PlanResponse`` / ``AssignPlanRequest``
+  schemas and the ``POST /tenants/{id}/plan`` super-admin
+  assign/change-plan endpoint (Journey J2; Requirements §4
+  Billing & Subscription). The plan catalog itself (the rows) is
+  defined by E9 task #105; this module only ships the wire shape.
 """
 
 import re
@@ -16,6 +21,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.i18n.currency import InvalidCurrencyCodeError, normalize_currency_code
+from app.models.plan import PlanTier
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -67,6 +73,63 @@ class TenantCreateRequest(BaseModel):
         return normalized
 
 
+class PlanResponse(BaseModel):
+    """Wire shape for a row in the platform-level plans catalog (E9; Journey J2).
+
+    Mirrors :class:`app.models.plan.Plan` -- the stable string tier
+    code (the wire value, not the enum member), the display name, the
+    per-tier limit columns, and the ``is_active`` retirement flag.
+    The full description is intentionally omitted from the default
+    shape to keep the cross-tenant list endpoint payload small; the
+    plan-detail UI in E45 / J38 is a future ticket.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: PlanTier
+    name: str
+    max_branches: int | None
+    max_staff: int | None
+    max_students: int | None
+    is_active: bool
+
+
+class AssignPlanRequest(BaseModel):
+    """Request body for ``POST /tenants/{id}/plan`` (E9 task #106; Journey J2).
+
+    The super admin supplies the stable tier code from
+    :class:`PlanTier`; the endpoint resolves it against the plans
+    catalog. The accepted values match the on-disk ``plans.code``
+    column exactly so the wire format and the storage format stay in
+    sync. Whitespace is stripped and the value is lower-cased to
+    tolerate the case a JSON client might use.
+    """
+
+    plan_code: str = Field(min_length=1, max_length=32)
+
+    @field_validator("plan_code", mode="before")
+    @classmethod
+    def _normalize_plan_code(cls, value: Any) -> str:
+        if value is None:
+            raise ValueError("plan_code must not be null")
+        if not isinstance(value, str):
+            raise ValueError("plan_code must be a string")
+        candidate = value.strip().lower()
+        if not candidate:
+            raise ValueError("plan_code must not be empty")
+        # Reject unknown codes at the schema layer so the endpoint can
+        # distinguish "caller did not pass a valid PlanTier" (422) from
+        # "the plan exists but is retired" (409) or "the tenant does
+        # not exist" (404).
+        valid_codes = {member.value for member in PlanTier}
+        if candidate not in valid_codes:
+            raise ValueError(
+                f"plan_code must be one of: {', '.join(sorted(valid_codes))}"
+            )
+        return candidate
+
+
 class TenantResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -78,6 +141,12 @@ class TenantResponse(BaseModel):
     # E10 task #109: ``currency`` is NOT NULL on the row (server default
     # ``"INR"``) and is therefore always populated on the response.
     currency: str
+    # E9 task #106: nested plan payload (None when no plan has been
+    # assigned yet). Built from the relationship lazy-load in
+    # ``app.routers.tenants`` -- the endpoint passes the freshly
+    # refreshed ``Plan`` row in via ``_plan_response_for`` so the
+    # response does not need an extra round-trip after the commit.
+    plan: PlanResponse | None = None
     created_at: datetime
     updated_at: datetime
 
