@@ -16,6 +16,7 @@ from app.rbac.permissions import Permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.student import StaffCreateStudentRequest, StaffCreateStudentResponse
+from app.services.plan_limits import PlanLimitExceeded, enforce_student_limit
 
 router = APIRouter()
 _DB_UNAVAILABLE_DETAIL = "Student service is temporarily unavailable"
@@ -56,6 +57,13 @@ def create_student(
         payload.email,
         unavailable_detail=_DB_UNAVAILABLE_DETAIL,
     )
+    try:
+        enforce_student_limit(db, current_user.tenant_id)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from None
     student = User(
         email=payload.email,
         password_hash=hash_password(payload.password),

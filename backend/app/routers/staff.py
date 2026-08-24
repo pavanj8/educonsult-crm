@@ -17,6 +17,7 @@ from app.rbac.dependencies import require_permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.staff import StaffCreateRequest, StaffResponse, StaffUpdateRequest
+from app.services.plan_limits import PlanLimitExceeded, enforce_staff_limit
 
 router = APIRouter()
 
@@ -209,6 +210,14 @@ def create_staff(
         branch_id=payload.branch_id,
     )
     _get_tenant_branch(payload.branch_id, current_user, db)
+
+    try:
+        enforce_staff_limit(db, current_user.tenant_id)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from None
 
     try:
         existing_user = (

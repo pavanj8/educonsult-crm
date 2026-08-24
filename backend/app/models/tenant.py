@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -36,6 +36,23 @@ class Tenant(Base):
     currency: Mapped[str] = mapped_column(
         String(3), nullable=False, server_default="INR"
     )
+    # E9 task #107: nullable FK to the platform-level plans catalog
+    # (E9 task #105). E9 task #106 (assign/change plan API) owns the
+    # write side; this module only consumes the column to enforce
+    # per-tier limits (branches / staff / students). Nullable because
+    # a tenant exists before a Super Admin has picked a tier, and
+    # ``PlanLimitExceeded`` enforcement short-circuits to no-cap when
+    # ``plan_id`` is NULL -- so existing tenants created before a
+    # plan was assigned continue to create branches / staff /
+    # students without errors. ON DELETE RESTRICT matches the
+    # catalog row's lifecycle (active tiers cannot be removed while
+    # tenants still reference them).
+    plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("plans.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    plan = relationship("Plan", foreign_keys=[plan_id])
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

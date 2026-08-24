@@ -14,6 +14,7 @@ from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.user import AuthenticatedUser
 from app.schemas.branch import BranchCreateRequest, BranchResponse, BranchUpdateRequest
+from app.services.plan_limits import PlanLimitExceeded, enforce_branch_limit
 
 router = APIRouter()
 
@@ -64,6 +65,14 @@ def create_branch(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
         )
+
+    try:
+        enforce_branch_limit(db, current_user.tenant_id)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from None
 
     branch = Branch(
         tenant_id=current_user.tenant_id,
