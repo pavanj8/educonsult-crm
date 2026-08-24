@@ -51,6 +51,7 @@ function renderRow(props: Partial<React.ComponentProps<typeof ApplicationRow>> =
 describe('ApplicationRow', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.clearAllMocks()
     localStorage.clear()
     localStorage.setItem('access_token', 'test-token')
   })
@@ -161,5 +162,21 @@ describe('ApplicationRow', () => {
     // year fragment is present and the raw ISO string is not shown as-is.
     expect(screen.getByText(/2026/)).toBeInTheDocument()
     expect(screen.queryByText('2026-01-15T10:00:00Z')).not.toBeInTheDocument()
+  })
+
+  it('renders "Not opted in" when loan_opt_in is false', () => {
+    globalThis.fetch = vi.fn() as typeof fetch
+
+    renderRow({ application: { ...mockApplication, loan_opt_in: false } })
+
+    expect(screen.getByTestId('application-loan-opt-in-7')).toHaveTextContent('Not opted in')
+  })
+
+  it('renders "Opted in" when loan_opt_in is true', () => {
+    globalThis.fetch = vi.fn() as typeof fetch
+
+    renderRow({ application: { ...mockApplication, loan_opt_in: true } })
+
+    expect(screen.getByTestId('application-loan-opt-in-7')).toHaveTextContent('Opted in')
   })
 })

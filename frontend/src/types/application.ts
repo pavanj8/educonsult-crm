@@ -94,13 +94,4 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
 export type CreateApplicationRequest = {
   university_id: number
   program_id: number
-  /**
-   * Optional loan-tracking opt-in for the new application (E36; Journey
-   * J29). When omitted the backend defaults to ``false``. Note: the
-   * backend ``CreateApplicationRequest`` schema currently does not
-   * accept this field — passing it is forward-compatible but the value
-   * is ignored until the backend schema is extended. The toggle on the
-   * application row remains the canonical way to opt in / out for now.
-   */
-  loan_opt_in?: boolean
 }
