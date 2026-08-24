@@ -32,7 +32,7 @@ whatever it has already loaded without a precondition dance.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.email.config import app_base_url
 from app.email.service import send_email
@@ -50,7 +50,11 @@ __all__ = [
 
 
 def _format_scheduled_at(when: datetime) -> str:
-    """Render a meeting time using its timezone's UTC offset.
+    """Render a meeting time in UTC, independent of the server's timezone.
+
+    Converting to UTC explicitly (rather than the bare ``astimezone()``,
+    which uses the host's local zone) keeps the emailed time correct and
+    consistent no matter what timezone the server runs in.
 
     Raises:
         ValueError: If ``when`` is naive or otherwise has no valid
@@ -58,7 +62,7 @@ def _format_scheduled_at(when: datetime) -> str:
     """
     if when.tzinfo is None or when.utcoffset() is None:
         raise ValueError("scheduled_at must be a timezone-aware datetime")
-    return when.astimezone().strftime("%Y-%m-%d %H:%M %Z")
+    return when.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _student_dashboard_url() -> str:
