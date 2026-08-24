@@ -83,8 +83,9 @@ def test_registrations_over_time_branch_manager_sees_own_branch_only(
         )
 
     # Query with a wide date range to capture all test data
-    start_date = (datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)).isoformat()
-    end_date = (datetime(2025, 2, 28, 23, 59, 59, tzinfo=timezone.utc)).isoformat()
+    # Use date-only format for clarity
+    start_date = "2025-01-01"
+    end_date = "2025-02-28"
 
     response = client.get(
         f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",
@@ -125,9 +126,11 @@ def test_registrations_over_time_owner_sees_all_branches(
         )
         other_students.append(student)
 
-    # Query with owner token
+    # Query with owner token using date range that includes test data
+    start_date = "2025-01-01"
+    end_date = "2025-02-28"
     response = client.get(
-        "/analytics/registrations-over-time",
+        f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",
         headers=owner_auth_headers,
     )
     assert response.status_code == status.HTTP_200_OK
@@ -146,6 +149,9 @@ def test_registrations_over_time_default_date_range(
     students_in_branch,
 ):
     """Test default date range (last 30 days)."""
+    # The students_in_branch fixture creates students around 2025-01-15
+    # Default range should return data, but may not include the test data
+    # depending on when the test runs. We just verify the endpoint works.
     response = client.get(
         "/analytics/registrations-over-time",
         headers=branch_manager_auth_headers,
@@ -155,9 +161,9 @@ def test_registrations_over_time_default_date_range(
     data = response.json()
     assert isinstance(data, list)
 
-    # With 30-day window, we should get exactly 30 data points (one per day)
+    # With 30-day window, we should get exactly 31 data points (one per day)
     # even if some have zero registrations
-    assert len(data) <= 31  # Allow for slight off-by-one
+    assert len(data) == 31
 
     # All items should have 'date' and 'count' keys
     for item in data:
@@ -173,8 +179,9 @@ def test_registrations_over_time_custom_date_range(
     students_in_branch,
 ):
     """Test custom start_date and end_date parameters."""
-    start_date = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
-    end_date = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    # Use date-only format for simplicity
+    start_date = "2025-01-01"
+    end_date = "2025-01-31"
 
     response = client.get(
         f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",
@@ -185,8 +192,8 @@ def test_registrations_over_time_custom_date_range(
     data = response.json()
     assert isinstance(data, list)
 
-    # Should have data for the custom range
-    assert len(data) >= 1
+    # Should have data for the custom range (31 days)
+    assert len(data) == 31
 
 
 def test_registrations_over_time_chronological_order(
@@ -195,8 +202,12 @@ def test_registrations_over_time_chronological_order(
     students_in_branch,
 ):
     """Results should be in chronological order."""
+    # Use a specific date range that includes our test data
+    start_date = "2025-01-01"
+    end_date = "2025-02-28"
+
     response = client.get(
-        "/analytics/registrations-over-time",
+        f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",
         headers=branch_manager_auth_headers,
     )
     assert response.status_code == status.HTTP_200_OK
@@ -214,15 +225,19 @@ def test_registrations_over_time_zero_counts_for_empty_days(
     students_in_branch,
 ):
     """Days with no registrations should have count=0."""
+    # Use a wide date range that includes our test data
+    start_date = "2025-01-01"
+    end_date = "2025-02-28"
+
     response = client.get(
-        "/analytics/registrations-over-time",
+        f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",
         headers=branch_manager_auth_headers,
     )
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
 
-    # With 10 students spread over ~30 days, there should be days with zero count
+    # With 10 students spread over ~59 days, there should be days with zero count
     zero_count_days = [item for item in data if item["count"] == 0]
     assert len(zero_count_days) > 0
 
@@ -254,9 +269,11 @@ def test_registrations_over_time_non_student_users_excluded(
             created_at=base_time,
         )
 
-    # Query analytics
+    # Query analytics with date range that includes the test data
+    start_date = "2025-01-01"
+    end_date = "2025-01-31"
     response = client.get(
-        "/analytics/registrations-over-time",
+        f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",
         headers=branch_manager_auth_headers,
     )
     assert response.status_code == status.HTTP_200_OK
@@ -332,8 +349,11 @@ def test_registrations_over_time_includes_only_students(
         created_at=base_time,
     )
 
+    # Query analytics with date range that includes the test data
+    start_date = "2025-01-01"
+    end_date = "2025-01-31"
     response = client.get(
-        "/analytics/registrations-over-time",
+        f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",
         headers=branch_manager_auth_headers,
     )
     assert response.status_code == status.HTTP_200_OK
