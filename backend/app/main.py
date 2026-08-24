@@ -97,6 +97,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="EduConsult CRM", lifespan=lifespan)
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 app.include_router(applications_router, prefix="/applications", tags=["applications"])
 app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 app.include_router(checklist_router, prefix="/applications", tags=["checklist"])
