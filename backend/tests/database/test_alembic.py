@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "p8q9r0s1t2u3"
+HEAD_REVISION = "q9r0s1t2u3v4"
 
 
 def _alembic_config() -> Config:
@@ -220,6 +220,31 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "created_at",
             "updated_at",
         }
+        # E34 task #193 (J27): visa type + embassy interview date
+        # recorded by a Visa Processor against an application.
+        assert "visa_details" in table_names
+        visa_detail_columns = {
+            column["name"] for column in inspect(connection).get_columns("visa_details")
+        }
+        assert visa_detail_columns == {
+            "id",
+            "tenant_id",
+            "application_id",
+            "visa_type",
+            "interview_date",
+            "created_at",
+            "updated_at",
+        }
+        visa_detail_indexes = {
+            index["name"] for index in inspect(connection).get_indexes("visa_details")
+        }
+        assert "ix_visa_details_tenant_id" in visa_detail_indexes
+        assert "ix_visa_details_application_id" in visa_detail_indexes
+        visa_detail_unique_constraints = {
+            constraint["name"]
+            for constraint in inspect(connection).get_unique_constraints("visa_details")
+        }
+        assert "uq_visa_details_application_id" in visa_detail_unique_constraints
         # E9 task #105: platform-level subscription plan catalog
         # (Starter/Growth/Enterprise + per-tier limits).
         assert "plans" in table_names
