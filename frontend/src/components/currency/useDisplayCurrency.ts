@@ -1,11 +1,10 @@
 import { useMemo } from 'react'
 
-import { useBranding } from '../../store/brandingStore'
+import { useTenantBranding } from '../../hooks/useTenantBranding'
 import {
   DEFAULT_CURRENCY_CODE,
   isSupportedCurrencyCodeValue,
   normalizeCurrencyCode,
-  type SupportedCurrencyCode,
 } from './formatCurrencyAmount'
 
 export interface DisplayCurrency {
@@ -58,7 +57,7 @@ export interface DisplayCurrency {
  * a string the formatter will accept.
  */
 export function useDisplayCurrency(): DisplayCurrency {
-  const { tenant, loading } = useBranding()
+  const { tenant, loading } = useTenantBranding()
 
   return useMemo<DisplayCurrency>(() => {
     const candidate = tenant?.currency ?? null

@@ -31,7 +31,7 @@ describe('normalizeCurrencyCode', () => {
     expect(normalizeCurrencyCode('CHF')).toBe('CHF')
   })
 
-  it.each([
+  it.each<[unknown, string]>([
     ['', 'empty string'],
     ['us', 'too short'],
     ['usdd', 'too long'],

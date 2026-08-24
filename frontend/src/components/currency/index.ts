@@ -16,7 +16,7 @@ export type { CurrencyAmountProps } from './CurrencyAmount'
 export { default as TenantCurrencyAmount } from './TenantCurrencyAmount'
 export type { TenantCurrencyAmountProps } from './TenantCurrencyAmount'
 
-export { default as useDisplayCurrency } from './useDisplayCurrency'
+export { useDisplayCurrency } from './useDisplayCurrency'
 export type { DisplayCurrency } from './useDisplayCurrency'
 
 export {
