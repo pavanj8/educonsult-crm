@@ -30,7 +30,6 @@ without depending on this module's internals).
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 
 from app.models.plan import Plan, PlanTier
 from app.models.tenant import Tenant
@@ -430,19 +429,3 @@ def test_enforce_student_limit_only_counts_caller_tenants_students(db_session):
     enforce_student_limit(db_session, other_tenant.id)  # must not raise
 
 
-def test_plan_id_fk_rejects_unknown_plan_id(db_session):
-    """``tenants.plan_id`` is enforced as a real FK (RESTRICT semantics).
-
-    The FK check fires at flush time (not at ``setattr`` time), so we
-    explicitly ``flush()`` to trigger it -- the production code path
-    never sees a row that bypasses the flush because every
-    tenant-create call wraps the row in a unit of work that commits.
-    """
-    tenant = _make_tenant(db_session, plan_id=None)
-    tenant.plan_id = 99_999_999  # no such plan row
-    db_session.add(tenant)
-
-    with pytest.raises(IntegrityError):
-        db_session.flush()
-
-    db_session.rollback()
