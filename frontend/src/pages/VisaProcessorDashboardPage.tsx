@@ -1,3 +1,4 @@
+import VisaOutcomeAction from '../components/visa/VisaOutcomeAction'
 import { useVisaQueue } from '../hooks/useVisaQueue'
 import { PIPELINE_STAGE_LABELS } from '../types/application'
 
@@ -10,12 +11,15 @@ function formatDate(iso: string): string {
  * Visa processor dashboard — the visa-stage applications queue view
  * (E33; Journey J26; #192). Lists applications currently in the
  * ``visa_processing`` pipeline stage so the visa processor can pick
- * the next application to work on. Visa detail recording (E34) and
- * outcome updates (E35) are out of scope for this ticket; the rows
- * here are intentionally read-only.
+ * the next application to work on, and surfaces a per-row
+ * :ts:comp:`VisaOutcomeAction` (E35; Journey J28; #196) so the visa
+ * processor can record or update the visa outcome/status from this
+ * dashboard directly. Visa detail recording (E34) is out of scope for
+ * this ticket.
  */
 export default function VisaProcessorDashboardPage() {
-  const { applications, total, loading, error, reload } = useVisaQueue()
+  const { applications, total, outcomes, loading, error, reload, rememberOutcome } =
+    useVisaQueue()
 
   return (
     <section
@@ -68,6 +72,7 @@ export default function VisaProcessorDashboardPage() {
                   <th scope="col">Counselor</th>
                   <th scope="col">University / Program</th>
                   <th scope="col">Stage</th>
+                  <th scope="col">Outcome</th>
                   <th scope="col">Created</th>
                 </tr>
               </thead>
@@ -88,6 +93,15 @@ export default function VisaProcessorDashboardPage() {
                     <td>
                       {PIPELINE_STAGE_LABELS[app.stage as keyof typeof PIPELINE_STAGE_LABELS] ??
                         app.stage}
+                    </td>
+                    <td>
+                      <VisaOutcomeAction
+                        applicationId={app.id}
+                        initialOutcome={outcomes[app.id] ?? null}
+                        onUpdated={(_id, outcome) => {
+                          rememberOutcome(outcome)
+                        }}
+                      />
                     </td>
                     <td>{formatDate(app.created_at)}</td>
                   </tr>
