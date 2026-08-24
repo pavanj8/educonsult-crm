@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "9abd2b26ef086ede"
+HEAD_REVISION = "o8p9q0r1s2t3"
 
 
 def _alembic_config() -> Config:
@@ -216,6 +216,24 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "application_id",
             "author_user_id",
             "body",
+            "created_at",
+            "updated_at",
+        }
+        # E9 task #105: platform-level subscription plan catalog
+        # (Starter/Growth/Enterprise + per-tier limits).
+        assert "plans" in table_names
+        plan_columns = {
+            column["name"] for column in inspect(connection).get_columns("plans")
+        }
+        assert plan_columns == {
+            "id",
+            "code",
+            "name",
+            "description",
+            "max_branches",
+            "max_staff",
+            "max_students",
+            "is_active",
             "created_at",
             "updated_at",
         }
