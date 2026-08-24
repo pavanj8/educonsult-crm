@@ -7,6 +7,7 @@ from app.models.meeting import Meeting
 from app.models.note import Note
 from app.models.notification import Notification
 from app.models.password_reset_token import PasswordResetToken
+from app.models.plan import Plan, PlanTier
 from app.models.program import Program
 from app.models.stage_history import StageHistory
 from app.models.stage_transition import StageTransition
@@ -26,6 +27,8 @@ __all__ = [
     "Note",
     "Notification",
     "PasswordResetToken",
+    "Plan",
+    "PlanTier",
     "Program",
     "StageHistory",
     "StageTransition",
