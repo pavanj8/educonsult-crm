@@ -503,7 +503,10 @@ def test_post_register_student_succeeds_when_plan_has_no_student_cap(
 
     response = client.post(
         "/auth/register-student",
-        json=make_register_student_payload(branch_id=branch.id),
+        json=make_register_student_payload(
+            tenant_slug=tenant.slug,
+            branch_id=branch.id,
+        ),
     )
 
     assert response.status_code == 201
