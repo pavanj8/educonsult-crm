@@ -33,21 +33,18 @@ function mapError(err: unknown): string {
  *
  * Rendered on the student application row, this control surfaces the
  * application's current ``loan_opt_in`` flag (Requirements §5:
- * "Loans: Tracking-only fields (opted-in, status, amount, lender) — no
- * separate loan officer workflow for v1") and lets the student toggle
- * it on or off. The backend persistence is the
- * ``PATCH /applications/{id}/loan-opt-in`` endpoint which is the
- * follow-up to this issue (the E36 backend field was added in #198;
- * the toggle endpoint is a natural follow-up because the loan
- * status / lender / amount fields are tracked separately in E37).
+ * "Loans: Tracking-only fields (opted-in, status, amount, lender) —
+ * no separate loan officer workflow for v1") and lets the student
+ * toggle it on or off. The backend persistence is the
+ * ``PATCH /applications/{id}/loan-opt-in`` endpoint, which is a
+ * student-only endpoint that returns the full updated ``Application``
+ * payload. The staff-side ``status / lender / amount`` fields are
+ * tracked separately under E37 (Journey J30) and are intentionally
+ * out of scope for this control.
  *
- * Until the backend endpoint exists, calls to ``setLoanOptIn`` will
- * return 404 from the API client; the UI surfaces that as a readable
- * "This application is no longer available" / "Failed to update"
- * error so the student sees the toggle attempt is acknowledged, not
- * silently dropped. The control stays disabled while the request is
- * in flight so the student cannot fire two concurrent toggles for
- * the same application.
+ * The control stays disabled while the request is in flight so the
+ * student cannot fire two concurrent toggles for the same
+ * application.
  */
 export default function LoanOptInAction({
   applicationId,

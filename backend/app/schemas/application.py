@@ -168,3 +168,38 @@ class ReassignCounselorRequest(BaseModel):
             "current counselor."
         ),
     )
+
+
+class SetLoanOptInRequest(BaseModel):
+    """Body for ``PATCH /applications/{id}/loan-opt-in`` (E36; Journey J29; issue #199).
+
+    Student-side opt-in toggle for loan tracking on an application.
+    Requirements §5: "Loans: Tracking-only fields (opted-in, status,
+    amount, lender) — no separate loan officer workflow for v1".
+    This endpoint owns the ``opted-in`` flag; the staff-side
+    ``status / lender / amount`` fields are tracked separately under
+    E37 (Journey J30) and are out of scope here.
+
+    The toggle is intentionally symmetric: a student may opt in AND
+    opt back out before loan-tracking fields are recorded (E37). Once
+    staff-side loan fields (lender / amount / status) have been
+    recorded the staff workflow continues to be authoritative for
+    those fields; a subsequent opt-out still flips ``loan_opt_in``
+    back to ``false`` and does not delete any staff-recorded loan
+    data. This is consistent with the v1 spec ("Tracking-only
+    fields").
+
+    The ``loan_opt_in`` field is ``strict=True`` so that Pydantic does
+    NOT silently coerce strings / ints to ``True`` (e.g. the truthy
+    string ``"yes"`` must surface as a 422, not silently become
+    ``True`` -- a future caller could be passing a UI form value
+    that needs to be an explicit ``true`` / ``false``).
+    """
+
+    loan_opt_in: bool = Field(
+        strict=True,
+        description=(
+            "Whether the student opts into loan tracking on this "
+            "application (true) or out of it (false)."
+        ),
+    )
