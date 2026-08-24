@@ -65,6 +65,23 @@ export type Application = {
   university_id: number
   program_id: number
   stage: PipelineStage
+  // E37 task #200: tracking-only loan fields (Journey J30; Requirements
+  // §5 "Loans: Tracking-only fields (opted-in, status, amount,
+  // lender) — no separate loan officer workflow for v1"). All
+  // nullable so the frontend can render "not yet recorded" states for
+  // fresh applications (and pre-E37 rows that pre-date the migration).
+  loan_opt_in?: boolean
+  loan_status: string | null
+  loan_lender: string | null
+  /**
+   * Loan amount as a JSON-decoded string (the backend's
+   * ``Numeric(12, 2)`` column round-trips through Pydantic v2 as a
+   * JSON string for precision). Use
+   * :ts:func:`../components/currency/formatCurrencyAmount.formatCurrencyAmount`
+   * to render it currency-aware in the tenant's display currency.
+   * ``null`` when the field has not been recorded yet.
+   */
+  loan_amount: string | null
   created_at: string
   updated_at: string
 }
