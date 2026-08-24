@@ -1,8 +1,8 @@
 /**
  * Branch Manager Analytics Dashboard (E41; Journey J34).
  *
- * Displays conversion funnel by stage with date-range filter.
- * Shows charts for branch-level analytics.
+ * Displays conversion funnel by stage and registrations-over-time
+ * with date-range filter. Shows charts for branch-level analytics.
  */
 
 import { useState } from 'react'
@@ -66,7 +66,8 @@ export default function BranchManagerDashboardPage() {
     dateRange = getDateRangeFromPreset(dateRangePreset)
   }
 
-  const { data, loading, error, reload } = useAnalytics(dateRange)
+  const { funnelData, registrationsData, loading, error, reload } =
+    useAnalytics(dateRange)
 
   const handlePresetChange = (preset: DateRangePreset) => {
     setDateRangePreset(preset)
@@ -175,7 +176,7 @@ export default function BranchManagerDashboardPage() {
         <p role="alert" data-testid="analytics-error">
           {error}
         </p>
-      ) : data ? (
+      ) : funnelData && registrationsData ? (
         <div className="analytics-content" data-testid="analytics-content">
           {/* Summary Stats */}
           <section
@@ -186,10 +187,16 @@ export default function BranchManagerDashboardPage() {
               Summary Statistics
             </h2>
             <div className="summary-cards">
+              <div className="summary-card" data-testid="total-registrations-card">
+                <dt>Total Registrations</dt>
+                <dd className="summary-value" data-testid="total-registrations-value">
+                  {registrationsData.total_registrations}
+                </dd>
+              </div>
               <div className="summary-card" data-testid="total-applications-card">
                 <dt>Total Applications</dt>
                 <dd className="summary-value" data-testid="total-applications-value">
-                  {data.total_applications}
+                  {funnelData.total_applications}
                 </dd>
               </div>
               <div
@@ -198,7 +205,7 @@ export default function BranchManagerDashboardPage() {
               >
                 <dt>Enrolled</dt>
                 <dd className="summary-value" data-testid="enrolled-value">
-                  {data.funnel.find((b) => b.stage === 'enrolled')?.count ?? 0}
+                  {funnelData.funnel.find((b) => b.stage === 'enrolled')?.count ?? 0}
                 </dd>
               </div>
               <div
@@ -207,10 +214,10 @@ export default function BranchManagerDashboardPage() {
               >
                 <dt>Conversion Rate</dt>
                 <dd className="summary-value" data-testid="conversion-rate-value">
-                  {data.total_applications > 0
+                  {funnelData.total_applications > 0
                     ? `${(
-                        ((data.funnel.find((b) => b.stage === 'enrolled')?.count ?? 0) /
-                          data.total_applications) *
+                        ((funnelData.funnel.find((b) => b.stage === 'enrolled')?.count ?? 0) /
+                          funnelData.total_applications) *
                         100
                       ).toFixed(1)}%`
                     : '0%'}
@@ -219,17 +226,80 @@ export default function BranchManagerDashboardPage() {
             </div>
           </section>
 
+          {/* Registrations Over Time Chart */}
+          <section
+            className="registrations-section"
+            aria-labelledby="registrations-heading"
+          >
+            <h2 id="registrations-heading">New Student Registrations Over Time</h2>
+            <RegistrationsChart data={registrationsData.data} />
+          </section>
+
           {/* Conversion Funnel Chart */}
           <section
             className="conversion-funnel-section"
             aria-labelledby="funnel-heading"
           >
             <h2 id="funnel-heading">Conversion Funnel by Stage</h2>
-            <ConversionFunnelChart funnel={data.funnel} />
+            <ConversionFunnelChart funnel={funnelData.funnel} />
           </section>
         </div>
       ) : null}
     </section>
+  )
+}
+
+/**
+ * Simple line chart for registrations-over-time.
+ * Uses HTML/CSS for accessibility and simplicity.
+ */
+interface RegistrationsChartProps {
+  data: Array<{ date: string; count: number }>
+}
+
+function RegistrationsChart({ data }: RegistrationsChartProps) {
+  const maxCount = Math.max(...data.map((d) => d.count), 1)
+
+  if (data.length === 0) {
+    return <p data-testid="no-registrations-data">No registrations data available</p>
+  }
+
+  return (
+    <div className="registrations-chart" data-testid="registrations-chart">
+      <table className="registrations-table">
+        <caption className="sr-only">New student registrations by date</caption>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">New Registrations</th>
+            <th scope="col" className="sr-only">
+              Bar chart
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((point) => (
+            <tr key={point.date} data-testid={`registration-row-${point.date}`}>
+              <th scope="row">{point.date}</th>
+              <td className="count-cell">{point.count}</td>
+              <td className="bar-cell">
+                <div
+                  className="bar"
+                  style={{
+                    width: `${(point.count / maxCount) * 100}%`,
+                  }}
+                  aria-label={`${point.count} new registrations on ${point.date}`}
+                >
+                  <span className="sr-only">
+                    {point.count} new registrations on {point.date}
+                  </span>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

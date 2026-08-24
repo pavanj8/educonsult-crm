@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event'
 import BranchManagerDashboardPage from './BranchManagerDashboardPage'
 
 // Mock the analytics hook
-const mockData = {
+const mockFunnelData = {
   funnel: [
     { stage: 'registered', count: 100 },
     { stage: 'counseling', count: 80 },
@@ -26,10 +26,20 @@ const mockData = {
   total_applications: 413,
 }
 
+const mockRegistrationsData = {
+  data: [
+    { date: '2024-01-01', count: 5 },
+    { date: '2024-01-02', count: 8 },
+    { date: '2024-01-03', count: 12 },
+  ],
+  total_registrations: 25,
+}
+
 const mockReload = vi.fn()
 
 const mockUseAnalytics = vi.fn(() => ({
-  data: mockData,
+  funnelData: mockFunnelData,
+  registrationsData: mockRegistrationsData,
   loading: false,
   error: null,
   reload: mockReload,
@@ -43,7 +53,8 @@ describe('BranchManagerDashboardPage', () => {
   beforeEach(() => {
     mockReload.mockClear()
     mockUseAnalytics.mockReturnValue({
-      data: mockData,
+      funnelData: mockFunnelData,
+      registrationsData: mockRegistrationsData,
       loading: false,
       error: null,
       reload: mockReload,
@@ -96,13 +107,47 @@ describe('BranchManagerDashboardPage', () => {
   it('renders summary statistics cards', () => {
     render(<BranchManagerDashboardPage />)
 
+    expect(screen.getByTestId('total-registrations-card')).toBeInTheDocument()
     expect(screen.getByTestId('total-applications-card')).toBeInTheDocument()
     expect(screen.getByTestId('enrolled-applications-card')).toBeInTheDocument()
     expect(screen.getByTestId('conversion-rate-card')).toBeInTheDocument()
 
+    expect(screen.getByTestId('total-registrations-value')).toHaveTextContent('25')
     expect(screen.getByTestId('total-applications-value')).toHaveTextContent('413')
     expect(screen.getByTestId('enrolled-value')).toHaveTextContent('15')
     expect(screen.getByTestId('conversion-rate-value')).toHaveTextContent('3.6%')
+  })
+
+  it('renders registrations chart heading', () => {
+    render(<BranchManagerDashboardPage />)
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'New Student Registrations Over Time',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders registrations chart table', () => {
+    render(<BranchManagerDashboardPage />)
+
+    const chart = screen.getByTestId('registrations-chart')
+    expect(chart).toBeInTheDocument()
+
+    // Check a few date rows
+    expect(screen.getByTestId('registration-row-2024-01-01')).toBeInTheDocument()
+    expect(screen.getByTestId('registration-row-2024-01-02')).toBeInTheDocument()
+    expect(screen.getByTestId('registration-row-2024-01-03')).toBeInTheDocument()
+  })
+
+  it('displays registrations counts correctly', () => {
+    render(<BranchManagerDashboardPage />)
+
+    const row1 = screen.getByTestId('registration-row-2024-01-01')
+    expect(row1).toHaveTextContent('5')
+
+    const row2 = screen.getByTestId('registration-row-2024-01-02')
+    expect(row2).toHaveTextContent('8')
   })
 
   it('renders conversion funnel chart heading', () => {
@@ -158,7 +203,8 @@ describe('BranchManagerDashboardPage', () => {
 
   it('shows loading state', () => {
     mockUseAnalytics.mockReturnValue({
-      data: null,
+      funnelData: null,
+      registrationsData: null,
       loading: true,
       error: null,
       reload: mockReload,
@@ -173,7 +219,8 @@ describe('BranchManagerDashboardPage', () => {
 
   it('shows error state', () => {
     mockUseAnalytics.mockReturnValue({
-      data: null,
+      funnelData: null,
+      registrationsData: null,
       loading: false,
       error: 'Failed to load',
       reload: mockReload,

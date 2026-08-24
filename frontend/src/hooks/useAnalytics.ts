@@ -1,21 +1,30 @@
 /**
  * React hook for analytics data (E41; Journey J34).
  *
- * Provides conversion funnel data with optional date range filtering.
+ * Provides conversion funnel and registrations-over-time data
+ * with optional date range filtering.
  */
 
 import { useState, useEffect } from 'react'
 
-import { fetchConversionFunnel } from '../api/analytics'
+import {
+  fetchConversionFunnel,
+  fetchRegistrationsOverTime,
+} from '../api/analytics'
 import type {
   AnalyticsParams,
   ConversionFunnelResponse,
   DateRange,
+  RegistrationsOverTimeResponse,
 } from '../types/analytics'
 import { isApiError } from '../api/client'
 
 export function useAnalytics(dateRange?: DateRange) {
-  const [data, setData] = useState<ConversionFunnelResponse | null>(null)
+  const [funnelData, setFunnelData] = useState<ConversionFunnelResponse | null>(
+    null
+  )
+  const [registrationsData, setRegistrationsData] =
+    useState<RegistrationsOverTimeResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,9 +40,13 @@ export function useAnalytics(dateRange?: DateRange) {
       params.end_date = dateRange.endDate
     }
 
-    fetchConversionFunnel(params)
-      .then((responseData) => {
-        setData(responseData)
+    Promise.all([
+      fetchConversionFunnel(params),
+      fetchRegistrationsOverTime(params),
+    ])
+      .then(([funnelResponse, registrationsResponse]) => {
+        setFunnelData(funnelResponse)
+        setRegistrationsData(registrationsResponse)
         setLoading(false)
       })
       .catch((err) => {
@@ -50,5 +63,5 @@ export function useAnalytics(dateRange?: DateRange) {
     reload()
   }, [dateRange?.startDate, dateRange?.endDate])
 
-  return { data, loading, error, reload }
+  return { funnelData, registrationsData, loading, error, reload }
 }

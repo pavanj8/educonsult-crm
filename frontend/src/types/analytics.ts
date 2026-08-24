@@ -5,6 +5,30 @@
  */
 
 /**
+ * A single data point in the registrations-over-time series.
+ * Represents the count of new student registrations for a specific date.
+ */
+export type RegistrationsOverTimeBucket = {
+  /** The date bucket in ISO 8601 format (YYYY-MM-DD) */
+  date: string
+  /** Number of new student registrations on this date */
+  count: number
+}
+
+/**
+ * Response for GET /analytics/registrations.
+ *
+ * Returns a time-series of student registrations grouped by date,
+ * ordered chronologically from oldest to newest.
+ */
+export type RegistrationsOverTimeResponse = {
+  /** Time-series data points of registrations over time */
+  data: RegistrationsOverTimeBucket[]
+  /** Total number of registrations in the filtered date range */
+  total_registrations: number
+}
+
+/**
  * A single stage in the conversion funnel. Represents the count of
  * applications currently at a specific pipeline stage, filtered by
  * date range and scoped to the caller's branch.
