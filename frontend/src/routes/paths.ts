@@ -14,6 +14,9 @@ export const STUDENT_DASHBOARD_PATH = '/dashboard'
 /** Document verifier dashboard route (E28; Journey J21). */
 export const VERIFIER_DASHBOARD_PATH = '/verifier'
 
+/** Visa processor dashboard route (E33; Journey J26; frontend #192). */
+export const VISA_DASHBOARD_PATH = '/visa'
+
 /** Counselor dashboard / assigned-application queue route (E21; Journey J14). */
 export const COUNSELOR_DASHBOARD_PATH = '/my-applications'
 
