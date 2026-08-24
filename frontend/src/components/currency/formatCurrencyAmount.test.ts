@@ -89,6 +89,26 @@ describe('formatCurrencyAmount', () => {
     expect(result.display).toMatch(/1,234\.56/)
   })
 
+  it('surfaces the ISO 4217 code exactly once in the rendered display', () => {
+    // Regression guard: ``Intl.NumberFormat({ currencyDisplay: 'code' })``
+    // already appends the code, so the formatter must not double it.
+    // A previous iteration appended ``${code}`` a second time, which
+    // rendered e.g. ``"USD 1,234.56 USD"`` for every amount and would
+    // have been a visible UX bug.
+    const usd = formatCurrencyAmount(1234.56, 'USD')
+    expect(usd.display).not.toMatch(/USD.*USD/)
+    // ``Intl.NumberFormat`` joins the code and amount with a
+    // non-breaking space (``\u00A0``), not a regular space. Assert on
+    // the substring with the literal separator so we exercise the
+    // same code path users see, regardless of ICU punctuation tweaks.
+    expect(usd.display).toContain('USD\u00A01,234.56')
+    expect(usd.display.endsWith('USD\u00A01,234.56')).toBe(true)
+
+    const inr = formatCurrencyAmount(123456, 'INR')
+    expect(inr.display).not.toMatch(/INR.*INR/)
+    expect(inr.display).toContain('INR\u00A01,23,456')
+  })
+
   it('renders integer amounts without a fractional part', () => {
     const result = formatCurrencyAmount(1000, 'EUR')
     expect(result.display).toMatch(/1,000(?!\.)/)

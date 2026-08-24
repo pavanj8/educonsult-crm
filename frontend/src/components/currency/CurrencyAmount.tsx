@@ -58,17 +58,10 @@ export default function CurrencyAmount({
   className,
   testId,
 }: CurrencyAmountProps) {
+  let display: string
+  let invalid = false
   try {
-    const { display } = formatCurrencyAmount(amount, currencyCode, { locale })
-    return (
-      <span
-        className={className ?? 'currency-amount'}
-        data-testid={testId ?? 'currency-amount'}
-        data-currency-code={currencyCode.toUpperCase()}
-      >
-        {display}
-      </span>
-    )
+    display = formatCurrencyAmount(amount, currencyCode, { locale }).display
   } catch (error) {
     // The component never throws upward — it renders a placeholder
     // span instead so a bug in one tenant's currency field cannot
@@ -82,13 +75,29 @@ export default function CurrencyAmount({
       // eslint-disable-next-line no-console
       console.warn(`CurrencyAmount: could not format ${String(amount)} ${currencyCode}`)
     }
+    invalid = true
+    display = ''
+  }
+
+  if (invalid) {
     return (
       <span
         className={className ?? 'currency-amount currency-amount--invalid'}
         data-testid={testId ? `${testId}-placeholder` : PLACEHOLDER_TEST_ID}
+        aria-label="unavailable amount"
       >
         —
       </span>
     )
   }
+
+  return (
+    <span
+      className={className ?? 'currency-amount'}
+      data-testid={testId ?? 'currency-amount'}
+      data-currency-code={currencyCode.toUpperCase()}
+    >
+      {display}
+    </span>
+  )
 }

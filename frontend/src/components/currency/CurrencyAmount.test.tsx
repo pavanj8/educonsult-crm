@@ -54,6 +54,7 @@ describe('CurrencyAmount', () => {
     expect(screen.queryByTestId('amount')).toBeNull()
     const placeholder = screen.getByTestId('amount-placeholder')
     expect(placeholder.textContent).toBe('—')
+    expect(placeholder.getAttribute('aria-label')).toBe('unavailable amount')
     expect(warn).toHaveBeenCalled()
   })
 
@@ -62,7 +63,9 @@ describe('CurrencyAmount', () => {
     render(<CurrencyAmount amount={NaN} currencyCode="USD" testId="amount" />)
 
     expect(screen.queryByTestId('amount')).toBeNull()
-    expect(screen.getByTestId('amount-placeholder')).toBeInTheDocument()
+    const placeholder = screen.getByTestId('amount-placeholder')
+    expect(placeholder).toBeInTheDocument()
+    expect(placeholder.getAttribute('aria-label')).toBe('unavailable amount')
     expect(warn).toHaveBeenCalled()
   })
 
@@ -71,5 +74,8 @@ describe('CurrencyAmount', () => {
     const node = screen.getByTestId('amount')
     expect(node.textContent).toContain('0')
     expect(node.textContent).toContain('USD')
+    // The code must appear exactly once: ``Intl.NumberFormat({ currencyDisplay: 'code' })``
+    // already includes the code in the formatted string.
+    expect(node.textContent?.match(/USD/g)).toHaveLength(1)
   })
 })

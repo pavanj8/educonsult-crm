@@ -10,9 +10,12 @@
  *   it has no per-user locale);
  * * the browser helper returns the locale-aware form
  *   ``Intl.NumberFormat`` produces (because the platform *does* know the
- *   active language through the i18next store), while still attaching the
- *   ISO 4217 code as a suffix so the rendered text is unambiguous across
- *   locales (e.g. ``"₹1,23,456.00 INR"``).
+ *   active language through the i18next store). Because we configure the
+ *   formatter with ``currencyDisplay: 'code'``, the ISO 4217 code is
+ *   already part of the formatted string (e.g. ``"USD 1,234.56"`` or
+ *   ``"INR 1,23,456"``). The code is also surfaced separately in the
+ *   returned object's ``code`` field so callers that need it for an
+ *   ``aria-label`` do not have to re-parse the rendered text.
  *
  * Both sides share the same input contract — only ISO 4217 three-letter
  * uppercase codes are accepted, and anything else raises
@@ -128,16 +131,16 @@ export function formatCurrencyAmount(
   const formatter = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: code,
+    // ``currencyDisplay: 'code'`` appends the ISO 4217 code to the
+    // formatted string (e.g. ``"USD 1,234.56"`` or ``"INR 1,23,456"``).
+    // We rely on the formatter to surface the code exactly once so a
+    // user reading the rendered text does not see the code doubled.
     currencyDisplay: 'code',
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   })
 
-  // ``currencyDisplay: 'code'`` already appends the ISO 4217 code to
-  // the formatted string (e.g. ``"USD 1,234.56"`` or ``"INR 1,23,456"``).
-  // We still surface ``code`` separately so a test or accessibility
-  // label does not have to re-parse the rendered text.
-  const display = `${formatter.format(numericAmount)} ${code}`
+  const display = formatter.format(numericAmount)
   return { display, code, locale }
 }
 
