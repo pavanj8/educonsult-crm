@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from app.db.branch_scope import BranchScopeError, apply_branch_scope
 from app.db.database import get_db
 from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
 from app.models.application import Application
@@ -96,8 +97,11 @@ def conversion_funnel(
     ```
     """
     try:
-        # Build the base query with tenant/branch scoping
+        # Build the base query with tenant scoping
         statement = apply_tenant_scope(select(Application), Application, current_user)
+
+        # Apply branch scoping (Branch Manager sees only their branch, Owner sees all)
+        statement = apply_branch_scope(statement, Application, current_user)
 
         # Apply date range filters if provided
         if start_date is not None:
@@ -140,7 +144,7 @@ def conversion_funnel(
             total_applications=total_applications,
         )
 
-    except TenantScopeError:
+    except (TenantScopeError, BranchScopeError):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",

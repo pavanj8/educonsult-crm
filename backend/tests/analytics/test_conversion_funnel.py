@@ -343,3 +343,82 @@ class TestConversionFunnel:
         # Should not see the other tenant's application
         assert data["total_applications"] == 0
 
+    def test_branch_manager_cannot_see_other_branches_in_same_tenant(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Branch manager cannot see applications from other branches in the same tenant (CRITICAL security test)."""
+        # Create two branches in the same tenant
+        branch1 = seed_branch(db_session, tenant_id=1, name="Branch 1", city="City 1")
+        branch2 = seed_branch(db_session, tenant_id=1, name="Branch 2", city="City 2")
+
+        # Branch manager assigned to branch1 only
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=71, tenant_id=1, branch_id=branch1.id
+            )
+        )
+
+        # Create a student in branch1
+        student1 = User(
+            tenant_id=1,
+            branch_id=branch1.id,
+            email="student1@example.com",
+            password_hash="hash",
+            name="Student 1",
+            role=Role.STUDENT,
+            is_active=True,
+        )
+        db_session.add(student1)
+
+        # Create a student in branch2
+        student2 = User(
+            tenant_id=1,
+            branch_id=branch2.id,
+            email="student2@example.com",
+            password_hash="hash",
+            name="Student 2",
+            role=Role.STUDENT,
+            is_active=True,
+        )
+        db_session.add(student2)
+        db_session.flush()
+
+        # Create applications in both branches
+        app1 = Application(
+            tenant_id=1,
+            branch_id=branch1.id,
+            student_id=student1.id,
+            assigned_counselor_id=71,
+            university_id=1,
+            program_id=1,
+            stage=PipelineStage.REGISTERED,
+        )
+        db_session.add(app1)
+
+        app2 = Application(
+            tenant_id=1,
+            branch_id=branch2.id,
+            student_id=student2.id,
+            assigned_counselor_id=72,
+            university_id=1,
+            program_id=1,
+            stage=PipelineStage.COUNSELING,
+        )
+        db_session.add(app2)
+        db_session.commit()
+
+        # Branch manager of branch1 queries the funnel
+        response = client.get("/analytics/funnel")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should only see applications from branch1 (not branch2)
+        assert data["total_applications"] == 1
+        funnel_by_stage = {bucket["stage"]: bucket["count"] for bucket in data["funnel"]}
+        assert funnel_by_stage.get("registered") == 1  # Only app1 from branch1
+        assert funnel_by_stage.get("counseling") == 0  # NOT app2 from branch2
+
