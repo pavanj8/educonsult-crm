@@ -365,3 +365,33 @@ def test_registrations_over_time_includes_only_students(
 
     assert day_data is not None
     assert day_data["count"] == 1  # Only the student, not the counselor
+
+
+def test_registrations_over_time_invalid_date_format_returns_422(
+    client,
+    branch_manager_auth_headers,
+):
+    """Test that invalid date format returns HTTP 422 validation error."""
+    # Test with invalid start_date
+    response = client.get(
+        "/analytics/registrations-over-time?start_date=invalid-date",
+        headers=branch_manager_auth_headers,
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert "Invalid date format" in response.json()["detail"]
+
+    # Test with invalid end_date
+    response = client.get(
+        "/analytics/registrations-over-time?end_date=not-a-date",
+        headers=branch_manager_auth_headers,
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert "Invalid date format" in response.json()["detail"]
+
+    # Test with malformed ISO-8601 date
+    response = client.get(
+        "/analytics/registrations-over-time?start_date=2025-13-01",  # Invalid month
+        headers=branch_manager_auth_headers,
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert "Invalid date format" in response.json()["detail"]

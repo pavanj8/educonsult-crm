@@ -69,20 +69,26 @@ def get_registrations_over_time(
     if end_date is None:
         end_datetime = datetime.now(timezone.utc)
     else:
-        # Parse ISO-8601 string to datetime
-        # Handles formats like: 2025-01-15T12:00:00+00:00 or 2025-01-15
-        if "T" in end_date:
-            # Full datetime with timezone
-            end_datetime = datetime.fromisoformat(end_date)
-            if end_datetime.tzinfo is None:
-                end_datetime = end_datetime.replace(tzinfo=timezone.utc)
-        else:
-            # Date only, treat as end of day UTC
-            end_datetime = datetime.combine(
-                datetime.fromisoformat(end_date).date(),
-                time.max,
-                tzinfo=timezone.utc
-            )
+        # Parse ISO-8601 string to datetime with validation
+        try:
+            # Handles formats like: 2025-01-15T12:00:00+00:00 or 2025-01-15
+            if "T" in end_date:
+                # Full datetime with timezone
+                end_datetime = datetime.fromisoformat(end_date)
+                if end_datetime.tzinfo is None:
+                    end_datetime = end_datetime.replace(tzinfo=timezone.utc)
+            else:
+                # Date only, treat as end of day UTC
+                end_datetime = datetime.combine(
+                    datetime.fromisoformat(end_date).date(),
+                    time.max,
+                    tzinfo=timezone.utc
+                )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid date format for end_date. Expected ISO-8601 format (e.g., 2025-01-15 or 2025-01-15T12:00:00Z). Error: {str(e)}",
+            ) from e
 
     if start_date is None:
         # 30 days before end_date
@@ -92,18 +98,24 @@ def get_registrations_over_time(
         # Subtract 30 days
         start_datetime = start_datetime - timedelta(days=30)
     else:
-        # Parse ISO-8601 string to datetime
-        if "T" in start_date:
-            start_datetime = datetime.fromisoformat(start_date)
-            if start_datetime.tzinfo is None:
-                start_datetime = start_datetime.replace(tzinfo=timezone.utc)
-        else:
-            # Date only, treat as start of day UTC
-            start_datetime = datetime.combine(
-                datetime.fromisoformat(start_date).date(),
-                time.min,
-                tzinfo=timezone.utc
-            )
+        # Parse ISO-8601 string to datetime with validation
+        try:
+            if "T" in start_date:
+                start_datetime = datetime.fromisoformat(start_date)
+                if start_datetime.tzinfo is None:
+                    start_datetime = start_datetime.replace(tzinfo=timezone.utc)
+            else:
+                # Date only, treat as start of day UTC
+                start_datetime = datetime.combine(
+                    datetime.fromisoformat(start_date).date(),
+                    time.min,
+                    tzinfo=timezone.utc
+                )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid date format for start_date. Expected ISO-8601 format (e.g., 2025-01-15 or 2025-01-15T12:00:00Z). Error: {str(e)}",
+            ) from e
 
     # For grouping purposes, normalize both to start of day (inclusive) and end of day (inclusive)
     # Both datetimes should already have timezone info from the parsing above
