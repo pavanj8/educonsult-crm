@@ -71,20 +71,20 @@ def test_registrations_over_time_branch_manager_sees_own_branch_only(
     make_user,
 ):
     """Branch manager sees registrations only for their own branch."""
-    # Create another branch with students
-    other_branch_manager = make_user(role=Role.BRANCH_MANAGER, tenant_id=branch_manager.tenant_id)
+    # Create students in another branch (branch_id=2, not visible to branch_id=1 manager)
     other_base_time = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
     for offset in [-5, 0, 5]:
         make_user(
             role=Role.STUDENT,
             tenant_id=branch_manager.tenant_id,
-            branch_id=other_branch_manager.branch_id,
+            branch_id=2,  # Explicitly use branch 2, different from branch_manager.branch_id
             created_at=other_base_time + timedelta(days=offset),
         )
 
     # Query with a wide date range to capture all test data
     # Use date-only format for clarity
-    start_date = "2025-01-01"
+    # Start one day earlier to include the student at offset -15 (created on 2024-12-31)
+    start_date = "2024-12-31"
     end_date = "2025-02-28"
 
     response = client.get(
@@ -127,7 +127,8 @@ def test_registrations_over_time_owner_sees_all_branches(
         other_students.append(student)
 
     # Query with owner token using date range that includes test data
-    start_date = "2025-01-01"
+    # Start one day earlier to include the student at offset -15 (created on 2024-12-31)
+    start_date = "2024-12-31"
     end_date = "2025-02-28"
     response = client.get(
         f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}",

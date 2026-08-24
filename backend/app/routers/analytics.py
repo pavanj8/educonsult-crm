@@ -105,16 +105,22 @@ def get_registrations_over_time(
                 tzinfo=timezone.utc
             )
 
-    # Normalize to UTC midnight for consistent grouping
-    start_datetime = start_datetime.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
-    end_datetime = end_datetime.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
+    # For grouping purposes, normalize both to start of day (inclusive) and end of day (inclusive)
+    # Both datetimes should already have timezone info from the parsing above
+    start_datetime = start_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_datetime = end_datetime.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     try:
         # Build base query with tenant/branch scoping
+        # SQLite stores datetimes as timezone-naive, so we need to strip timezone info from query parameters
+        # for comparison to work correctly
+        start_datetime_naive = start_datetime.replace(tzinfo=None)
+        end_datetime_naive = end_datetime.replace(tzinfo=None)
+
         statement = select(User).where(
             User.role == Role.STUDENT,
-            User.created_at >= start_datetime,
-            User.created_at <= end_datetime,
+            User.created_at >= start_datetime_naive,
+            User.created_at <= end_datetime_naive,
         )
 
         # Apply scoping: branch manager sees only their branch, owner sees all
