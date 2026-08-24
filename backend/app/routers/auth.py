@@ -53,6 +53,7 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.schemas.student import RegisterStudentRequest, RegisterStudentResponse
+from app.services.plan_limits import PlanLimitExceeded, enforce_student_limit
 
 router = APIRouter()
 
@@ -228,6 +229,14 @@ def register_student(
 
     ensure_email_available(db, payload.email, unavailable_detail=_DB_UNAVAILABLE_DETAIL)
     validate_target_master_data(db, tenant.id, payload)
+
+    try:
+        enforce_student_limit(db, tenant.id)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from None
 
     student_user = User(
         email=payload.email,

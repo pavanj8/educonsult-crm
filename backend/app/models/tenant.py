@@ -41,11 +41,17 @@ class Tenant(Base):
     currency: Mapped[str] = mapped_column(
         String(3), nullable=False, server_default="INR"
     )
-    # E9 task #106: nullable FK to the platform-level plans catalog
-    # (E9 task #105). A tenant exists before any plan is chosen; the
-    # super-admin assign/change-plan endpoint sets this. ON DELETE is
-    # left to the database default (RESTRICT) so an active tier cannot
-    # be removed while tenants still reference it.
+    # E9 task #107: nullable FK to the platform-level plans catalog
+    # (E9 task #105). E9 task #106 (assign/change plan API) owns the
+    # write side; this module only consumes the column to enforce
+    # per-tier limits (branches / staff / students). Nullable because
+    # a tenant exists before a Super Admin has picked a tier, and
+    # ``PlanLimitExceeded`` enforcement short-circuits to no-cap when
+    # ``plan_id`` is NULL -- so existing tenants created before a
+    # plan was assigned continue to create branches / staff /
+    # students without errors. ON DELETE RESTRICT matches the
+    # catalog row's lifecycle (active tiers cannot be removed while
+    # tenants still reference them).
     plan_id: Mapped[int | None] = mapped_column(
         ForeignKey("plans.id", ondelete="RESTRICT"),
         nullable=True,
