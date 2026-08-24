@@ -42,6 +42,7 @@ from app.pipeline.stages import PipelineStage
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.user import AuthenticatedUser
+from app.routers._application_lookup import get_tenant_application
 from app.schemas.visa import (
     UpdateVisaOutcomeRequest,
     VisaOutcomeResponse,
@@ -138,39 +139,6 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _get_tenant_application_for_outcome(
-    application_id: int,
-    current_user: AuthenticatedUser,
-    db: Session,
-) -> Application:
-    """Load an application belonging to the caller's tenant, or raise 404.
-
-    Mirrors the cross-tenant 404 convention used by the E25
-    ``_get_tenant_application`` helper in
-    :mod:`app.routers.applications` so a visa processor probing for
-    cross-tenant ids gets the same "not found" surface as a tenant
-    member probing for a non-existent id -- never a 403, which would
-    leak tenant existence.
-    """
-    try:
-        application = db.get(Application, application_id)
-    except OperationalError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_OUTCOME_DB_UNAVAILABLE_DETAIL,
-        ) from None
-
-    if application is None or (
-        current_user.tenant_id is not None
-        and application.tenant_id != current_user.tenant_id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found",
-        )
-
-    return application
-
 
 @router.patch(
     "/applications/{application_id}/outcome",
@@ -253,8 +221,11 @@ def update_visa_outcome(
             detail="User has no tenant scope",
         )
 
-    application = _get_tenant_application_for_outcome(
-        application_id, current_user, db
+    application = get_tenant_application(
+        application_id,
+        current_user,
+        db,
+        db_unavailable_detail=_OUTCOME_DB_UNAVAILABLE_DETAIL,
     )
 
     if application.stage != PipelineStage.VISA_PROCESSING.value:
@@ -289,7 +260,7 @@ def update_visa_outcome(
             detail="status is required when creating a new visa outcome",
         )
 
-    now = _utc_now()
+    now = datetime.now(timezone.utc)
     if existing is None:
         outcome = VisaOutcome(
             tenant_id=application.tenant_id,
