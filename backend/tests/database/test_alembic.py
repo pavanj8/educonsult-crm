@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "q9r0s1t2u3v4"
+HEAD_REVISION = "r1s2t3u4v5w6"
 
 
 def _alembic_config() -> Config:
@@ -245,6 +245,34 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             for constraint in inspect(connection).get_unique_constraints("visa_details")
         }
         assert "uq_visa_details_application_id" in visa_detail_unique_constraints
+        # E35 task #195 (J28): visa outcome/status (status,
+        # optional outcome_date, optional notes) recorded by a
+        # Visa Processor against an application at the visa
+        # processing stage.
+        assert "visa_outcomes" in table_names
+        visa_outcome_columns = {
+            column["name"] for column in inspect(connection).get_columns("visa_outcomes")
+        }
+        assert visa_outcome_columns == {
+            "id",
+            "tenant_id",
+            "application_id",
+            "status",
+            "outcome_date",
+            "notes",
+            "created_at",
+            "updated_at",
+        }
+        visa_outcome_indexes = {
+            index["name"] for index in inspect(connection).get_indexes("visa_outcomes")
+        }
+        assert "ix_visa_outcomes_tenant_id" in visa_outcome_indexes
+        assert "ix_visa_outcomes_application_id" in visa_outcome_indexes
+        visa_outcome_unique_constraints = {
+            constraint["name"]
+            for constraint in inspect(connection).get_unique_constraints("visa_outcomes")
+        }
+        assert "uq_visa_outcomes_application_id" in visa_outcome_unique_constraints
         # E9 task #105: platform-level subscription plan catalog
         # (Starter/Growth/Enterprise + per-tier limits).
         assert "plans" in table_names
