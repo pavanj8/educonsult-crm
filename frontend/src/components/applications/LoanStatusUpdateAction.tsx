@@ -337,14 +337,13 @@ export default function LoanStatusUpdateAction({
       .join(' ') || undefined
 
   if (done) {
-    const summaryStatus = form.loan_status.trim() || 'updated'
     return (
       <p
         role="status"
         aria-live="polite"
         data-testid={`loan-status-success-${applicationId}`}
       >
-        Loan tracking fields saved — status: {summaryStatus}.
+        Loan tracking fields saved.
       </p>
     )
   }
