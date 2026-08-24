@@ -24,6 +24,12 @@ def test_application_model_has_required_columns():
         "program_id",
         "stage",
         "loan_opt_in",
+        # E37 task #200: the three loan tracking fields (Journey J30;
+        # Requirements §5). All nullable; persisted as
+        # String(32) / String(120) / Numeric(12, 2).
+        "loan_status",
+        "loan_lender",
+        "loan_amount",
         "created_at",
         "updated_at",
     }

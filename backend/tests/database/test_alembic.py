@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "s2t3u4v5w6x7"
+HEAD_REVISION = "t3u4v5w6x7y8"
 
 
 def _alembic_config() -> Config:
@@ -105,6 +105,14 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "program_id",
             "stage",
             "loan_opt_in",
+            # E37 task #200 (J30): loan tracking fields (status,
+            # lender, amount) added on top of the E36 loan_opt_in
+            # column. All nullable so existing pre-E37 rows persist
+            # without a backfill (the conservative default is "no
+            # value recorded yet").
+            "loan_status",
+            "loan_lender",
+            "loan_amount",
             "created_at",
             "updated_at",
         }
