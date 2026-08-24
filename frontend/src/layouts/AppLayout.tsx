@@ -7,6 +7,7 @@ import {
   CHECKLIST_TEMPLATES_PATH,
   MASTER_DATA_ADMIN_PATH,
   TENANT_BRANDING_PATH,
+  VISA_DASHBOARD_PATH,
 } from '../routes/paths'
 import { useAuth } from '../store/authStore'
 import { useBranding } from '../store/brandingStore'
@@ -123,6 +124,13 @@ export default function AppLayout() {
             <nav className="app-header__nav" aria-label={t('app.nav.main')}>
               <Link to="/receptionist/intake" data-testid="nav-receptionist-intake">
                 {t('app.nav.intake')}
+              </Link>
+            </nav>
+          ) : null}
+          {user?.role === 'visa_processor' ? (
+            <nav className="app-header__nav" aria-label={t('app.nav.main')}>
+              <Link to={VISA_DASHBOARD_PATH} data-testid="nav-visa">
+                {t('app.nav.visaQueue')}
               </Link>
             </nav>
           ) : null}

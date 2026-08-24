@@ -16,6 +16,7 @@ import StudentDashboardPage from '../pages/StudentDashboardPage'
 import TenantBrandingPage from '../pages/TenantBrandingPage'
 import TenantsPage from '../pages/TenantsPage'
 import VerifierDashboardPage from '../pages/VerifierDashboardPage'
+import VisaProcessorDashboardPage from '../pages/VisaProcessorDashboardPage'
 import CounselorDashboardPage from '../pages/CounselorDashboardPage'
 import ChecklistTemplateAdminRoute from './ChecklistTemplateAdminRoute'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
@@ -27,6 +28,7 @@ import StaffManagerRoute from './StaffManagerRoute'
 import StudentRoute from './StudentRoute'
 import SuperAdminRoute from './SuperAdminRoute'
 import VerifierRoute from './VerifierRoute'
+import VisaProcessorRoute from './VisaProcessorRoute'
 import {
   CHECKLIST_TEMPLATES_PATH,
   COUNSELOR_DASHBOARD_PATH,
@@ -38,6 +40,7 @@ import {
   STUDENT_DASHBOARD_PATH,
   TENANT_BRANDING_PATH,
   VERIFIER_DASHBOARD_PATH,
+  VISA_DASHBOARD_PATH,
 } from './paths'
 
 export function AppRoutes() {
@@ -80,6 +83,9 @@ export function AppRoutes() {
           </Route>
           <Route element={<CounselorRoute />}>
             <Route path={COUNSELOR_DASHBOARD_PATH.slice(1)} element={<CounselorDashboardPage />} />
+          </Route>
+          <Route element={<VisaProcessorRoute />}>
+            <Route path={VISA_DASHBOARD_PATH.slice(1)} element={<VisaProcessorDashboardPage />} />
           </Route>
           <Route element={<ReceptionistRoute />}>
             <Route
