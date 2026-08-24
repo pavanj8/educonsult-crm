@@ -29,59 +29,74 @@ export default function VisaProcessorDashboardPage() {
         </button>
       </header>
 
-      {loading ? (
-        <p role="status" aria-live="polite" data-testid="visa-queue-loading">
-          Loading visa applications…
-        </p>
-      ) : error ? (
-        <p role="alert" data-testid="visa-queue-error">
-          {error}
-        </p>
-      ) : applications.length === 0 ? (
-        <p data-testid="visa-queue-empty">No applications are at the visa stage.</p>
-      ) : (
-        <>
-          <p data-testid="visa-queue-count">
-            {total} application{total === 1 ? '' : 's'} at the visa stage
+      {/*
+        The live region intentionally wraps the entire dashboard body
+        so that toggling aria-busy to true while a refetch is in flight
+        is announced by screen readers regardless of which subtree
+        (table vs. error vs. empty) is currently visible. This is the
+        same "busy container" pattern used by the document-verifier
+        dashboard.
+      */}
+      <div
+        role="region"
+        aria-live="polite"
+        aria-busy={loading}
+        data-testid="visa-queue-region"
+      >
+        {loading ? (
+          <p role="status" aria-live="polite" data-testid="visa-queue-loading">
+            Loading visa applications…
           </p>
-          <table className="visa-queue-table" data-testid="visa-queue-table">
-            <caption className="sr-only">Applications at the visa stage</caption>
-            <thead>
-              <tr>
-                <th scope="col">Application</th>
-                <th scope="col">Student</th>
-                <th scope="col">Branch</th>
-                <th scope="col">Counselor</th>
-                <th scope="col">University / Program</th>
-                <th scope="col">Stage</th>
-                <th scope="col">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {applications.map((app) => (
-                <tr key={app.id} data-testid={`visa-queue-row-${app.id}`}>
-                  <td>#{app.id}</td>
-                  <td>#{app.student_id}</td>
-                  <td>{app.branch_id == null ? '—' : `#${app.branch_id}`}</td>
-                  <td>
-                    {app.assigned_counselor_id == null
-                      ? '—'
-                      : `#${app.assigned_counselor_id}`}
-                  </td>
-                  <td>
-                    #{app.university_id} / #{app.program_id}
-                  </td>
-                  <td>
-                    {PIPELINE_STAGE_LABELS[app.stage as keyof typeof PIPELINE_STAGE_LABELS] ??
-                      app.stage}
-                  </td>
-                  <td>{formatDate(app.created_at)}</td>
+        ) : error ? (
+          <p role="alert" data-testid="visa-queue-error">
+            {error}
+          </p>
+        ) : applications.length === 0 ? (
+          <p data-testid="visa-queue-empty">No applications are at the visa stage.</p>
+        ) : (
+          <>
+            <p data-testid="visa-queue-count">
+              {total} application{total === 1 ? '' : 's'} at the visa stage
+            </p>
+            <table className="visa-queue-table" data-testid="visa-queue-table">
+              <caption className="sr-only">Applications at the visa stage</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Application</th>
+                  <th scope="col">Student</th>
+                  <th scope="col">Branch</th>
+                  <th scope="col">Counselor</th>
+                  <th scope="col">University / Program</th>
+                  <th scope="col">Stage</th>
+                  <th scope="col">Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
+              </thead>
+              <tbody>
+                {applications.map((app) => (
+                  <tr key={app.id} data-testid={`visa-queue-row-${app.id}`}>
+                    <td>#{app.id}</td>
+                    <td>#{app.student_id}</td>
+                    <td>{app.branch_id == null ? '—' : `#${app.branch_id}`}</td>
+                    <td>
+                      {app.assigned_counselor_id == null
+                        ? '—'
+                        : `#${app.assigned_counselor_id}`}
+                    </td>
+                    <td>
+                      #{app.university_id} / #{app.program_id}
+                    </td>
+                    <td>
+                      {PIPELINE_STAGE_LABELS[app.stage as keyof typeof PIPELINE_STAGE_LABELS] ??
+                        app.stage}
+                    </td>
+                    <td>{formatDate(app.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
     </section>
   )
 }

@@ -69,4 +69,22 @@ describe('useVisaQueue', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toMatch(/permission/i)
   })
+
+  it('surfaces the backend detail message on 5xx errors', async () => {
+    // The visa queue router (#191) translates a database outage into
+    // a 503 with detail "Visa queue is temporarily unavailable"; the
+    // hook must propagate that detail to the UI so the operator can
+    // distinguish a transient backend issue from a generic failure.
+    localStorage.setItem('access_token', 'test-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({ detail: 'Visa queue is temporarily unavailable' }),
+    }) as typeof fetch
+
+    const { result } = renderHook(() => useVisaQueue())
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBe('Visa queue is temporarily unavailable')
+  })
 })

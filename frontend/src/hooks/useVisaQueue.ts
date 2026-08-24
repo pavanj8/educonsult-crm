@@ -36,6 +36,12 @@ export function useVisaQueue() {
         setError('You do not have permission to view the visa queue')
       } else if (isApiError(err) && err.status === 401) {
         setError('Sign in to view the visa queue')
+      } else if (err instanceof Error && err.message) {
+        // Surface the backend detail (e.g. "Visa queue is temporarily
+        // unavailable" on a 503 from sibling ticket #191) so the user
+        // can distinguish a transient backend outage from a generic
+        // client-side failure.
+        setError(err.message)
       } else {
         setError('Failed to load the visa queue')
       }

@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider } from '../store/authStore'
@@ -33,7 +34,7 @@ function createFetchMock(handlers: Handlers = {}) {
     if (path.includes('/auth/me')) {
       return { ok: true, status: 200, json: async () => mockVisaProcessor }
     }
-    if (path.includes('/applications/queue')) {
+    if (path.includes('/visa/applications/queue')) {
       if (handlers.queueStatus && handlers.queueStatus >= 400) {
         return { ok: false, status: handlers.queueStatus, json: async () => ({ detail: 'nope' }) }
       }
@@ -102,10 +103,53 @@ describe('VisaProcessorDashboardPage', () => {
     expect(alert).toHaveTextContent(/permission/i)
   })
 
-  it('shows a generic error when the API fails with 500', async () => {
+  it('shows the backend detail when the API fails with 500', async () => {
+    // The visa queue router (#191) translates a database outage into
+    // a 503 with a specific detail string. For non-auth failures the
+    // hook surfaces whatever the backend's ``detail`` was so the
+    // operator can distinguish a transient backend issue from a
+    // generic client-side failure.
     globalThis.fetch = createFetchMock({ queueStatus: 500 })
     renderPage()
 
-    expect(await screen.findByTestId('visa-queue-error')).toHaveTextContent(/failed to load/i)
+    const alert = await screen.findByTestId('visa-queue-error')
+    expect(alert).toHaveTextContent(/nope/)
+  })
+
+  it('triggers a refetch when the Refresh button is clicked', async () => {
+    const user = userEvent.setup()
+    globalThis.fetch = createFetchMock({ items: [mockApplication], total: 1 })
+    renderPage()
+
+    await screen.findByTestId('visa-queue-table')
+
+    const refresh = screen.getByRole('button', { name: /refresh/i })
+    await user.click(refresh)
+
+    await waitFor(() => {
+      const queueCalls = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.filter(
+        ([url]) => String(url).includes('/visa/applications/queue'),
+      )
+      expect(queueCalls.length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
+  it('renders the unauthenticated state without calling the API', async () => {
+    localStorage.removeItem('access_token')
+    const fetchMock = createFetchMock()
+    globalThis.fetch = fetchMock
+    renderPage()
+
+    // The dashboard should not crash; without an access token the
+    // hook short-circuits and the dashboard renders its empty
+    // loading-resolved state (loading false, no error, no rows).
+    await waitFor(() => {
+      expect(screen.getByTestId('visa-queue-empty')).toBeInTheDocument()
+    })
+    expect(
+      (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
+        String(url).includes('/visa/applications/queue'),
+      ),
+    ).toHaveLength(0)
   })
 })
