@@ -20,7 +20,7 @@
     "mode": "github"
   },
   "queue": {
-    "phase": "phase-2"
+    "phase": "phase-3"
   },
   "models": {
     "dev": "MiniMax-M3",
