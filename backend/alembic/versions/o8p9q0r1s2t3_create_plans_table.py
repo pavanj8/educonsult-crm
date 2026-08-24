@@ -14,30 +14,14 @@ The catalog lives on its own ``plans`` table (no ``tenant_id`` column
 on the row; plans are platform-global) per the ADR-0001 exception for
 cross-tenant reference data. The future ``tenants.plan_id`` FK -- owned
 by E9 task #106 -- is what makes a tenant point at a plan; this
-<<<<<<< HEAD
 migration only stands up the catalog and seeds the three rows so
 ``tenants.plan_id`` can resolve cleanly as soon as the FK lands.
-=======
-migration only stands up the catalog (no rows seeded here). Inserting
-the three canonical tier rows is the platform seed / admin path's
-responsibility (E9 task #106 / #108), which deliberately lives outside
-the migration so it can be re-run idempotently and so re-seeding a
-catalog row doesn't have to ship as a schema migration.
->>>>>>> origin/main
 
 Columns:
 
 * ``code`` -- stable PlanTier string (``STARTER`` / ``GROWTH`` /
-<<<<<<< HEAD
   ``ENTERPRISE``); unique + indexed so duplicate seed runs can't
   double-insert the same tier and lookups by code are fast.
-=======
-  ``ENTERPRISE``); unique so duplicate seed runs can't double-insert
-  the same tier. PostgreSQL materializes a unique index to back the
-  ``UniqueConstraint``, which is what ``tenants.plan_id`` lookups
-  and the future ``Plan`` API in #106 will key off -- no separate
-  non-unique index is added on top.
->>>>>>> origin/main
 * ``name`` -- human-readable display name ("Starter", "Growth",
   "Enterprise").
 * ``description`` -- optional blurb shown on the J38 owner plan-usage
@@ -87,7 +71,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("code", name="uq_plans_code"),
     )
-<<<<<<< HEAD
     op.create_index(
         op.f("ix_plans_code"),
         "plans",
@@ -98,9 +81,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index(op.f("ix_plans_code"), table_name="plans")
-=======
-
-
-def downgrade() -> None:
->>>>>>> origin/main
     op.drop_table("plans")
