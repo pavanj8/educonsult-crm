@@ -69,9 +69,10 @@ class Plan(Base):
     * ``id`` -- surrogate primary key.
     * ``code`` -- stable string tier code (``PlanTier.value``).
       Unique so duplicate catalog rows cannot slip in via seed
-      reruns. Indexed because ``tenants.plan_id`` lookups will
-      key off this code (the future ``Plan`` API in #106 also
-      exposes plans by code).
+      reruns. The ``UniqueConstraint`` creates the backing index,
+      which is what ``tenants.plan_id`` lookups and the future
+      ``Plan`` API in #106 will key off -- no separate non-unique
+      index is added on top of it.
     * ``name`` -- human-readable display name ("Starter", "Growth",
       "Enterprise"). 255 chars covers any future copy tweak.
     * ``description`` -- optional free-text blurb shown on the owner
@@ -99,7 +100,6 @@ class Plan(Base):
         ),
         unique=True,
         nullable=False,
-        index=True,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
