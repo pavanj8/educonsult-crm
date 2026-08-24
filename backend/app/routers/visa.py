@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.application import Application
+from app.models.visa_detail import VisaDetail
 from app.models.visa_outcome import VisaOutcome
 from app.pipeline.stages import PipelineStage
 from app.rbac import Permission
@@ -44,7 +45,9 @@ from app.rbac.dependencies import require_permission
 from app.rbac.user import AuthenticatedUser
 from app.routers._application_lookup import get_tenant_application
 from app.schemas.visa import (
+    UpdateVisaDetailRequest,
     UpdateVisaOutcomeRequest,
+    VisaDetailResponse,
     VisaOutcomeResponse,
     VisaStageQueueItem,
     VisaStageQueueResponse,
@@ -130,6 +133,239 @@ def list_visa_stage_applications(
         limit=limit,
         offset=offset,
     )
+
+
+_DETAIL_DB_UNAVAILABLE_DETAIL = "Visa detail is temporarily unavailable"
+_DETAIL_NOT_FOUND_DETAIL = "Visa detail not found"
+
+
+@router.get(
+    "/applications/{application_id}/details",
+    response_model=VisaDetailResponse,
+)
+def get_visa_detail(
+    application_id: int,
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.VISA_MANAGE)),
+    ],
+    db: Session = Depends(get_db),
+) -> VisaDetail:
+    """Return the visa detail recorded for an application (E34; Journey J27; issue #194).
+
+    Backs the frontend :class:`VisaDetailUpdateForm` pre-fill flow
+    (frontend ticket #194). The form's :func:`fetchVisaDetail` helper
+    calls this endpoint via ``GET /visa/applications/{id}/details`` so
+    the visa processor can edit an existing entry in place rather than
+    start from blank; if no detail has been recorded yet the form
+    starts blank (the API returns 404 in that case and the frontend
+    collapses 404 into "no detail yet").
+
+    Behavior:
+
+    * Gated on ``visa:manage`` (granted to ``VISA_PROCESSOR``,
+      ``CONSULTANCY_OWNER``, and ``SUPER_ADMIN`` per
+      :data:`app.rbac.permissions.ROLE_PERMISSIONS`). Roles that do
+      not hold this permission -- STUDENT, COUNSELOR, RECEPTIONIST,
+      BRANCH_MANAGER, DOCUMENT_VERIFIER -- are blocked at the
+      dependency layer (403 ``Insufficient permissions``) before any
+      DB query runs.
+    * Tenant scoping is enforced via
+      :func:`get_tenant_application`: cross-tenant requests surface
+      as 404, never 403, to prevent tenant enumeration -- same
+      convention as the E25 / E33 / E35 endpoints. A cross-tenant
+      GET that finds no detail row also surfaces as 404 (the
+      application itself is missing from this tenant's view), so an
+      attacker cannot distinguish "no detail yet" from "no such
+      application" by probing this endpoint.
+    * If the application exists in the caller's tenant but no
+      :class:`VisaDetail` row has been recorded for it yet, the
+      endpoint returns 404 with ``Visa detail not found`` -- the
+      frontend collapses that into an empty form (record-new flow).
+    * The endpoint does NOT require the application to be in
+      ``visa_processing``. The visa detail is a historical record
+      the visa processor may want to re-read after the application
+      has moved on (e.g. for an audit pull). Stage guards are a
+      write-side concern handled by :func:`upsert_visa_detail`.
+
+    Errors:
+
+    * 401 -- caller is not authenticated.
+    * 403 -- caller lacks ``visa:manage``, or has no tenant scope.
+    * 404 -- application does not exist / belongs to a different
+      tenant, or no detail has been recorded for the application yet.
+    * 503 -- database unavailable while loading the application or
+      the :class:`VisaDetail` row.
+    """
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no tenant scope",
+        )
+
+    application = get_tenant_application(
+        application_id,
+        current_user,
+        db,
+        db_unavailable_detail=_DETAIL_DB_UNAVAILABLE_DETAIL,
+    )
+
+    try:
+        detail = db.scalar(
+            select(VisaDetail).where(
+                VisaDetail.application_id == application.id,
+            )
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DETAIL_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    if detail is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_DETAIL_NOT_FOUND_DETAIL,
+        )
+
+    return detail
+
+
+@router.put(
+    "/applications/{application_id}/details",
+    response_model=VisaDetailResponse,
+)
+def upsert_visa_detail(
+    application_id: int,
+    payload: UpdateVisaDetailRequest,
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_permission(Permission.VISA_MANAGE)),
+    ],
+    db: Session = Depends(get_db),
+) -> VisaDetail:
+    """Record or update the visa type + embassy interview date (E34; Journey J27; issue #194).
+
+    Backs the frontend :class:`VisaDetailUpdateForm` submit handler
+    (frontend ticket #194). The form PUTs
+    ``{ visa_type, interview_date }`` back to this endpoint so the
+    visa processor can record the visa type on first save and add
+    the interview date later without creating a second row (the
+    1:1 unique constraint on ``application_id`` enforces this).
+
+    Behavior:
+
+    * Gated on ``visa:manage`` (granted to ``VISA_PROCESSOR``,
+      ``CONSULTANCY_OWNER``, and ``SUPER_ADMIN`` per
+      :data:`app.rbac.permissions.ROLE_PERMISSIONS`). Roles that do
+      not hold this permission -- STUDENT, COUNSELOR, RECEPTIONIST,
+      BRANCH_MANAGER, DOCUMENT_VERIFIER -- are blocked at the
+      dependency layer (403 ``Insufficient permissions``) before any
+      DB query runs.
+    * Tenant scoping is enforced via
+      :func:`get_tenant_application`: cross-tenant requests surface
+      as 404, never 403, to prevent tenant enumeration -- same
+      convention as the E25 / E33 / E35 endpoints.
+    * The endpoint REQUIRES the application's current pipeline stage
+      to be ``visa_processing``. Applications in any other stage
+      (including terminal stages) are rejected with 422 -- the visa
+      type and interview date are recorded for *the* application at
+      the visa stage, not as a free-floating note. This matches
+      Journey J27's "Visa Processor records visa type & embassy
+      interview date" phrasing: the detail is captured while the
+      application is being processed at the visa stage.
+    * If a :class:`VisaDetail` row already exists for the
+      application (the visa processor is *updating* the detail), the
+      existing row is updated in place. Otherwise a new row is
+      inserted. The 1:1 unique constraint on ``application_id``
+      guarantees there is at most one row per application, so the
+      create-vs-update decision reduces to "does the lookup return
+      a row?". The unique constraint is also keyed off ``tenant_id``
+      indirectly (via the FK to ``applications.id`` which is itself
+      tenant-scoped), so a crafted cross-tenant race is impossible.
+    * The endpoint does NOT write a :class:`StageHistory` row and
+      does NOT trigger an in-app notification. The application's
+      pipeline stage is unchanged by a visa detail update (the
+      detail is captured *alongside* the visa stage -- the
+      application has not yet enrolled / rejected / withdrawn).
+      Future notification wiring for visa detail events is out of
+      scope and tracked as a separate ticket.
+
+    Errors:
+
+    * 401 -- caller is not authenticated.
+    * 403 -- caller lacks ``visa:manage``, or has no tenant scope.
+    * 404 -- application does not exist or belongs to a different tenant.
+    * 422 -- application is not in the ``visa_processing`` stage,
+      or the request body fails Pydantic validation (empty / whitespace
+      ``visa_type``, ``visa_type`` > 100 chars, naive ``interview_date``).
+      No row is written in the 422 stage-mismatch case.
+    * 503 -- database unavailable while loading / writing the
+      application or the :class:`VisaDetail` row.
+    """
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no tenant scope",
+        )
+
+    application = get_tenant_application(
+        application_id,
+        current_user,
+        db,
+        db_unavailable_detail=_DETAIL_DB_UNAVAILABLE_DETAIL,
+    )
+
+    if application.stage != PipelineStage.VISA_PROCESSING.value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Application in stage '{application.stage}' cannot have "
+                "its visa detail recorded. The application must be in the "
+                "'visa_processing' stage."
+            ),
+        )
+
+    try:
+        existing = db.scalar(
+            select(VisaDetail).where(
+                VisaDetail.application_id == application.id,
+            )
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DETAIL_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    now = datetime.now(timezone.utc)
+    if existing is None:
+        detail = VisaDetail(
+            tenant_id=application.tenant_id,
+            application_id=application.id,
+            visa_type=payload.visa_type,
+            interview_date=payload.interview_date,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(detail)
+    else:
+        existing.visa_type = payload.visa_type
+        existing.interview_date = payload.interview_date
+        existing.updated_at = now
+        detail = existing
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DETAIL_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    db.refresh(detail)
+    return detail
 
 
 _OUTCOME_DB_UNAVAILABLE_DETAIL = "Visa outcome update is temporarily unavailable"
