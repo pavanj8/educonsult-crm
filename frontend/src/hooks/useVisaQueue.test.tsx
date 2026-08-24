@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useVisaQueue } from './useVisaQueue'
@@ -86,5 +86,36 @@ describe('useVisaQueue', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toBe('Visa queue is temporarily unavailable')
+  })
+
+  it('starts with an empty outcomes map and remembers recorded outcomes', async () => {
+    localStorage.setItem('access_token', 'test-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockQueue,
+    }) as typeof fetch
+
+    const { result } = renderHook(() => useVisaQueue())
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.outcomes).toEqual({})
+
+    const outcome = {
+      id: 11,
+      tenant_id: 10,
+      application_id: 101,
+      status: 'approved',
+      outcome_date: null,
+      notes: 'OK',
+      created_at: '2026-02-03T10:00:00Z',
+      updated_at: '2026-02-03T10:00:00Z',
+    }
+
+    act(() => {
+      result.current.rememberOutcome(outcome)
+    })
+
+    expect(result.current.outcomes).toEqual({ 101: outcome })
   })
 })
