@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "r1s2t3u4v5w6"
+HEAD_REVISION = "s2t3u4v5w6x7"
 
 
 def _alembic_config() -> Config:
@@ -104,6 +104,7 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "university_id",
             "program_id",
             "stage",
+            "loan_opt_in",
             "created_at",
             "updated_at",
         }

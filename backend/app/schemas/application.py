@@ -26,6 +26,7 @@ class ApplicationResponse(BaseModel):
     university_id: int
     program_id: int
     stage: ApplicationStageEnum
+    loan_opt_in: bool
     created_at: datetime
     updated_at: datetime
 

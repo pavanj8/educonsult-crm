@@ -1140,6 +1140,7 @@ def test_reassign_response_includes_full_application_payload(
         "university_id",
         "program_id",
         "stage",
+        "loan_opt_in",
         "created_at",
         "updated_at",
     ):

@@ -23,6 +23,7 @@ def test_application_model_has_required_columns():
         "university_id",
         "program_id",
         "stage",
+        "loan_opt_in",
         "created_at",
         "updated_at",
     }
@@ -150,3 +151,46 @@ def test_student_can_have_multiple_applications_with_independent_stages(db_sessi
     assert first.id != second.id
     assert first.stage == PipelineStage.COUNSELING
     assert second.stage == PipelineStage.APPLICATION_SUBMITTED
+
+
+def test_application_loan_opt_in_defaults_to_false(db_session):
+    """A newly-created application defaults to ``loan_opt_in=False`` (E36; J29).
+
+    The default captures the conservative "student did not opt in" state for
+    rows persisted both before and after the E36 migration. The ORM and the
+    PostgreSQL server default must agree so existing rows pre-dating the
+    migration read back as ``False`` after upgrade.
+    """
+    now = datetime.now(timezone.utc)
+    application = Application(
+        tenant_id=1,
+        student_id=10,
+        university_id=100,
+        program_id=200,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(application)
+    db_session.commit()
+    db_session.refresh(application)
+
+    assert application.loan_opt_in is False
+
+
+def test_application_loan_opt_in_can_be_set_true(db_session):
+    """A student can opt into loan tracking on an application (E36; J29)."""
+    now = datetime.now(timezone.utc)
+    application = Application(
+        tenant_id=1,
+        student_id=10,
+        university_id=100,
+        program_id=200,
+        loan_opt_in=True,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(application)
+    db_session.commit()
+    db_session.refresh(application)
+
+    assert application.loan_opt_in is True

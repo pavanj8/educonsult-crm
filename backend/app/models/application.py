@@ -1,4 +1,4 @@
-"""Application model (E18; E21; Requirements §5).
+"""Application model (E18; E21; E36; Requirements §5).
 
 The E21 queue fields are nullable for backwards compatibility with rows
 created by E18, which pre-dates the branch and counselor-assignment
@@ -12,6 +12,12 @@ columns. Follow-ups tracked for the tightening of these columns to NOT NULL:
 - **E21 — Counselor Dashboard & Queue** (this issue; Journey J14): the
   ``GET /applications/assigned-to-me`` endpoint reads
   ``branch_id`` / ``assigned_counselor_id`` for the role-scoped queue.
+- **E36 — Student Loan Opt-in** (Journey J29): ``loan_opt_in`` tracks
+  whether the student opted into loan tracking on the application
+  (Requirements §5: "Loans: Tracking-only fields (opted-in, status,
+  amount, lender) — no separate loan officer workflow for v1").
+  Default ``False`` for backwards compatibility with rows created
+  before E36.
 
 Until those follow-ups land, an ``Application`` may be persisted with
 ``branch_id IS NULL`` and/or ``assigned_counselor_id IS NULL``. The
@@ -19,7 +25,7 @@ constraints can be tightened in the respective follow-up issues when the
 columns are reliably populated for new rows.
 """
 
-from sqlalchemy import Enum, ForeignKey, Integer
+from sqlalchemy import Boolean, Enum, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TenantScopedBase
@@ -29,7 +35,7 @@ __all__ = ["Application", "ApplicationStage"]
 
 
 class Application(TenantScopedBase):
-    """Student application to a university/program (E18; E21)."""
+    """Student application to a university/program (E18; E21; E36)."""
 
     __tablename__ = "applications"
 
@@ -57,4 +63,10 @@ class Application(TenantScopedBase):
         ),
         nullable=False,
         default=ApplicationStage.REGISTERED,
+    )
+    loan_opt_in: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
     )
