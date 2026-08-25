@@ -13,6 +13,8 @@ from app.db.database import get_db
 from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
 from app.models.application import Application
 from app.models.branch import Branch
+from app.models.plan import Plan
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.pipeline.stages import PipelineStage
 from app.rbac.dependencies import require_role
@@ -23,8 +25,10 @@ from app.schemas.analytics import (
     BranchComparisonResponse,
     ConversionFunnelBucket,
     ConversionFunnelResponse,
+    PlatformWideStatsResponse,
     RegistrationsOverTimeBucket,
     RegistrationsOverTimeResponse,
+    TenantStatsBucket,
 )
 
 router = APIRouter()
@@ -489,6 +493,312 @@ def branch_comparison(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
         ) from None
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+
+@router.get("/platform-wide-stats", response_model=PlatformWideStatsResponse)
+def platform_wide_stats(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_role(Role.SUPER_ADMIN)),
+    ],
+    start_date: Annotated[
+        datetime | None,
+        Query(
+            description=(
+                "Filter applications/students created on or after this date/time "
+                "(ISO 8601 format). Defaults to beginning of available data. "
+                "Does NOT filter tenants, branches, or staff counts."
+            )
+        ),
+    ] = None,
+    end_date: Annotated[
+        datetime | None,
+        Query(
+            description=(
+                "Filter applications/students created before or on this date/time "
+                "(ISO 8601 format). Defaults to current time. "
+                "Does NOT filter tenants, branches, or staff counts."
+            )
+        ),
+    ] = None,
+    db: Session = Depends(get_db),
+) -> PlatformWideStatsResponse:
+    """Get platform-wide tenant stats for super admin dashboard (E43; Journey J36).
+
+    Returns aggregated metrics for all tenants on the platform, allowing
+    Super Admins to monitor overall platform health, tenant growth, and
+    usage patterns. Each tenant bucket includes counts for branches,
+    staff, students, applications (with terminal-stage breakdowns), and
+    subscription plan code.
+
+    **Permission**: ``SUPER_ADMIN`` only
+
+    **Scoping**:
+    - Super admins see all tenants on the platform (no filtering)
+
+    **Date filtering**:
+    - Both ``start_date`` and ``end_date`` are optional
+    - When provided, filters applications and students by ``created_at`` timestamp
+    - ``start_date`` is inclusive (>=), ``end_date`` is inclusive (<=)
+    - Does NOT filter tenants, branches, or staff counts (these show current totals)
+
+    **Response structure**:
+    - ``tenants``: list of tenant metrics ordered by applications_count descending
+    - ``total_tenants``: total number of tenants on the platform
+    - ``total_branches``: total branches across all tenants
+    - ``total_staff``: total staff across all tenants
+    - ``total_students``: total students on the platform (filtered by date range)
+    - ``total_applications``: total applications across all tenants (filtered by date range)
+
+    **Example**:
+    ```json
+    {
+      "tenants": [
+        {
+          "tenant_id": 1,
+          "tenant_name": "ABC Consultancy",
+          "tenant_slug": "abc-consultancy",
+          "plan_code": "growth",
+          "branches_count": 3,
+          "staff_count": 12,
+          "students_count": 150,
+          "applications_count": 200,
+          "enrolled_count": 40,
+          "rejected_count": 20,
+          "withdrawn_count": 10,
+          "active_count": 130
+        },
+        {
+          "tenant_id": 2,
+          "tenant_name": "XYZ Education",
+          "tenant_slug": "xyz-education",
+          "plan_code": "starter",
+          "branches_count": 1,
+          "staff_count": 5,
+          "students_count": 50,
+          "applications_count": 75,
+          "enrolled_count": 15,
+          "rejected_count": 8,
+          "withdrawn_count": 2,
+          "active_count": 50
+        }
+      ],
+      "total_tenants": 2,
+      "total_branches": 4,
+      "total_staff": 17,
+      "total_students": 200,
+      "total_applications": 275
+    }
+    ```
+    """
+    try:
+        from sqlalchemy import Case
+
+        # Get all tenants with their plan codes
+        tenant_query = select(
+            Tenant.id,
+            Tenant.name,
+            Tenant.slug,
+            Plan.code.label("plan_code"),
+        ).select_from(Tenant).outerjoin(Plan, Tenant.plan_id == Plan.id)
+
+        tenants_result = db.execute(tenant_query).all()
+
+        if not tenants_result:
+            return PlatformWideStatsResponse(
+                tenants=[],
+                total_tenants=0,
+                total_branches=0,
+                total_staff=0,
+                total_students=0,
+                total_applications=0,
+            )
+
+        # Build list of tenant IDs for further queries
+        tenant_ids = [row.id for row in tenants_result]
+        tenant_map = {row.id: row for row in tenants_result}
+
+        # Query branch counts per tenant
+        branch_counts_query = (
+            select(
+                Branch.tenant_id,
+                func.count(Branch.id).label("branches_count"),
+            )
+            .select_from(Branch)
+            .where(Branch.tenant_id.in_(tenant_ids))
+            .group_by(Branch.tenant_id)
+        )
+        branch_counts_result = db.execute(branch_counts_query).all()
+        branch_counts_map = {row.tenant_id: row.branches_count for row in branch_counts_result}
+
+        # Query staff counts per tenant (non-student roles)
+        # Staff = all users who are NOT students
+        staff_counts_query = (
+            select(
+                User.tenant_id,
+                func.count(User.id).label("staff_count"),
+            )
+            .select_from(User)
+            .where(User.tenant_id.in_(tenant_ids))
+            .where(User.role != Role.STUDENT)
+            .group_by(User.tenant_id)
+        )
+        staff_counts_result = db.execute(staff_counts_query).all()
+        staff_counts_map = {row.tenant_id: row.staff_count for row in staff_counts_result}
+
+        # Query student counts per tenant (with optional date filtering)
+        student_counts_query = (
+            select(
+                User.tenant_id,
+                func.count(User.id).label("students_count"),
+            )
+            .select_from(User)
+            .where(User.tenant_id.in_(tenant_ids))
+            .where(User.role == Role.STUDENT)
+        )
+
+        # Apply date filtering to students if provided
+        if start_date is not None:
+            student_counts_query = student_counts_query.where(User.created_at >= start_date)
+        if end_date is not None:
+            student_counts_query = student_counts_query.where(User.created_at <= end_date)
+
+        student_counts_query = student_counts_query.group_by(User.tenant_id)
+        student_counts_result = db.execute(student_counts_query).all()
+        student_counts_map = {row.tenant_id: row.students_count for row in student_counts_result}
+
+        # Query application counts per tenant (with optional date filtering)
+        app_base_query = select(Application).where(Application.tenant_id.in_(tenant_ids))
+
+        # Apply date filtering to applications if provided
+        if start_date is not None:
+            app_base_query = app_base_query.where(Application.created_at >= start_date)
+        if end_date is not None:
+            app_base_query = app_base_query.where(Application.created_at <= end_date)
+
+        # Aggregate application metrics per tenant
+        app_counts_query = (
+            app_base_query.add_columns(
+                Application.tenant_id,
+                func.count(Application.id).label("total_apps"),
+                func.sum(
+                    Case(
+                        (Application.stage == PipelineStage.ENROLLED.value, 1),
+                        else_=0,
+                    )
+                ).label("enrolled"),
+                func.sum(
+                    Case(
+                        (Application.stage == PipelineStage.REJECTED.value, 1),
+                        else_=0,
+                    )
+                ).label("rejected"),
+                func.sum(
+                    Case(
+                        (Application.stage == PipelineStage.WITHDRAWN.value, 1),
+                        else_=0,
+                    )
+                ).label("withdrawn"),
+                func.sum(
+                    Case(
+                        (Application.stage == PipelineStage.ENROLLED.value, 0),
+                        (Application.stage == PipelineStage.REJECTED.value, 0),
+                        (Application.stage == PipelineStage.WITHDRAWN.value, 0),
+                        else_=1,
+                    )
+                ).label("active"),
+            )
+            .group_by(Application.tenant_id)
+            .subquery()
+        )
+
+        app_counts_result = db.execute(
+            select(
+                app_counts_query.c.tenant_id,
+                app_counts_query.c.total_apps,
+                app_counts_query.c.enrolled,
+                app_counts_query.c.rejected,
+                app_counts_query.c.withdrawn,
+                app_counts_query.c.active,
+            )
+        ).all()
+
+        app_counts_map = {}
+        for row in app_counts_result:
+            app_counts_map[row.tenant_id] = {
+                "total_apps": row.total_apps if row.total_apps is not None else 0,
+                "enrolled": int(row.enrolled) if row.enrolled is not None else 0,
+                "rejected": int(row.rejected) if row.rejected is not None else 0,
+                "withdrawn": int(row.withdrawn) if row.withdrawn is not None else 0,
+                "active": int(row.active) if row.active is not None else 0,
+            }
+
+        # Build tenant buckets
+        tenants_list = []
+        total_branches = 0
+        total_staff = 0
+        total_students = 0
+        total_applications = 0
+
+        for tenant_id in tenant_ids:
+            tenant_row = tenant_map[tenant_id]
+            branches_count = branch_counts_map.get(tenant_id, 0)
+            staff_count = staff_counts_map.get(tenant_id, 0)
+            students_count = student_counts_map.get(tenant_id, 0)
+
+            app_metrics = app_counts_map.get(tenant_id)
+            if app_metrics:
+                applications_count = app_metrics["total_apps"]
+                enrolled_count = app_metrics["enrolled"]
+                rejected_count = app_metrics["rejected"]
+                withdrawn_count = app_metrics["withdrawn"]
+                active_count = app_metrics["active"]
+            else:
+                applications_count = 0
+                enrolled_count = 0
+                rejected_count = 0
+                withdrawn_count = 0
+                active_count = 0
+
+            tenants_list.append(
+                TenantStatsBucket(
+                    tenant_id=tenant_id,
+                    tenant_name=tenant_row.name,
+                    tenant_slug=tenant_row.slug,
+                    plan_code=tenant_row.plan_code,
+                    branches_count=branches_count,
+                    staff_count=staff_count,
+                    students_count=students_count,
+                    applications_count=applications_count,
+                    enrolled_count=enrolled_count,
+                    rejected_count=rejected_count,
+                    withdrawn_count=withdrawn_count,
+                    active_count=active_count,
+                )
+            )
+
+            total_branches += branches_count
+            total_staff += staff_count
+            total_students += students_count
+            total_applications += applications_count
+
+        # Order by applications_count descending
+        tenants_list.sort(key=lambda t: t.applications_count, reverse=True)
+
+        return PlatformWideStatsResponse(
+            tenants=tenants_list,
+            total_tenants=len(tenant_ids),
+            total_branches=total_branches,
+            total_staff=total_staff,
+            total_students=total_students,
+            total_applications=total_applications,
+        )
+
     except OperationalError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
