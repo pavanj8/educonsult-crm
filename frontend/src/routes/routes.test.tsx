@@ -589,4 +589,16 @@ describe('AppRouter routes', () => {
     expect(screen.queryByTestId('receptionist-intake-page')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Intake' })).not.toBeInTheDocument()
   })
+
+  it('renders the landing page publicly without authentication', async () => {
+    renderAppAt('/landing')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /streamline your education consultancy/i })).toBeInTheDocument()
+    })
+
+    // CTA buttons should be present
+    expect(screen.getByRole('link', { name: /start free trial/i })).toHaveAttribute('href', '/register')
+    expect(screen.getByRole('link', { name: /log in/i })).toHaveAttribute('href', '/login')
+  })
 })

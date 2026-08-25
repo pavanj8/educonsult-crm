@@ -64,8 +64,12 @@ export function AppRoutes() {
       <Route path={REGISTER_PATH} element={<RegisterStudentPage />} />
       <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPasswordPage />} />
       <Route path={RESET_PASSWORD_PATH} element={<ResetPasswordPage />} />
+<<<<<<< HEAD
       
       {/* Protected routes */}
+=======
+      <Route path={LANDING_PATH} element={<LandingPage />} />
+>>>>>>> origin/main
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="app" element={<HomePage />} />
