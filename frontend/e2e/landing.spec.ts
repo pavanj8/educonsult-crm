@@ -14,7 +14,7 @@ test.describe('Landing Page CTA Buttons', () => {
     // "Start Free Trial" button should navigate to /register
     await page.getByRole('link', { name: 'Start Free Trial' }).click()
     await expect(page).toHaveURL('/register')
-    await expect(page.getByRole('heading', { name: /student registration/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /create student account/i })).toBeVisible()
 
     // Go back to landing page
     await page.goto('/')
@@ -22,7 +22,7 @@ test.describe('Landing Page CTA Buttons', () => {
     // "Log In" button should navigate to /login
     await page.getByRole('link', { name: 'Log In' }).click()
     await expect(page).toHaveURL('/login')
-    await expect(page.getByRole('heading', { name: /log in/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   })
 
   test('bottom CTA section buttons navigate to correct routes', async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('Landing Page CTA Buttons', () => {
     // "Get Started Free" button should navigate to /register
     await page.getByRole('link', { name: 'Get Started Free' }).click()
     await expect(page).toHaveURL('/register')
-    await expect(page.getByRole('heading', { name: /student registration/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /create student account/i })).toBeVisible()
 
     // Go back to landing page
     await page.goto('/')
@@ -43,7 +43,7 @@ test.describe('Landing Page CTA Buttons', () => {
     // "Request Demo" button should navigate to /login
     await page.getByRole('link', { name: 'Request Demo' }).click()
     await expect(page).toHaveURL('/login')
-    await expect(page.getByRole('heading', { name: /log in/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   })
 
   test('all CTA links are accessible and have proper href attributes', async ({ page }) => {

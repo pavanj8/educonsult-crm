@@ -85,8 +85,8 @@ describe('AppRouter routes', () => {
     localStorage.clear()
   })
 
-  it('redirects unauthenticated users to the public login page', async () => {
-    renderAppAt('/')
+  it('redirects unauthenticated users from protected routes to the public login page', async () => {
+    renderAppAt('/app')
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
