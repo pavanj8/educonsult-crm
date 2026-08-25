@@ -17,7 +17,7 @@ def test_create_upgrade_order_as_owner(
         "status": "created",
     }
 
-    with patch("app.billing.razorpay_client.create_order") as mock_create_order:
+    with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
         response = auth_client.post(
@@ -55,7 +55,7 @@ def test_create_upgrade_order_plan_code_normalized(
         "status": "created",
     }
 
-    with patch("app.billing.razorpay_client.create_order") as mock_create_order:
+    with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
         response = auth_client.post(
@@ -130,7 +130,7 @@ def test_create_upgrade_order_razorpay_unavailable(
     db_session, auth_client, owner_user, owner_tenant, test_plan, razorpay_test_credentials
 ):
     """Razorpay service errors return 503."""
-    with patch("app.billing.razorpay_client.create_order") as mock_create_order:
+    with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.side_effect = Exception("Razorpay API error")
 
         response = auth_client.post(
@@ -164,8 +164,8 @@ def test_create_upgrade_order_razorpay_not_configured(
     )
     client.headers.update({"Authorization": f"Bearer {token}"})
 
-    # Mock the config functions to raise RuntimeError (missing credentials)
-    with patch("app.billing.config.razorpay_key_id", side_effect=RuntimeError("RAZORPAY_KEY_ID not set")):
+    # Mock the config function to raise RuntimeError (missing credentials)
+    with patch("app.routers.billing.razorpay_key_id", side_effect=RuntimeError("RAZORPAY_KEY_ID not set")):
         response = client.post(
             "/billing/create-upgrade-order",
             json={"plan_code": "growth"},
@@ -239,7 +239,7 @@ def test_create_upgrade_order_enterprise_to_growth(
         "status": "created",
     }
 
-    with patch("app.billing.razorpay_client.create_order") as mock_create_order:
+    with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
         response = auth_client.post(
@@ -264,7 +264,7 @@ def test_create_upgrade_order_multiple_orders_same_plan(
         "status": "created",
     }
 
-    with patch("app.billing.razorpay_client.create_order") as mock_create_order:
+    with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
         # First order
