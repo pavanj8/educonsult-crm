@@ -19,6 +19,7 @@ import TenantsPage from '../pages/TenantsPage'
 import VerifierDashboardPage from '../pages/VerifierDashboardPage'
 import VisaProcessorDashboardPage from '../pages/VisaProcessorDashboardPage'
 import CounselorDashboardPage from '../pages/CounselorDashboardPage'
+import BranchManagerDashboardPage from '../pages/BranchManagerDashboardPage'
 import ChecklistTemplateAdminRoute from './ChecklistTemplateAdminRoute'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
 import CounselorRoute from './CounselorRoute'
@@ -43,6 +44,7 @@ import {
   TENANT_BRANDING_PATH,
   VERIFIER_DASHBOARD_PATH,
   VISA_DASHBOARD_PATH,
+  BRANCH_MANAGER_DASHBOARD_PATH,
 } from './paths'
 
 export function AppRoutes() {
@@ -65,6 +67,10 @@ export function AppRoutes() {
           </Route>
           <Route element={<StaffManagerRoute />}>
             <Route path="staff" element={<StaffPage />} />
+            <Route
+              path={BRANCH_MANAGER_DASHBOARD_PATH.slice(1)}
+              element={<BranchManagerDashboardPage />}
+            />
           </Route>
           <Route element={<MasterDataAdminRoute />}>
             <Route

@@ -21,6 +21,13 @@ export type {
 } from './checklist'
 export type { Country, Program, University } from './masterData'
 export type {
+  AnalyticsParams,
+  ConversionFunnelBucket,
+  ConversionFunnelResponse,
+  DateRange,
+  DateRangePreset,
+} from './analytics'
+export type {
   ReceptionistIntakeRequest,
   ReceptionistIntakeResponse,
 } from './receptionistIntake'
