@@ -641,7 +641,7 @@ def get_my_plan_and_usage(
         AuthenticatedUser, Depends(require_permission(Permission.BILLING_READ_OWN))
     ],
     db: Session = Depends(get_db),
-) -> dict[str, Plan | None, dict]:
+) -> PlanAndUsageResponse:
     """Return the current owner's tenant plan and usage summary (E45; Journey J38).
 
     Consultancy owner only (``billing:read_own`` permission). The endpoint:
@@ -723,6 +723,9 @@ def get_my_plan_and_usage(
         ) from None
 
     # Count staff (all non-student roles) for this tenant.
+    # Staff includes: consultancy_owner, branch_manager, counselor,
+    # document_verifier, visa_processor, receptionist. This matches the
+    # E43 platform-wide-stats endpoint which counts all non-student roles.
     try:
         staff_used = (
             db.execute(
@@ -730,15 +733,7 @@ def get_my_plan_and_usage(
                 .select_from(User)
                 .where(
                     User.tenant_id == current_user.tenant_id,
-                    User.role.in_(
-                        (
-                            "branch_manager",
-                            "counselor",
-                            "document_verifier",
-                            "visa_processor",
-                            "receptionist",
-                        )
-                    ),
+                    User.role != Role.STUDENT,
                 )
             )
             .scalar_one()
@@ -757,7 +752,7 @@ def get_my_plan_and_usage(
                 .select_from(User)
                 .where(
                     User.tenant_id == current_user.tenant_id,
-                    User.role == "student",
+                    User.role == Role.STUDENT,
                 )
             )
             .scalar_one()

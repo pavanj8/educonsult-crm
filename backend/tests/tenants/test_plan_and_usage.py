@@ -149,7 +149,8 @@ def test_plan_and_usage_returns_null_when_no_plan_assigned(client, db_session):
     # Usage should still be populated
     assert "usage" in data
     assert data["usage"]["branches_used"] == 0
-    assert data["usage"]["staff_used"] == 0
+    # Staff count includes the owner even with no plan
+    assert data["usage"]["staff_used"] == 1
     assert data["usage"]["students_used"] == 0
     assert data["usage"]["branches_limit"] is None
     assert data["usage"]["staff_limit"] is None
@@ -192,7 +193,7 @@ def test_plan_and_usage_counts_staff(client, db_session):
         code=PlanTier.STARTER,
         name="Starter",
         max_branches=1,
-        max_staff=5,
+        max_staff=6,
         max_students=50,
     )
     tenant = _make_tenant(db_session, plan_id=plan.id)
@@ -211,8 +212,9 @@ def test_plan_and_usage_counts_staff(client, db_session):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["usage"]["staff_used"] == 5
-    assert data["usage"]["staff_limit"] == 5
+    # Staff count includes the owner + 5 created staff = 6 total
+    assert data["usage"]["staff_used"] == 6
+    assert data["usage"]["staff_limit"] == 6
 
 
 def test_plan_and_usage_does_not_count_students_as_staff(client, db_session):
@@ -222,7 +224,7 @@ def test_plan_and_usage_does_not_count_students_as_staff(client, db_session):
         code=PlanTier.STARTER,
         name="Starter",
         max_branches=1,
-        max_staff=2,
+        max_staff=3,
         max_students=10,
     )
     tenant = _make_tenant(db_session, plan_id=plan.id)
@@ -241,7 +243,8 @@ def test_plan_and_usage_does_not_count_students_as_staff(client, db_session):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["usage"]["staff_used"] == 1
+    # Staff count includes the owner + 1 counselor = 2 total
+    assert data["usage"]["staff_used"] == 2
     assert data["usage"]["students_used"] == 3
 
 
@@ -302,7 +305,8 @@ def test_plan_and_usage_returns_null_limits_for_unlimited_plan(client, db_sessio
     data = response.json()
     assert data["usage"]["branches_used"] == 1
     assert data["usage"]["branches_limit"] is None
-    assert data["usage"]["staff_used"] == 1
+    # Staff count includes owner + counselor = 2 total
+    assert data["usage"]["staff_used"] == 2
     assert data["usage"]["staff_limit"] is None
     assert data["usage"]["students_used"] == 1
     assert data["usage"]["students_limit"] is None
@@ -316,7 +320,7 @@ def test_plan_and_usage_does_not_leak_cross_tenant_data(client, db_session):
         code=PlanTier.STARTER,
         name="Starter",
         max_branches=1,
-        max_staff=5,
+        max_staff=6,
         max_students=50,
     )
     tenant1 = _make_tenant(db_session, plan_id=plan1.id)
@@ -327,7 +331,7 @@ def test_plan_and_usage_does_not_leak_cross_tenant_data(client, db_session):
         code=PlanTier.GROWTH,
         name="Growth",
         max_branches=5,
-        max_staff=20,
+        max_staff=21,
         max_students=200,
     )
     tenant2 = _make_tenant(db_session, plan_id=plan2.id)
@@ -357,8 +361,9 @@ def test_plan_and_usage_does_not_leak_cross_tenant_data(client, db_session):
     data1 = response1.json()
     assert data1["usage"]["branches_used"] == 1
     assert data1["usage"]["branches_limit"] == 1
-    assert data1["usage"]["staff_used"] == 1
-    assert data1["usage"]["staff_limit"] == 5
+    # Staff count includes owner + 1 counselor = 2 total
+    assert data1["usage"]["staff_used"] == 2
+    assert data1["usage"]["staff_limit"] == 6
     assert data1["usage"]["students_used"] == 1
     assert data1["usage"]["students_limit"] == 50
 
@@ -373,7 +378,8 @@ def test_plan_and_usage_does_not_leak_cross_tenant_data(client, db_session):
     data2 = response2.json()
     assert data2["usage"]["branches_used"] == 3
     assert data2["usage"]["branches_limit"] == 5
-    assert data2["usage"]["staff_used"] == 10
-    assert data2["usage"]["staff_limit"] == 20
+    # Staff count includes owner + 10 counselors = 11 total
+    assert data2["usage"]["staff_used"] == 11
+    assert data2["usage"]["staff_limit"] == 21
     assert data2["usage"]["students_used"] == 50
     assert data2["usage"]["students_limit"] == 200
