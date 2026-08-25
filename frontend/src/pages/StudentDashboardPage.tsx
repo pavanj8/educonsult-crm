@@ -25,6 +25,7 @@ export default function StudentDashboardPage() {
   const [selectedUniversityId, setSelectedUniversityId] = useState<number | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [applicationLoanOptIn, setApplicationLoanOptIn] = useState<Record<number, boolean>>({})
   const errorId = useId()
   const successId = useId()
 
@@ -81,6 +82,10 @@ export default function StudentDashboardPage() {
     setValidationError(null)
   }
 
+  function handleLoanOptInChange(applicationId: number, loanOptIn: boolean) {
+    setApplicationLoanOptIn((prev) => ({ ...prev, [applicationId]: loanOptIn }))
+  }
+
   const errorMessage = validationError ?? createError
   const statusMessage = errorMessage ? errorId : successMessage ? successId : undefined
 
@@ -119,6 +124,7 @@ export default function StudentDashboardPage() {
                   <th scope="col">Program</th>
                   <th scope="col">Stage</th>
                   <th scope="col">Created</th>
+                  <th scope="col">Loan tracking</th>
                   <th scope="col">Documents</th>
                 </tr>
               </thead>
@@ -126,13 +132,18 @@ export default function StudentDashboardPage() {
                 {applications.map((application) => (
                   <ApplicationRow
                     key={application.id}
-                    application={application}
+                    application={{
+                      ...application,
+                      loan_opt_in:
+                        applicationLoanOptIn[application.id] ?? application.loan_opt_in,
+                    }}
                     universityName={universityName(application.university_id)}
                     programName={
                       programName(application.university_id, application.program_id) ??
                       `Program #${application.program_id}`
                     }
                     createdAt={application.created_at}
+                    onLoanOptInChanged={handleLoanOptInChange}
                   />
                 ))}
               </tbody>

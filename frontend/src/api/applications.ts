@@ -111,6 +111,32 @@ export async function reassignCounselor(
   })
 }
 
+/**
+ * Set the student's loan-tracking opt-in flag on an application (E36;
+ * Journey J29; frontend #199). Backed by
+ * ``PATCH /applications/{id}/loan-opt-in`` — a student-only endpoint
+ * that persists the boolean toggle and returns the full updated
+ * ``Application`` payload (including the new ``loan_opt_in`` flag and
+ * refreshed ``updated_at``). The frontend re-uses the host's
+ * application state on success via the ``onChanged(applicationId,
+ * loanOpt_in)`` callback, mirroring the
+ * ``ReassignCounselorAction`` contract.
+ *
+ * Pass ``true`` to opt in, ``false`` to opt out. The toggle is
+ * symmetric — a student may opt in and opt back out before any
+ * staff-side loan data (lender / amount / status, tracked under
+ * E37 / Journey J30) is recorded.
+ */
+export async function setLoanOptIn(
+  applicationId: number,
+  loanOptIn: boolean,
+): Promise<Application> {
+  return apiFetch<Application>(`/applications/${applicationId}/loan-opt-in`, {
+    method: 'PATCH',
+    body: JSON.stringify({ loan_opt_in: loanOptIn }),
+  })
+}
+
 export interface UpdateLoanRequest {
   loan_status?: string | null
   loan_lender?: string | null

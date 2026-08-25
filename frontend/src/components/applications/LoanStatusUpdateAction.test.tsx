@@ -33,6 +33,7 @@ const SAVED_APPLICATION = {
   university_id: 1,
   program_id: 10,
   stage: 'loan_processing' as const,
+  loan_opt_in: true,
   loan_status: 'approved',
   loan_lender: 'HDFC Credila',
   loan_amount: '1500000.00',
