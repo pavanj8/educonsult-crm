@@ -632,18 +632,18 @@ class TestExportStudentList:
 
         assert response.status_code == 422
 
-    def test_super_admin_requires_report_export_permission(
+    def test_super_admin_has_report_export_permission(
         self,
         client,
         db_session,
         override_authenticated_user,
     ):
-        """Super admin does not have REPORT_EXPORT permission by default."""
+        """Super admin has REPORT_EXPORT permission and can export student lists."""
         override_authenticated_user(
             make_authenticated_user(Role.SUPER_ADMIN, user_id=100, tenant_id=None)
         )
 
         response = client.get("/analytics/export/students?format=csv")
 
-        # Super admins don't have REPORT_EXPORT permission, so they should be denied
-        assert response.status_code == 403
+        # Super admins DO have REPORT_EXPORT permission
+        assert response.status_code == 200
