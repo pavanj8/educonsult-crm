@@ -1,9 +1,9 @@
 /**
- * Plan and usage API client functions (E45, E46; Journey J38, J39).
+ * Plan and usage API client functions (E45, E46; Journey J38, J39, E47; Journey J40).
  */
 
 import { apiFetch } from './client'
-import type { PlanAndUsage, UpgradeOrderResponse } from '../types/plan'
+import type { PlanAndUsage, TenantBillingStatus, UpgradeOrderResponse } from '../types/plan'
 
 /**
  * Fetch the current plan and usage summary for the authenticated user's tenant.
@@ -40,4 +40,20 @@ export async function createUpgradeOrder(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan_code: planCode }),
   })
+}
+
+/**
+ * Fetch all tenants' billing/subscription status.
+ *
+ * This endpoint is used by the Super Admin to view all tenants' plan
+ * assignments and usage across the platform.
+ *
+ * Endpoint: ``GET /billing/tenant-status`` (E47; Journey J40).
+ *
+ * Returns a list of all tenants with their assigned plan details and
+ * current usage counts. Tenants without an assigned plan are included
+ * with a null plan field.
+ */
+export async function fetchAllTenantsBillingStatus(): Promise<TenantBillingStatus[]> {
+  return apiFetch<TenantBillingStatus[]>('/billing/tenant-status')
 }

@@ -111,3 +111,52 @@ export type RazorpayPaymentResponse = {
   /** Razorpay signature. */
   razorpay_signature: string
 }
+
+/**
+ * Plan details as returned in the tenant billing status response (E47; Journey J40).
+ *
+ * This is a simplified view of plan data for display in the super admin
+ * billing status overview. It contains the tier code, name, and limits.
+ */
+export type TenantPlanInfo = {
+  /** Plan tier code (starter, growth, enterprise). */
+  code: 'starter' | 'growth' | 'enterprise'
+  /** Human-readable plan name. */
+  name: string
+  /** Maximum number of branches (null for unlimited). */
+  max_branches: number | null
+  /** Maximum number of staff accounts (null for unlimited). */
+  max_staff: number | null
+  /** Maximum number of student accounts (null for unlimited). */
+  max_students: number | null
+  /** Whether the plan is active. */
+  is_active: boolean
+}
+
+/**
+ * Billing status for a single tenant (E47; Journey J40).
+ *
+ * Returned by the GET /billing/tenant-status super admin endpoint.
+ * Contains the tenant's identity, assigned plan details, and current
+ * usage counts against plan caps.
+ */
+export type TenantBillingStatus = {
+  /** The tenant's primary key. */
+  tenant_id: number
+  /** Human-readable tenant name. */
+  tenant_name: string
+  /** Tenant's URL slug. */
+  tenant_slug: string
+  /** The tenant's assigned plan (null if no plan assigned). */
+  plan: TenantPlanInfo | null
+  /** Current number of branches created by this tenant. */
+  branches_used: number
+  /** Current number of staff accounts (non-student roles). */
+  staff_used: number
+  /** Current number of student accounts. */
+  students_used: number
+  /** When the tenant was created. */
+  created_at: string
+  /** When the tenant was last updated. */
+  updated_at: string
+}

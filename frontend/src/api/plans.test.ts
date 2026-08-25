@@ -1,12 +1,12 @@
 /**
- * Tests for plans API client (E45, E46; Journey J38, J39).
+ * Tests for plans API client (E45, E46, E47; Journey J38, J39, J40).
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-import { fetchMyPlanAndUsage, createUpgradeOrder } from './plans'
+import { fetchMyPlanAndUsage, createUpgradeOrder, fetchAllTenantsBillingStatus } from './plans'
 import { apiFetch } from './client'
-import type { PlanAndUsage, UpgradeOrderResponse } from '../types/plan'
+import type { PlanAndUsage, UpgradeOrderResponse, TenantBillingStatus } from '../types/plan'
 
 // Mock the HTTP client
 vi.mock('./client', () => ({
@@ -208,6 +208,109 @@ describe('plans API client', () => {
       vi.mocked(apiFetch).mockRejectedValue(new Error('Network error'))
 
       await expect(createUpgradeOrder('growth')).rejects.toThrow('Network error')
+    })
+  })
+
+  describe('fetchAllTenantsBillingStatus (E47; Journey J40)', () => {
+    it('should fetch all tenants billing status successfully', async () => {
+      const mockResponse: TenantBillingStatus[] = [
+        {
+          tenant_id: 1,
+          tenant_name: 'Tenant A',
+          tenant_slug: 'tenant-a',
+          plan: {
+            code: 'starter',
+            name: 'Starter Plan',
+            max_branches: 1,
+            max_staff: 5,
+            max_students: 50,
+            is_active: true,
+          },
+          branches_used: 1,
+          staff_used: 2,
+          students_used: 10,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+        {
+          tenant_id: 2,
+          tenant_name: 'Tenant B',
+          tenant_slug: 'tenant-b',
+          plan: null,
+          branches_used: 0,
+          staff_used: 0,
+          students_used: 0,
+          created_at: '2024-01-02T00:00:00Z',
+          updated_at: '2024-01-02T00:00:00Z',
+        },
+      ]
+
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
+
+      const result = await fetchAllTenantsBillingStatus()
+
+      expect(apiFetch).toHaveBeenCalledWith('/billing/tenant-status')
+      expect(result).toEqual(mockResponse)
+      expect(result).toHaveLength(2)
+      expect(result[0].tenant_name).toBe('Tenant A')
+      expect(result[1].plan).toBeNull()
+    })
+
+    it('should handle tenants with unlimited plan (null limits)', async () => {
+      const mockResponse: TenantBillingStatus[] = [
+        {
+          tenant_id: 1,
+          tenant_name: 'Enterprise Tenant',
+          tenant_slug: 'enterprise-tenant',
+          plan: {
+            code: 'enterprise',
+            name: 'Enterprise Plan',
+            max_branches: null,
+            max_staff: null,
+            max_students: null,
+            is_active: true,
+          },
+          branches_used: 100,
+          staff_used: 500,
+          students_used: 1000,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+      ]
+
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
+
+      const result = await fetchAllTenantsBillingStatus()
+
+      expect(result[0].plan?.max_branches).toBeNull()
+      expect(result[0].plan?.max_staff).toBeNull()
+      expect(result[0].plan?.max_students).toBeNull()
+    })
+
+    it('should handle empty tenant list', async () => {
+      const mockResponse: TenantBillingStatus[] = []
+
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
+
+      const result = await fetchAllTenantsBillingStatus()
+
+      expect(result).toEqual([])
+      expect(apiFetch).toHaveBeenCalledWith('/billing/tenant-status')
+    })
+
+    it('should throw error on network failure', async () => {
+      vi.mocked(apiFetch).mockRejectedValue(new Error('Network error'))
+
+      await expect(fetchAllTenantsBillingStatus()).rejects.toThrow('Network error')
+    })
+
+    it('should throw error on 403 forbidden (non-super-admin)', async () => {
+      const mockError = new Error('Forbidden') as Error & { status: number }
+      mockError.status = 403
+
+      vi.mocked(apiFetch).mockRejectedValue(mockError)
+
+      await expect(fetchAllTenantsBillingStatus()).rejects.toThrow('Forbidden')
     })
   })
 })

@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import AppLayout from '../layouts/AppLayout'
 import BranchesPage from '../pages/BranchesPage'
+import BillingStatusPage from '../pages/BillingStatusPage'
 import ChecklistTemplatesPage from '../pages/ChecklistTemplatesPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
@@ -35,6 +36,7 @@ import SuperAdminRoute from './SuperAdminRoute'
 import VerifierRoute from './VerifierRoute'
 import VisaProcessorRoute from './VisaProcessorRoute'
 import {
+  BILLING_STATUS_PATH,
   CHECKLIST_TEMPLATES_PATH,
   COUNSELOR_DASHBOARD_PATH,
   FORGOT_PASSWORD_PATH,
@@ -69,6 +71,10 @@ export function AppRoutes() {
             <Route
               path={SUPER_ADMIN_DASHBOARD_PATH.slice(1)}
               element={<SuperAdminDashboardPage />}
+            />
+            <Route
+              path={BILLING_STATUS_PATH.slice(1)}
+              element={<BillingStatusPage />}
             />
           </Route>
           <Route element={<ConsultancyOwnerRoute />}>
