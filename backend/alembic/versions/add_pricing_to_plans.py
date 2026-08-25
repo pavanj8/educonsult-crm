@@ -37,7 +37,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "add_pricing_to_plans"
-down_revision: Union[str, None] = "p8q9r0s1t2u3"
+down_revision: Union[str, None] = "t3u4v5w6x7y8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

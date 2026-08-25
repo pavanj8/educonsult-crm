@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "t3u4v5w6x7y8"
+HEAD_REVISION = "add_pricing_to_plans"
 
 
 def _alembic_config() -> Config:
@@ -296,6 +296,8 @@ def test_alembic_upgrade_head_records_revision(tmp_path, monkeypatch):
             "max_branches",
             "max_staff",
             "max_students",
+            "price_in_cents",
+            "currency",
             "is_active",
             "created_at",
             "updated_at",
