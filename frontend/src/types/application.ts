@@ -65,7 +65,6 @@ export type Application = {
   university_id: number
   program_id: number
   stage: PipelineStage
-<<<<<<< HEAD
   /**
    * Whether the student opted into loan tracking on this application
    * (E36; Journey J29; Requirements §5 "Loans: Tracking-only fields
@@ -74,13 +73,11 @@ export type Application = {
    * the E36 backend field.
    */
   loan_opt_in: boolean
-=======
   // E37 task #200: tracking-only loan fields (Journey J30; Requirements
   // §5 "Loans: Tracking-only fields (opted-in, status, amount,
   // lender) — no separate loan officer workflow for v1"). All
   // nullable so the frontend can render "not yet recorded" states for
   // fresh applications (and pre-E37 rows that pre-date the migration).
-  loan_opt_in?: boolean
   loan_status: string | null
   loan_lender: string | null
   /**
@@ -92,7 +89,6 @@ export type Application = {
    * ``null`` when the field has not been recorded yet.
    */
   loan_amount: string | null
->>>>>>> origin/main
   created_at: string
   updated_at: string
 }

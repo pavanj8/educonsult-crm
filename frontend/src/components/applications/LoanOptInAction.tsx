@@ -45,21 +45,37 @@ function mapError(err: unknown): string {
  * The control stays disabled while the request is in flight so the
  * student cannot fire two concurrent toggles for the same
  * application.
+ *
+ * After a successful toggle, the control reflects the new state
+ * immediately (button label flips to the inverse action, status
+ * text updates) so the student sees the change take effect. The
+ * ``onChanged`` callback is then invoked so the parent can reload
+ * or update its application list if it needs the refreshed
+ * ``updated_at`` timestamp or other server-side changes.
  */
 export default function LoanOptInAction({
   applicationId,
-  loanOptIn,
+  loanOptIn: initialLoanOptIn,
   onChanged,
 }: LoanOptInActionProps) {
+  const [localLoanOptIn, setLocalLoanOptIn] = useState(initialLoanOptIn)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  // When the prop changes (e.g., after a parent reload), sync local state
+  if (localLoanOptIn !== initialLoanOptIn) {
+    setLocalLoanOptIn(initialLoanOptIn)
+  }
+
   async function handleToggle() {
+    const newValue = !localLoanOptIn
     setSubmitError(null)
     setSubmitting(true)
     try {
-      await setLoanOptIn(applicationId, !loanOptIn)
-      onChanged?.(applicationId, !loanOptIn)
+      await setLoanOptIn(applicationId, newValue)
+      // Optimistically update local state so the UI reflects the change immediately
+      setLocalLoanOptIn(newValue)
+      onChanged?.(applicationId, newValue)
     } catch (err) {
       setSubmitError(mapError(err))
     } finally {
@@ -67,8 +83,8 @@ export default function LoanOptInAction({
     }
   }
 
-  const label = loanOptIn ? 'Opt out of loan tracking' : 'Opt in to loan tracking'
-  const statusLabel = loanOptIn ? 'Opted in' : 'Not opted in'
+  const label = localLoanOptIn ? 'Opt out of loan tracking' : 'Opt in to loan tracking'
+  const statusLabel = localLoanOptIn ? 'Opted in' : 'Not opted in'
 
   return (
     <div className="loan-opt-in-action" data-testid={`loan-opt-in-action-${applicationId}`}>
@@ -77,7 +93,7 @@ export default function LoanOptInAction({
         <span
           className="loan-opt-in-action__status-value"
           data-testid={`loan-opt-in-status-${applicationId}`}
-          data-loan-opt-in={loanOptIn ? 'true' : 'false'}
+          data-loan-opt-in={localLoanOptIn ? 'true' : 'false'}
         >
           {statusLabel}
         </span>

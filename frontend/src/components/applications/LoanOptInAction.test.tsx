@@ -46,7 +46,7 @@ describe('LoanOptInAction', () => {
     )
   })
 
-  it('patches loan_opt_in=true when the student opts in and notifies the host', async () => {
+  it('patches loan_opt_in=true when the student opts in, updates the UI to reflect the new state, and notifies the host', async () => {
     const user = userEvent.setup()
     const onChanged = vi.fn()
     setLoanOptInMock.mockResolvedValue({
@@ -63,6 +63,12 @@ describe('LoanOptInAction', () => {
 
     render(<LoanOptInAction applicationId={42} loanOptIn={false} onChanged={onChanged} />)
 
+    // Initial state: not opted in
+    expect(screen.getByTestId('loan-opt-in-status-42')).toHaveTextContent('Not opted in')
+    expect(screen.getByTestId('loan-opt-in-toggle-42')).toHaveTextContent(
+      'Opt in to loan tracking',
+    )
+
     await user.click(screen.getByTestId('loan-opt-in-toggle-42'))
 
     expect(setLoanOptInMock).toHaveBeenCalledWith(42, true)
@@ -70,6 +76,16 @@ describe('LoanOptInAction', () => {
     await waitFor(() => {
       expect(onChanged).toHaveBeenCalledWith(42, true)
     })
+
+    // After successful toggle, the UI reflects the new state
+    expect(screen.getByTestId('loan-opt-in-status-42')).toHaveTextContent('Opted in')
+    expect(screen.getByTestId('loan-opt-in-status-42')).toHaveAttribute(
+      'data-loan-opt-in',
+      'true',
+    )
+    expect(screen.getByTestId('loan-opt-in-toggle-42')).toHaveTextContent(
+      'Opt out of loan tracking',
+    )
 
     expect(screen.queryByTestId('loan-opt-in-error-42')).not.toBeInTheDocument()
   })
@@ -112,7 +128,7 @@ describe('LoanOptInAction', () => {
     )
   })
 
-  it('patches loan_opt_in=false when the student opts out and notifies the host', async () => {
+  it('patches loan_opt_in=false when the student opts out, updates the UI to reflect the new state, and notifies the host', async () => {
     const user = userEvent.setup()
     const onChanged = vi.fn()
     setLoanOptInMock.mockResolvedValue({
@@ -129,6 +145,12 @@ describe('LoanOptInAction', () => {
 
     render(<LoanOptInAction applicationId={42} loanOptIn={true} onChanged={onChanged} />)
 
+    // Initial state: opted in
+    expect(screen.getByTestId('loan-opt-in-status-42')).toHaveTextContent('Opted in')
+    expect(screen.getByTestId('loan-opt-in-toggle-42')).toHaveTextContent(
+      'Opt out of loan tracking',
+    )
+
     await user.click(screen.getByTestId('loan-opt-in-toggle-42'))
 
     expect(setLoanOptInMock).toHaveBeenCalledWith(42, false)
@@ -136,6 +158,16 @@ describe('LoanOptInAction', () => {
     await waitFor(() => {
       expect(onChanged).toHaveBeenCalledWith(42, false)
     })
+
+    // After successful toggle, the UI reflects the new state
+    expect(screen.getByTestId('loan-opt-in-status-42')).toHaveTextContent('Not opted in')
+    expect(screen.getByTestId('loan-opt-in-status-42')).toHaveAttribute(
+      'data-loan-opt-in',
+      'false',
+    )
+    expect(screen.getByTestId('loan-opt-in-toggle-42')).toHaveTextContent(
+      'Opt in to loan tracking',
+    )
   })
 
   it('disables the toggle while the PATCH request is in flight', async () => {

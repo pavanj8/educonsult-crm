@@ -111,7 +111,6 @@ export async function reassignCounselor(
   })
 }
 
-<<<<<<< HEAD
 /**
  * Set the student's loan-tracking opt-in flag on an application (E36;
  * Journey J29; frontend #199). Backed by
@@ -136,7 +135,8 @@ export async function setLoanOptIn(
     method: 'PATCH',
     body: JSON.stringify({ loan_opt_in: loanOptIn }),
   })
-=======
+}
+
 export interface UpdateLoanRequest {
   loan_status?: string | null
   loan_lender?: string | null
@@ -188,5 +188,4 @@ export async function updateApplicationLoan(
       body: JSON.stringify(payload),
     },
   ).then((response) => response.application)
->>>>>>> origin/main
 }
