@@ -1,4 +1,4 @@
-"""Analytics routes (E41, E42; Journey J34, J35)."""
+"""Analytics routes (E41, E42, E44; Journey J34, J35, J37)."""
 
 from datetime import datetime
 from typing import Annotated
@@ -20,6 +20,7 @@ from app.pipeline.stages import PipelineStage
 from app.rbac.dependencies import require_role
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
+from app.routers.analytics_export import export_student_list
 from app.schemas.analytics import (
     BranchComparisonBucket,
     BranchComparisonResponse,
@@ -34,6 +35,9 @@ from app.schemas.analytics import (
 router = APIRouter()
 
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
+
+# Add export endpoint
+router.add_api_route("/export/students", export_student_list, methods=["GET"])
 
 
 @router.get("/funnel", response_model=ConversionFunnelResponse)
