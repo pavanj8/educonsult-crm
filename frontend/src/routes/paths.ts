@@ -1,10 +1,5 @@
-<<<<<<< HEAD
 /** Marketing landing page path (E53; Requirements §10). */
 export const LANDING_PATH = '/'
-=======
-/** Public marketing landing page (E53; Requirements §10). */
-export const LANDING_PATH = '/landing'
->>>>>>> origin/main
 
 /** Public auth route paths. */
 

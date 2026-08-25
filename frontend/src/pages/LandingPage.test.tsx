@@ -148,6 +148,6 @@ describe('LandingPage', () => {
   })
 
   it('LANDING_PATH is exported correctly', () => {
-    expect(LANDING_PATH).toBe('/landing')
+    expect(LANDING_PATH).toBe('/')
   })
 })
