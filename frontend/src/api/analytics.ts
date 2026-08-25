@@ -118,3 +118,71 @@ export async function fetchPlatformWideStats(
 
   return apiFetch<PlatformWideStatsResponse>(path)
 }
+
+/**
+ * Export student list as CSV or Excel (E44; Journey J37).
+ *
+ * This function returns a URL that can be used with the ExportButton component
+ * or similar to trigger a browser download.
+ *
+ * @param format - Export format: 'csv' or 'xlsx'
+ * @param params - Optional date range filters (start_date, end_date)
+ * @returns The API endpoint URL for the export request
+ */
+export function getStudentListExportUrl(
+  format: 'csv' | 'xlsx' = 'csv',
+  params?: AnalyticsParams,
+): string {
+  const searchParams = new URLSearchParams()
+  searchParams.set('format', format)
+
+  if (params?.start_date) {
+    searchParams.set('start_date', params.start_date)
+  }
+
+  if (params?.end_date) {
+    searchParams.set('end_date', params.end_date)
+  }
+
+  const queryString = searchParams.toString()
+  return `/analytics/export/students${queryString ? `?${queryString}` : ''}`
+}
+
+/**
+ * Export analytics data as CSV or Excel (E44; Journey J37).
+ *
+ * This function returns a URL that can be used with the ExportButton component
+ * or similar to trigger a browser download.
+ *
+ * @param exportType - Type of analytics export: 'funnel' or 'registrations' or 'branch-comparison' or 'platform-stats'
+ * @param format - Export format: 'csv' or 'xlsx'
+ * @param params - Optional date range filters (start_date, end_date)
+ * @returns The API endpoint URL for the export request
+ */
+export function getAnalyticsExportUrl(
+  exportType: 'funnel' | 'registrations' | 'branch-comparison' | 'platform-stats',
+  format: 'csv' | 'xlsx' = 'csv',
+  params?: AnalyticsParams,
+): string {
+  const searchParams = new URLSearchParams()
+  searchParams.set('format', format)
+
+  if (params?.start_date) {
+    searchParams.set('start_date', params.start_date)
+  }
+
+  if (params?.end_date) {
+    searchParams.set('end_date', params.end_date)
+  }
+
+  const queryString = searchParams.toString()
+
+  const endpoints = {
+    funnel: '/analytics/export/funnel',
+    registrations: '/analytics/export/registrations',
+    'branch-comparison': '/analytics/export/branch-comparison',
+    'platform-stats': '/analytics/export/platform-stats',
+  }
+
+  return `${endpoints[exportType]}${queryString ? `?${queryString}` : ''}`
+}

@@ -12,6 +12,21 @@ import { fetchPlatformWideStats } from '../api/analytics'
 // Mock the API
 vi.mock('../api/analytics', () => ({
   fetchPlatformWideStats: vi.fn(),
+  getAnalyticsExportUrl: vi.fn((type: string, format: string) => {
+    if (type === 'platform-stats') {
+      return format === 'xlsx' ? '/analytics/export/platform-stats?format=xlsx' : '/analytics/export/platform-stats?format=csv'
+    }
+    return '/analytics/export/unknown?format=csv'
+  }),
+}))
+
+// Mock ExportButton to simplify testing
+vi.mock('../components/analytics/ExportButton', () => ({
+  ExportButton: ({ label, className, 'data-testid': testId }: { label: string; className?: string; 'data-testid'?: string }) => (
+    <button type="button" className={className} data-testid={testId}>
+      {label}
+    </button>
+  ),
 }))
 
 // Mock the auth store to simulate super admin role
@@ -343,5 +358,29 @@ describe('SuperAdminDashboardPage', () => {
     // The display shows actual dates when a preset is selected
     expect(display.textContent).toMatch(/Showing data from/)
     expect(display.textContent).toMatch(/to/)
+  })
+
+  it('renders export buttons for platform stats (CSV and Excel)', async () => {
+    const mockStats = {
+      tenants: [],
+      total_tenants: 1,
+      total_branches: 1,
+      total_staff: 3,
+      total_students: 15,
+      total_applications: 20,
+    }
+
+    vi.mocked(fetchPlatformWideStats).mockResolvedValue(mockStats)
+
+    renderWithRouter()
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('analytics-loading')).not.toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('export-platform-stats-csv')).toBeInTheDocument()
+    expect(screen.getByTestId('export-platform-stats-csv')).toHaveTextContent('Export Stats (CSV)')
+    expect(screen.getByTestId('export-platform-stats-xlsx')).toBeInTheDocument()
+    expect(screen.getByTestId('export-platform-stats-xlsx')).toHaveTextContent('Export Stats (Excel)')
   })
 })
