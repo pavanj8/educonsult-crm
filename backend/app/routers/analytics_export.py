@@ -332,7 +332,7 @@ def export_conversion_funnel(
     """
     try:
         from app.models.application import Application
-        from app.pipeline.stages import Stage
+        from app.pipeline.stages import PipelineStage
 
         # Build the base query with tenant and branch scoping
         statement = apply_tenant_scope(select(Application), Application, current_user)
@@ -348,7 +348,7 @@ def export_conversion_funnel(
         result = db.execute(statement).scalars().all()
 
         # Count applications per stage
-        stage_counts = {stage.value: 0 for stage in Stage}
+        stage_counts = {stage.value: 0 for stage in PipelineStage}
         for app in result:
             stage_counts[app.stage] = stage_counts.get(app.stage, 0) + 1
 
