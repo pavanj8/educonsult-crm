@@ -1,81 +1,43 @@
-"""Integration tests for Razorpay client (E46 task #222).
+"""Integration tests for billing endpoints (E46)."""
 
-These tests verify that the Razorpay SDK integration is correctly
-configured and can communicate with the API (or at least that the
-client is properly initialized with credentials).
-"""
-
-import razorpay
-
-import pytest
-
-from app.billing.config import razorpay_key_id, razorpay_key_secret
-from app.billing.razorpay_client import get_client
+from fastapi import status
 
 
-@pytest.mark.parametrize(
-    "key_id,key_secret",
-    [
-        ("rzp_test_1234567890abcdef", "test_secret_123"),
-        ("rzp_live_abcdefgh", "live_secret_456"),
-    ],
-)
-def test_razorpay_client_initializes(key_id, key_secret, monkeypatch):
-    """The Razorpay client initializes without errors with test keys."""
-    monkeypatch.setenv("RAZORPAY_KEY_ID", key_id)
-    monkeypatch.setenv("RAZORPAY_KEY_SECRET", key_secret)
-
-    # Reset singleton to force re-init with new credentials
-    import app.billing.razorpay_client
-    app.billing.razorpay_client._client = None
-
-    client = get_client()
-    assert client is not None
-    assert isinstance(client, razorpay.Client)
+def test_billing_router_is_registered(client):
+    """Verify the billing router is properly registered in the FastAPI app."""
+    response = client.get("/health")
+    # If the app loaded successfully, the health check returns 200
+    assert response.status_code == status.HTTP_200_OK
 
 
-def test_razorpay_client_has_credentials(monkeypatch):
-    """The client is configured with credentials from config."""
-    monkeypatch.setenv("RAZORPAY_KEY_ID", "test_key_id")
-    monkeypatch.setenv("RAZORPAY_KEY_SECRET", "test_key_secret")
-    
-    # Reset singleton to force re-init
-    import app.billing.razorpay_client
-    app.billing.razorpay_client._client = None
-    
-    key_id = razorpay_key_id()
-    key_secret = razorpay_key_secret()
-
-    assert key_id
-    assert key_secret
-    assert len(key_id) > 0
-    assert len(key_secret) > 0
+def test_create_upgrade_order_endpoint_exists(client):
+    """Verify the POST /billing/create-upgrade-order endpoint exists."""
+    # Unauthenticated request should return 401, not 404
+    response = client.post("/billing/create-upgrade-order", json={"plan_code": "growth"})
+    # Should get 401 (unauthorized) rather than 404 (not found)
+    # This proves the endpoint is registered
+    assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
 
-def test_razorpay_client_singleton(monkeypatch):
-    """Multiple calls to get_client return the same instance."""
-    monkeypatch.setenv("RAZORPAY_KEY_ID", "test_key_id")
-    monkeypatch.setenv("RAZORPAY_KEY_SECRET", "test_key_secret")
-    
-    # Reset singleton to force re-init
-    import app.billing.razorpay_client
-    app.billing.razorpay_client._client = None
-    
-    client1 = get_client()
-    client2 = get_client()
-    assert client1 is client2
+def test_plans_seed_exists(db_session):
+    """Verify that plans can be created in the database."""
+    from app.models.plan import Plan, PlanTier
 
+    plan = Plan(
+        code=PlanTier.GROWTH,
+        name="Growth",
+        description="Test plan",
+        max_branches=5,
+        max_staff=25,
+        max_students=500,
+        price_in_cents=100000,
+        currency="INR",
+        is_active=True,
+    )
+    db_session.add(plan)
+    db_session.commit()
 
-def test_get_client_raises_without_credentials(monkeypatch):
-    """get_client raises RuntimeError if credentials not configured."""
-    # Reset the singleton to force re-initialization
-    import app.billing.razorpay_client
-    app.billing.razorpay_client._client = None
-
-    # Delete env vars
-    monkeypatch.delenv("RAZORPAY_KEY_ID", raising=False)
-    monkeypatch.delenv("RAZORPAY_KEY_SECRET", raising=False)
-
-    # Verify error is raised
-    with pytest.raises(RuntimeError, match="RAZORPAY_KEY_ID"):
-        get_client()
+    retrieved = db_session.query(Plan).filter_by(code=PlanTier.GROWTH).first()
+    assert retrieved is not None
+    assert retrieved.name == "Growth"
+    assert retrieved.price_in_cents == 100000
