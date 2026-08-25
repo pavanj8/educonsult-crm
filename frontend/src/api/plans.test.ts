@@ -5,7 +5,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import { fetchMyPlanAndUsage } from './plans'
+import { apiFetch } from './client'
 import type { PlanAndUsage } from '../types/plan'
+
+// Mock the HTTP client
+vi.mock('./client', () => ({
+  apiFetch: vi.fn(),
+}))
 
 describe('plans API client', () => {
   beforeEach(() => {
@@ -35,20 +41,12 @@ describe('plans API client', () => {
         },
       }
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response)
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
 
       const result = await fetchMyPlanAndUsage()
 
+      expect(apiFetch).toHaveBeenCalledWith('/me/plan-usage')
       expect(result).toEqual(mockResponse)
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          method: 'GET',
-        })
-      )
     })
 
     it('should handle null plan (no plan assigned)', async () => {
@@ -61,10 +59,7 @@ describe('plans API client', () => {
         },
       }
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response)
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
 
       const result = await fetchMyPlanAndUsage()
 
@@ -94,10 +89,7 @@ describe('plans API client', () => {
         },
       }
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response)
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
 
       const result = await fetchMyPlanAndUsage()
 
@@ -107,19 +99,18 @@ describe('plans API client', () => {
     })
 
     it('should throw error on network failure', async () => {
-      global.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error'))
+      vi.mocked(apiFetch).mockRejectedValue(new Error('Network error'))
 
       await expect(fetchMyPlanAndUsage()).rejects.toThrow('Network error')
     })
 
     it('should throw error on non-OK response', async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        statusText: 'Forbidden',
-      } as Response)
+      const mockError = new Error('Forbidden') as Error & { status: number }
+      mockError.status = 403
 
-      await expect(fetchMyPlanAndUsage()).rejects.toThrow()
+      vi.mocked(apiFetch).mockRejectedValue(mockError)
+
+      await expect(fetchMyPlanAndUsage()).rejects.toThrow('Forbidden')
     })
   })
 })
