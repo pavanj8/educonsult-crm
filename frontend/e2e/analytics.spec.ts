@@ -250,6 +250,7 @@ test.describe('Branch Manager Analytics Dashboard', () => {
 
     await page.route('**/analytics/registrations*', async (route) => {
       requestCount++
+      void requestCount // Use the variable to avoid lint warning
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -275,7 +276,6 @@ test.describe('Branch Manager Analytics Dashboard', () => {
 
     // Wait for initial load
     await expect(page.getByTestId('analytics-content')).toBeVisible()
-    const initialCount = requestCount
 
     // Click refresh button
     await page.getByRole('button', { name: 'Refresh' }).click()
@@ -393,9 +393,7 @@ test.describe('Branch Manager Analytics Dashboard', () => {
     await page.waitForTimeout(100)
 
     // Verify the date range was sent in the API request
-    if (capturedUrl) {
-      expect(capturedUrl).toContain('start_date=2024-01-01')
-      expect(capturedUrl).toContain('end_date=2024-01-31')
-    }
+    expect(capturedUrl).toContain('start_date=2024-01-01')
+    expect(capturedUrl).toContain('end_date=2024-01-31')
   })
 })
