@@ -12,27 +12,19 @@ from app.db.branch_scope import BranchScopeError, apply_branch_scope
 from app.db.database import get_db
 from app.db.tenant_scope import TenantScopeError, apply_tenant_scope
 from app.models.application import Application
-<<<<<<< HEAD
-from app.models.user import User
-=======
 from app.models.branch import Branch
->>>>>>> origin/main
+from app.models.user import User
 from app.pipeline.stages import PipelineStage
 from app.rbac.dependencies import require_role
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.analytics import (
-<<<<<<< HEAD
-    ConversionFunnelBucket,
-    ConversionFunnelResponse,
-    RegistrationsOverTimeBucket,
-    RegistrationsOverTimeResponse,
-=======
     BranchComparisonBucket,
     BranchComparisonResponse,
     ConversionFunnelBucket,
     ConversionFunnelResponse,
->>>>>>> origin/main
+    RegistrationsOverTimeBucket,
+    RegistrationsOverTimeResponse,
 )
 
 router = APIRouter()

@@ -191,6 +191,14 @@ describe('BranchManagerDashboardPage', () => {
     expect(enrolledRow).toHaveTextContent('15')
   })
 
+  it('calculates conversion rate correctly (enrolled / total * 100)', () => {
+    render(<BranchManagerDashboardPage />)
+
+    const conversionRate = screen.getByTestId('conversion-rate-value')
+    // 15 enrolled / 413 total * 100 = 3.63% (rounded to 3.6%)
+    expect(conversionRate).toHaveTextContent('3.6%')
+  })
+
   it('calls reload when refresh button is clicked', async () => {
     const user = userEvent.setup()
     render(<BranchManagerDashboardPage />)
