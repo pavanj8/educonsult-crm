@@ -35,3 +35,4 @@ export {
   updateVisaDetail,
   type VisaStageQueueParams,
 } from './visa'
+export { fetchMyPlanAndUsage } from './plans'
