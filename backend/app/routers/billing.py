@@ -94,9 +94,18 @@ def _resolve_plan_for_order(plan_code: str, db: Session) -> Plan:
     pricing page, so a 404 here is honest about plan-code existence.
     """
     try:
+        plan_tier = PlanTier(plan_code)
+    except ValueError:
+        # Unknown plan code (not one of the three PlanTier values)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_PLAN_NOT_FOUND_DETAIL,
+        ) from None
+
+    try:
         plan = (
             db.query(Plan)
-            .filter(Plan.code == PlanTier(plan_code))
+            .filter(Plan.code == plan_tier)
             .one_or_none()
         )
     except Exception:

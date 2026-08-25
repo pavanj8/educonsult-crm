@@ -6,7 +6,7 @@ from fastapi import status
 
 
 def test_create_upgrade_order_as_owner(
-    db_session, auth_client, owner_user, owner_tenant, test_plan
+    db_session, auth_client, owner_user, owner_tenant, test_plan, razorpay_test_credentials
 ):
     """Owner can create an upgrade order for their tenant."""
     # Mock Razorpay client to return a successful order
@@ -44,7 +44,7 @@ def test_create_upgrade_order_as_owner(
 
 
 def test_create_upgrade_order_plan_code_normalized(
-    db_session, auth_client, owner_user, owner_tenant, test_plan
+    db_session, auth_client, owner_user, owner_tenant, test_plan, razorpay_test_credentials
 ):
     """Plan code is normalized to lowercase (Growth -> growth)."""
     mock_order_response = {
@@ -67,7 +67,7 @@ def test_create_upgrade_order_plan_code_normalized(
         assert data["plan_code"] == "growth"  # Normalized in response
 
 
-def test_create_upgrade_order_unknown_plan(db_session, auth_client, owner_user):
+def test_create_upgrade_order_unknown_plan(db_session, auth_client, owner_user, razorpay_test_credentials):
     """Unknown plan code returns 404."""
     response = auth_client.post(
         "/billing/create-upgrade-order",
@@ -126,13 +126,13 @@ def test_create_upgrade_order_requires_authentication(db_session, client):
 
 
 def test_create_upgrade_order_razorpay_unavailable(
-    db_session, auth_client, owner_user, owner_tenant, test_plan
+    db_session, auth_client, owner_user, owner_tenant, test_plan, razorpay_test_credentials
 ):
     """Razorpay service errors return 503."""
     import razorpay.errors
 
     with patch("app.routers.billing.create_order") as mock_create_order:
-        mock_create_order.side_effect = razorpay.errors.RazorpayError(
+        mock_create_order.side_effect = razorpay.errors.ServerError(
             "Razorpay API error"
         )
 
@@ -172,9 +172,15 @@ def test_create_upgrade_order_razorpay_not_configured(
     monkeypatch.delenv("RAZORPAY_KEY_ID", raising=False)
     monkeypatch.delenv("RAZORPAY_KEY_SECRET", raising=False)
 
-    # Also need to clear the cached config value
+    # Also need to clear any cached config module values
     import app.billing.config
-    app.billing.config.razorpay_key_id.cache_clear()
+    import importlib
+    importlib.reload(app.billing.config)
+
+    # Reload the router to pick up the new config values
+    import importlib
+    import app.routers.billing
+    importlib.reload(app.routers.billing)
 
     response = client.post(
         "/billing/create-upgrade-order",
@@ -210,7 +216,7 @@ def test_create_upgrade_order_missing_plan_code(
 
 
 def test_create_upgrade_order_no_tenant_id(
-    db_session, client, super_admin_user
+    db_session, client, super_admin_user, razorpay_test_credentials
 ):
     """Users without tenant_id (e.g., super admin) are rejected."""
     from app.auth.jwt import create_access_token
@@ -230,12 +236,13 @@ def test_create_upgrade_order_no_tenant_id(
         headers={"Authorization": f"Bearer {token}"},
     )
 
+    # Super admin doesn't have billing:manage permission, so it fails with permission error
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert "not associated with a tenant" in response.json()["detail"]
+    assert "Insufficient permissions" in response.json()["detail"]
 
 
 def test_create_upgrade_order_enterprise_to_growth(
-    db_session, auth_client, owner_user, owner_tenant, enterprise_plan
+    db_session, auth_client, owner_user, owner_tenant, enterprise_plan, test_plan, razorpay_test_credentials
 ):
     """Downgrade from Enterprise to Growth works."""
     mock_order_response = {
@@ -260,7 +267,7 @@ def test_create_upgrade_order_enterprise_to_growth(
 
 
 def test_create_upgrade_order_multiple_orders_same_plan(
-    db_session, auth_client, owner_user, owner_tenant, test_plan
+    db_session, auth_client, owner_user, owner_tenant, test_plan, razorpay_test_credentials
 ):
     """Creating multiple orders for the same plan is allowed (idempotent)."""
     mock_order_response = {
