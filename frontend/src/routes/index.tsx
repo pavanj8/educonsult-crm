@@ -21,6 +21,7 @@ import VisaProcessorDashboardPage from '../pages/VisaProcessorDashboardPage'
 import CounselorDashboardPage from '../pages/CounselorDashboardPage'
 import BranchManagerDashboardPage from '../pages/BranchManagerDashboardPage'
 import SuperAdminDashboardPage from '../pages/SuperAdminDashboardPage'
+import PlanAndUsagePage from '../pages/PlanAndUsagePage'
 import ChecklistTemplateAdminRoute from './ChecklistTemplateAdminRoute'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
 import CounselorRoute from './CounselorRoute'
@@ -38,6 +39,7 @@ import {
   FORGOT_PASSWORD_PATH,
   MASTER_DATA_ADMIN_PATH,
   OWNER_DASHBOARD_PATH,
+  PLAN_AND_USAGE_PATH,
   RECEPTIONIST_INTAKE_PATH,
   REGISTER_PATH,
   RESET_PASSWORD_PATH,
@@ -70,6 +72,7 @@ export function AppRoutes() {
             <Route path="branches" element={<BranchesPage />} />
             <Route path={TENANT_BRANDING_PATH.slice(1)} element={<TenantBrandingPage />} />
             <Route path={OWNER_DASHBOARD_PATH.slice(1)} element={<OwnerDashboardPage />} />
+            <Route path={PLAN_AND_USAGE_PATH.slice(1)} element={<PlanAndUsagePage />} />
           </Route>
           <Route element={<StaffManagerRoute />}>
             <Route path="staff" element={<StaffPage />} />
