@@ -5,6 +5,7 @@ import BranchesPage from '../pages/BranchesPage'
 import ChecklistTemplatesPage from '../pages/ChecklistTemplatesPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
+import LandingPage from '../pages/LandingPage'
 import LoginPage from '../pages/LoginPage'
 import MasterDataAdminPage from '../pages/MasterDataAdminPage'
 import OwnerDashboardPage from '../pages/OwnerDashboardPage'
@@ -37,6 +38,7 @@ import {
   CHECKLIST_TEMPLATES_PATH,
   COUNSELOR_DASHBOARD_PATH,
   FORGOT_PASSWORD_PATH,
+  LANDING_PATH,
   MASTER_DATA_ADMIN_PATH,
   OWNER_DASHBOARD_PATH,
   PLAN_AND_USAGE_PATH,
@@ -58,6 +60,7 @@ export function AppRoutes() {
       <Route path={REGISTER_PATH} element={<RegisterStudentPage />} />
       <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPasswordPage />} />
       <Route path={RESET_PASSWORD_PATH} element={<ResetPasswordPage />} />
+      <Route path={LANDING_PATH} element={<LandingPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />

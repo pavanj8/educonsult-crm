@@ -1,3 +1,6 @@
+/** Public marketing landing page (E53; Requirements §10). */
+export const LANDING_PATH = '/landing'
+
 /** Public auth route paths. */
 
 export const REGISTER_PATH = '/register'

@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import LandingPage from './LandingPage'
+import { LANDING_PATH } from '../routes/paths'
 
 // Mock i18n
 vi.mock('react-i18next', () => ({
@@ -144,5 +145,9 @@ describe('LandingPage', () => {
 
     // Fourth element should be footer
     expect(sections[3].tagName.toLowerCase()).toBe('footer')
+  })
+
+  it('LANDING_PATH is exported correctly', () => {
+    expect(LANDING_PATH).toBe('/landing')
   })
 })
