@@ -1,8 +1,9 @@
 /**
- * Analytics types (E41/E42; Journeys J34/J35).
+ * Analytics types (E41, E42, E43; Journeys J34, J35, J36).
  *
- * Supports branch manager dashboard with date-range filter (E41)
- * and owner cross-branch comparison dashboard (E42).
+ * Supports branch manager dashboard with date-range filter (E41),
+ * owner cross-branch comparison dashboard (E42), and super admin
+ * platform-wide stats dashboard (E43).
  */
 
 /**
@@ -107,5 +108,60 @@ export interface BranchComparisonBucket {
 export interface BranchComparisonResponse {
   branches: BranchComparisonBucket[]
   total_branches: number
+  total_applications: number
+}
+
+/**
+ * Metrics for a single tenant in platform-wide stats (E43; Journey J36).
+ *
+ * Represents aggregated metrics for one consultancy tenant on the platform,
+ * used by Super Admins to monitor overall platform health and tenant growth.
+ */
+export type TenantStatsBucket = {
+  /** ID of the tenant */
+  tenant_id: number
+  /** Name of the tenant consultancy */
+  tenant_name: string
+  /** URL-friendly slug identifier of the tenant */
+  tenant_slug: string
+  /** Subscription plan code (starter/growth/enterprise) if assigned */
+  plan_code: string | null
+  /** Number of branches in this tenant */
+  branches_count: number
+  /** Number of staff accounts in this tenant */
+  staff_count: number
+  /** Number of student accounts in this tenant */
+  students_count: number
+  /** Total number of applications in this tenant */
+  applications_count: number
+  /** Number of applications enrolled (terminal stage) */
+  enrolled_count: number
+  /** Number of applications rejected (terminal stage) */
+  rejected_count: number
+  /** Number of applications withdrawn (terminal stage) */
+  withdrawn_count: number
+  /** Number of applications still in active stages (not yet terminal) */
+  active_count: number
+}
+
+/**
+ * Response for GET /analytics/platform-wide-stats (E43; Journey J36).
+ *
+ * Returns aggregated metrics for all tenants on the platform,
+ * allowing Super Admins to monitor overall platform health, tenant
+ * growth, and usage patterns.
+ */
+export type PlatformWideStatsResponse = {
+  /** List of tenant metrics, ordered by applications_count descending */
+  tenants: TenantStatsBucket[]
+  /** Total number of tenants on the platform */
+  total_tenants: number
+  /** Total number of branches across all tenants */
+  total_branches: number
+  /** Total number of staff across all tenants */
+  total_staff: number
+  /** Total number of students across all tenants */
+  total_students: number
+  /** Total number of applications across all tenants */
   total_applications: number
 }

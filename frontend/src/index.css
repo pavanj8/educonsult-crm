@@ -1867,3 +1867,134 @@ body {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* Super Admin Platform-Wide Stats Dashboard (E43; Journey J36) */
+.super-admin-dashboard {
+  max-width: 96rem;
+}
+
+.super-admin-dashboard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.super-admin-dashboard__header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.super-admin-dashboard__filter {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+}
+
+.platform-summary {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  margin-bottom: 2rem;
+}
+
+.platform-summary h2 {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+}
+
+.tenant-list-section {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #ffffff;
+}
+
+.tenant-list-section h2 {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+}
+
+.tenant-table-container {
+  overflow-x: auto;
+}
+
+.tenant-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.tenant-table th,
+.tenant-table td {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tenant-table th {
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+}
+
+.tenant-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.tenant-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.tenant-slug {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.plan-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.plan-badge--starter {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.plan-badge--growth {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.plan-badge--enterprise {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #111827;
+}
+
+.text-cell {
+  text-align: left;
+}
+
+.text-muted {
+  color: #6b7280;
+}
+
+.plan-cell {
+  white-space: nowrap;
+}
