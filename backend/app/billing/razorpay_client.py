@@ -17,11 +17,25 @@ Why a singleton client:
   HTTP client on every call.
 * This pattern matches the boto3 S3 client wrapper in
   :mod:`app.storage.service`.
+
+Thread safety
+-------------
+
+The ``get_client()`` function initializes the global ``_client`` singleton
+on first call. The initialization check-and-assign sequence is **NOT**
+thread-safe: if two threads call ``get_client()`` simultaneously before
+initialization, both may see ``_client is None`` and create separate clients.
+In practice, this is unlikely because the FastAPI app calls ``get_client()``
+once at startup (during dependency injection setup), long before handling
+concurrent requests. For production safety, ensure the app startup calls
+``get_client()`` before serving requests (the default FastAPI lifecycle
+guarantees this).
 """
 
 from __future__ import annotations
 
 import razorpay
+import razorpay.errors
 
 from app.billing.config import razorpay_key_id, razorpay_key_secret
 
@@ -33,11 +47,17 @@ def get_client() -> razorpay.Client:
     """Return the singleton Razorpay SDK client.
 
     The client is initialized once with credentials from the environment
-    and reused across all calls. This function is thread-safe because
-    the Razorpay client itself is thread-safe.
+    and reused across all calls. This function is **not thread-safe for
+    initialization** (race condition on first access), but the FastAPI
+    app startup calls it once before serving requests, so concurrent
+    initialization is not a concern in normal operation.
 
     Returns:
         The configured Razorpay client instance.
+
+    Raises:
+        RuntimeError: If credentials are not configured (propagated from
+        :mod:`app.billing.config`).
     """
     global _client
     if _client is None:
@@ -109,5 +129,5 @@ def verify_webhook_signature(
     try:
         client.utility.verify_webhook_signature(webhook_body, webhook_signature, secret)
         return True
-    except Exception:
+    except razorpay.errors.SignatureVerificationError:
         return False

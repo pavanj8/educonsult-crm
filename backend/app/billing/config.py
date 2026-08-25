@@ -10,11 +10,11 @@ Environment variables
 ---------------------
 
 ``RAZORPAY_KEY_ID``
-    Razorpay Key ID for API authentication. Required in production;
-    defaults to a test key ID for local development.
+    Razorpay Key ID for API authentication. **Required** — the application
+    will fail to start with a clear error if this is not set.
 ``RAZORPAY_KEY_SECRET``
-    Razorpay Key Secret for API authentication. Required in production;
-    defaults to a test key secret for local development.
+    Razorpay Key Secret for API authentication. **Required** — the application
+    will fail to start with a clear error if this is not set.
 
 Test mode
 ---------
@@ -29,32 +29,53 @@ Security
 These credentials are sensitive and should never be committed to the
 repository. They are injected via environment variables in production
 deployments (Docker Compose for on-prem, AWS Secrets Manager or similar
-for SaaS). The defaults here are Razorpay's public test keys (documented
-on https://razorpay.com/docs/payment-gateway/flutter-tutorial/); they
-work only in test mode and are safe to check in for development.
+for SaaS). There are NO hardcoded defaults — credentials must be
+explicitly configured or the application will raise a RuntimeError at
+startup.
 """
 
 import os
-
-# Razorpay's public test keys (documented, safe for development)
-# These work only in test mode; production requires live keys.
-_DEFAULT_TEST_KEY_ID = "rzp_test_1234567890abcdef"
-_DEFAULT_TEST_KEY_SECRET = "1234567890abcdef"
 
 
 def razorpay_key_id() -> str:
     """Return the Razorpay Key ID for API authentication.
 
-    Defaults to a test key for local development; production must
-    set RAZORPAY_KEY_ID to a live key.
+    Reads from the ``RAZORPAY_KEY_ID`` environment variable. This is
+    required; if not set, a ``RuntimeError`` is raised.
+
+    Returns:
+        The Razorpay Key ID.
+
+    Raises:
+        RuntimeError: If ``RAZORPAY_KEY_ID`` is not set in the environment.
     """
-    return os.environ.get("RAZORPAY_KEY_ID", _DEFAULT_TEST_KEY_ID)
+    key_id = os.environ.get("RAZORPAY_KEY_ID")
+    if not key_id or not key_id.strip():
+        raise RuntimeError(
+            "RAZORPAY_KEY_ID environment variable is required but not set. "
+            "Obtain test keys from https://dashboard.razorpay.com/testmode "
+            "or live keys from your Razorpay dashboard."
+        )
+    return key_id.strip()
 
 
 def razorpay_key_secret() -> str:
     """Return the Razorpay Key Secret for API authentication.
 
-    Defaults to a test key for local development; production must
-    set RAZORPAY_KEY_SECRET to a live key.
+    Reads from the ``RAZORPAY_KEY_SECRET`` environment variable. This is
+    required; if not set, a ``RuntimeError`` is raised.
+
+    Returns:
+        The Razorpay Key Secret.
+
+    Raises:
+        RuntimeError: If ``RAZORPAY_KEY_SECRET`` is not set in the environment.
     """
-    return os.environ.get("RAZORPAY_KEY_SECRET", _DEFAULT_TEST_KEY_SECRET)
+    key_secret = os.environ.get("RAZORPAY_KEY_SECRET")
+    if not key_secret or not key_secret.strip():
+        raise RuntimeError(
+            "RAZORPAY_KEY_SECRET environment variable is required but not set. "
+            "Obtain test keys from https://dashboard.razorpay.com/testmode "
+            "or live keys from your Razorpay dashboard."
+        )
+    return key_secret.strip()

@@ -2,17 +2,22 @@
 
 from unittest.mock import MagicMock, patch
 
-import razorpay
-
 from app.billing.razorpay_client import create_order, get_client, verify_webhook_signature
 
 
-def test_get_client_returns_singleton():
+def test_get_client_returns_singleton(monkeypatch):
     """get_client returns the same instance across calls."""
+    monkeypatch.setenv("RAZORPAY_KEY_ID", "test_key_id")
+    monkeypatch.setenv("RAZORPAY_KEY_SECRET", "test_key_secret")
+    
+    # Reset singleton to force re-init
+    import app.billing.razorpay_client
+    app.billing.razorpay_client._client = None
+    
     client1 = get_client()
     client2 = get_client()
     assert client1 is client2
-    assert isinstance(client1, razorpay.Client)
+    assert isinstance(client1, __import__("razorpay").Client)
 
 
 def test_get_client_is_initialized_with_credentials(monkeypatch):
@@ -26,7 +31,7 @@ def test_get_client_is_initialized_with_credentials(monkeypatch):
 
     client = get_client()
     assert client is not None
-    assert isinstance(client, razorpay.Client)
+    assert isinstance(client, __import__("razorpay").Client)
 
 
 @patch("app.billing.razorpay_client.get_client")
@@ -111,12 +116,18 @@ def test_verify_webhook_signature_valid(mock_get_client):
 
 
 @patch("app.billing.razorpay_client.get_client")
-def test_verify_webhook_signature_invalid(mock_get_client):
+@patch("app.billing.razorpay_client.razorpay_key_secret")
+def test_verify_webhook_signature_invalid(mock_key_secret, mock_get_client):
     """verify_webhook_signature returns False for invalid signature."""
+    mock_key_secret.return_value = "test_secret"
     mock_client = MagicMock()
     mock_get_client.return_value = mock_client
-    # Mock failed verification (raises exception)
-    mock_client.utility.verify_webhook_signature.side_effect = Exception("Invalid signature")
+    # Mock failed verification (raises SignatureVerificationError)
+    import razorpay.errors
+
+    mock_client.utility.verify_webhook_signature.side_effect = razorpay.errors.SignatureVerificationError(
+        "Invalid signature"
+    )
 
     result = verify_webhook_signature(
         webhook_body='{"event":"payment.authenticated"}',

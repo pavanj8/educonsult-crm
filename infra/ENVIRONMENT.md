@@ -62,6 +62,13 @@ be overridden.
 | `SMTP_FROM` | `noreply@educonsult.test` | **Yes** | `From:` address on outbound email. Use a real address your relay accepts. |
 | `APP_BASE_URL` | `http://localhost:5173` | **Yes** | Public origin of the frontend. Used to build absolute URLs inside email bodies (e.g. password-reset links, owner-invite links — see Requirements §6). Trailing slashes are stripped automatically. |
 
+### Payments — Razorpay (`backend/app/billing/config.py`)
+
+| Variable | Default | Required for production | Purpose |
+|---|---|---|---|
+| `RAZORPAY_KEY_ID` | _unset (raises RuntimeError)_ | **Yes** | Razorpay API Key ID for payment processing (E46 task #222). Obtain test keys from https://dashboard.razorpay.com/testmode or live keys from your Razorpay dashboard. Treat as secret. |
+| `RAZORPAY_KEY_SECRET` | _unset (raises RuntimeError)_ | **Yes** | Razorpay API Key Secret for payment processing (E46 task #222). Treat as secret. |
+
 ### Document storage — S3-compatible (`backend/app/storage/config.py`, `backend/app/storage/service.py`)
 
 | Variable | Default | Required for production | Purpose |
