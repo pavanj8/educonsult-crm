@@ -78,6 +78,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.billing.config import razorpay_key_id, razorpay_key_secret
@@ -89,13 +90,18 @@ from app.billing.plan_change import (
 )
 from app.billing.razorpay_client import create_order, verify_webhook_signature
 from app.db.database import get_db
+from app.models.branch import Branch
 from app.models.plan import Plan, PlanTier
+from app.models.tenant import Tenant
+from app.models.user import User
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
+from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.billing import (
     CreateUpgradeOrderRequest,
     PlanChangeResponse,
+    TenantBillingStatusResponse,
     UpgradeOrderResponse,
 )
 
@@ -446,6 +452,139 @@ async def razorpay_webhook(
         new_plan_id=result.new_plan_id,
         plan_code=result.plan_code,
     )
+
+
+@router.get(
+    "/tenant-status",
+    response_model=list[TenantBillingStatusResponse],
+    status_code=status.HTTP_200_OK,
+)
+def list_all_tenants_billing_status(
+    _current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.BILLING_PLATFORM))
+    ],
+    db: Session = Depends(get_db),
+) -> list[TenantBillingStatusResponse]:
+    """List all tenants' billing/subscription status (E47 task #227; Journey J40).
+
+    Super admin only (``billing:platform`` permission). The endpoint:
+
+    1. Queries all tenants with their assigned plan details.
+    2. For each tenant, counts current usage of branches, staff, and students.
+    3. Returns a list of billing status records with plan details and usage.
+
+    The response includes tenants with no assigned plan (``plan`` field is
+    ``None``). Usage counts are still calculated for those tenants.
+
+    Error responses
+    ----------------
+    * 401 -- caller is not authenticated.
+    * 403 -- caller lacks ``billing:platform`` permission.
+    * 503 -- database is unavailable.
+
+    Traceability
+    ------------
+    * Requirements §4 (Billing & Subscription: 3 tiers).
+    * Journey J40 (Super Admin views all tenants' billing/subscription status).
+    * Epic E47 (Super Admin Billing Status Overview).
+    """
+    try:
+        # Load all tenants with their plan relationship
+        tenants = (
+            db.query(Tenant)
+            .order_by(Tenant.id)
+            .all()
+        )
+    except Exception as e:
+        logger.error(f"Failed to query tenants: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from e
+
+    result: list[TenantBillingStatusResponse] = []
+
+    for tenant in tenants:
+        # Count branches for this tenant
+        try:
+            branches_used = (
+                db.execute(
+                    select(func.count())
+                    .select_from(Branch)
+                    .where(Branch.tenant_id == tenant.id)
+                )
+                .scalar_one()
+            )
+        except Exception as e:
+            logger.error(f"Failed to count branches for tenant {tenant.id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=_DB_UNAVAILABLE_DETAIL,
+            ) from e
+
+        # Count staff (all non-student roles) for this tenant
+        try:
+            staff_used = (
+                db.execute(
+                    select(func.count())
+                    .select_from(User)
+                    .where(
+                        User.tenant_id == tenant.id,
+                        User.role != Role.STUDENT,
+                    )
+                )
+                .scalar_one()
+            )
+        except Exception as e:
+            logger.error(f"Failed to count staff for tenant {tenant.id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=_DB_UNAVAILABLE_DETAIL,
+            ) from e
+
+        # Count students for this tenant
+        try:
+            students_used = (
+                db.execute(
+                    select(func.count())
+                    .select_from(User)
+                    .where(
+                        User.tenant_id == tenant.id,
+                        User.role == Role.STUDENT,
+                    )
+                )
+                .scalar_one()
+            )
+        except Exception as e:
+            logger.error(f"Failed to count students for tenant {tenant.id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=_DB_UNAVAILABLE_DETAIL,
+            ) from e
+
+        # Build the plan response from the tenant's plan relationship
+        plan_data = None
+        if tenant.plan is not None:
+            from app.schemas.tenant import PlanResponse as TenantPlanResponse
+            plan_response = TenantPlanResponse.model_validate(tenant.plan)
+            # Convert to dict for serialization
+            plan_data = plan_response.model_dump()
+
+        result.append(
+            TenantBillingStatusResponse(
+                tenant_id=tenant.id,
+                tenant_name=tenant.name,
+                tenant_slug=tenant.slug,
+                plan=plan_data,
+                branches_used=int(branches_used),
+                staff_used=int(staff_used),
+                students_used=int(students_used),
+                created_at=tenant.created_at,
+                updated_at=tenant.updated_at,
+            )
+        )
+
+    return result
 
 
 __all__ = ["router"]
