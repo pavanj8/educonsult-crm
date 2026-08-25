@@ -21,6 +21,12 @@ from app.rbac.dependencies import require_permission
 from app.rbac.permissions import Permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
+from app.utils.export_helpers import (
+    write_csv_response as write_csv_util,
+)
+from app.utils.export_helpers import (
+    write_excel_response as write_excel_util,
+)
 
 router = APIRouter()
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
@@ -99,8 +105,6 @@ def export_student_list(
     - filename includes ``students-`` and timestamp
     """
     try:
-        import csv
-        from io import StringIO
 
         # Build the base query with tenant scoping - filter for STUDENT role only
         statement = apply_tenant_scope(select(User), User, current_user)
@@ -138,131 +142,28 @@ def export_student_list(
 
         result = db.execute(statement).all()
 
+        # Convert query results to list of dicts for export helpers
+        rows = []
+        for row in result:
+            rows.append({
+                "Student ID": str(row.id),
+                "Email": row.email,
+                "Name": row.name or "",
+                "Phone": row.phone or "",
+                "Date of Birth": str(row.date_of_birth) if row.date_of_birth else "",
+                "Branch Name": row.branch_name or "",
+                "Branch City": row.branch_city or "",
+                "Target Country ID": str(row.target_country_id) if row.target_country_id else "",
+                "Target University ID": str(row.target_university_id) if row.target_university_id else "",
+                "Target Program ID": str(row.target_program_id) if row.target_program_id else "",
+                "Created At": row.created_at.isoformat() if row.created_at else "",
+                "Is Active": "Yes" if row.is_active else "No",
+            })
+
         if format == "csv":
-            # Generate CSV content
-            output = StringIO()
-            writer = csv.writer(output)
-
-            # Write header
-            writer.writerow(
-                [
-                    "Student ID",
-                    "Email",
-                    "Name",
-                    "Phone",
-                    "Date of Birth",
-                    "Branch Name",
-                    "Branch City",
-                    "Target Country ID",
-                    "Target University ID",
-                    "Target Program ID",
-                    "Created At",
-                    "Is Active",
-                ]
-            )
-
-            # Write data rows
-            for row in result:
-                writer.writerow(
-                    [
-                        row.id,
-                        row.email,
-                        row.name or "",
-                        row.phone or "",
-                        str(row.date_of_birth) if row.date_of_birth else "",
-                        row.branch_name or "",
-                        row.branch_city or "",
-                        row.target_country_id or "",
-                        row.target_university_id or "",
-                        row.target_program_id or "",
-                        row.created_at.isoformat() if row.created_at else "",
-                        "Yes" if row.is_active else "No",
-                    ]
-                )
-
-            # Reset pointer to beginning
-            output.seek(0)
-
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"students-{timestamp}.csv"
-
-            return StreamingResponse(
-                output,
-                media_type="text/csv",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                },
-            )
-
+            return write_csv_util(rows, "students")
         else:  # format == "xlsx"
-            import io
-
-            try:
-                from openpyxl import Workbook
-            except ImportError:
-                raise HTTPException(
-                    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                    detail="Excel export requires openpyxl library to be installed",
-                ) from None
-
-            # Create workbook and worksheet
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Students"
-
-            # Write header row
-            headers = [
-                "Student ID",
-                "Email",
-                "Name",
-                "Phone",
-                "Date of Birth",
-                "Branch Name",
-                "Branch City",
-                "Target Country ID",
-                "Target University ID",
-                "Target Program ID",
-                "Created At",
-                "Is Active",
-            ]
-            ws.append(headers)
-
-            # Write data rows
-            for row in result:
-                ws.append(
-                    [
-                        row.id,
-                        row.email,
-                        row.name or "",
-                        row.phone or "",
-                        str(row.date_of_birth) if row.date_of_birth else "",
-                        row.branch_name or "",
-                        row.branch_city or "",
-                        row.target_country_id or "",
-                        row.target_university_id or "",
-                        row.target_program_id or "",
-                        row.created_at.isoformat() if row.created_at else "",
-                        "Yes" if row.is_active else "No",
-                    ]
-                )
-
-            # Save to memory
-            output = io.BytesIO()
-            wb.save(output)
-            output.seek(0)
-
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"students-{timestamp}.xlsx"
-
-            return StreamingResponse(
-                output,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                },
-            )
+            return write_excel_util(rows, "students", sheet_title="Students")
 
     except (TenantScopeError, BranchScopeError):
         raise HTTPException(
