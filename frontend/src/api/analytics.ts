@@ -1,17 +1,9 @@
 /**
-<<<<<<< HEAD
- * Analytics API client (E41, E42, E43; Journey J34, J35, J36).
+ * Analytics API client (E41, E42, E43; Journeys J34, J35, J36).
  *
  * Provides functions to fetch branch manager analytics data,
  * owner cross-branch comparison data, and super admin platform-wide
  * stats with optional date range filtering.
-=======
- * Analytics API client (E41/E42; Journeys J34/J35).
- *
- * Provides functions to fetch branch manager analytics data
- * (registrations-over-time, conversion funnel) and consultancy owner
- * cross-branch comparison data, with optional date range filtering.
->>>>>>> origin/main
  */
 
 import { apiFetch } from './client'
@@ -19,9 +11,13 @@ import type {
   AnalyticsParams,
   BranchComparisonResponse,
   ConversionFunnelResponse,
-  RegistrationsOverTimeResponse,
   PlatformWideStatsResponse,
+  RegistrationsOverTimeResponse,
 } from '../types/analytics'
+import type { BranchComparisonParams } from '../types/analytics'
+
+// Re-export types that are used by other modules
+export type { BranchComparisonParams }
 
 /**
  * Fetch registrations-over-time data for the current user's branch.
@@ -74,7 +70,31 @@ export async function fetchConversionFunnel(
 }
 
 /**
-<<<<<<< HEAD
+ * Fetch cross-branch comparison data for the consultancy owner dashboard.
+ * Requires consultancy_owner or super_admin role.
+ *
+ * @param params - Optional date range filters
+ * @returns Branch comparison metrics for all branches in the consultancy
+ */
+export async function fetchBranchComparison(
+  params?: BranchComparisonParams,
+): Promise<BranchComparisonResponse> {
+  const searchParams = new URLSearchParams()
+  if (params?.start_date) {
+    searchParams.set('start_date', params.start_date)
+  }
+  if (params?.end_date) {
+    searchParams.set('end_date', params.end_date)
+  }
+
+  const queryString = searchParams.toString()
+  const url = `/analytics/branch-comparison${queryString ? `?${queryString}` : ''}`
+
+  const response = await apiFetch<BranchComparisonResponse>(url)
+  return response
+}
+
+/**
  * Fetch platform-wide stats for super admin view.
  *
  * @param params - Optional date range filters (start_date, end_date)
@@ -89,42 +109,12 @@ export async function fetchPlatformWideStats(
     searchParams.set('start_date', params.start_date)
   }
 
-=======
- * Query parameters for branch comparison API.
- */
-export interface BranchComparisonParams {
-  start_date?: string
-  end_date?: string
-}
-
-/**
- * Fetch cross-branch comparison data for the consultancy owner dashboard.
- * Requires consultancy_owner or super_admin role.
- *
- * @param params - Optional date range filters
- * @returns Branch comparison metrics for all branches in the consultancy
- */
-export async function fetchBranchComparison(
-  params?: BranchComparisonParams,
-): Promise<BranchComparisonResponse> {
-  const searchParams = new URLSearchParams()
-  if (params?.start_date) {
-    searchParams.set('start_date', params.start_date)
-  }
->>>>>>> origin/main
   if (params?.end_date) {
     searchParams.set('end_date', params.end_date)
   }
 
   const queryString = searchParams.toString()
-<<<<<<< HEAD
   const path = `/analytics/platform-wide-stats${queryString ? `?${queryString}` : ''}`
 
   return apiFetch<PlatformWideStatsResponse>(path)
-=======
-  const url = `/analytics/branch-comparison${queryString ? `?${queryString}` : ''}`
-
-  const response = await apiFetch<BranchComparisonResponse>(url)
-  return response
->>>>>>> origin/main
 }

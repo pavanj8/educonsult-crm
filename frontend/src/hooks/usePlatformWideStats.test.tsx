@@ -192,4 +192,75 @@ describe('usePlatformWideStats', () => {
       end_date: '2024-01-31',
     })
   })
+
+  it('should handle undefined dateRange (default case)', async () => {
+    const mockStats = {
+      tenants: [],
+      total_tenants: 2,
+      total_branches: 3,
+      total_staff: 8,
+      total_students: 40,
+      total_applications: 60,
+    }
+
+    vi.mocked(fetchPlatformWideStats).mockResolvedValue(mockStats)
+
+    const { result } = renderHook(() => usePlatformWideStats(undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(fetchPlatformWideStats).toHaveBeenCalledWith(undefined)
+    expect(result.current.stats).toEqual(mockStats)
+  })
+
+  it('should handle explicit undefined dateRange (default case)', async () => {
+    const mockStats = {
+      tenants: [],
+      total_tenants: 2,
+      total_branches: 3,
+      total_staff: 8,
+      total_students: 40,
+      total_applications: 60,
+    }
+
+    vi.mocked(fetchPlatformWideStats).mockResolvedValue(mockStats)
+
+    const { result } = renderHook(() => usePlatformWideStats(undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(fetchPlatformWideStats).toHaveBeenCalledWith(undefined)
+    expect(result.current.stats).toEqual(mockStats)
+  })
+
+  it('should handle dateRange with null dates (default case)', async () => {
+    const mockStats = {
+      tenants: [],
+      total_tenants: 1,
+      total_branches: 1,
+      total_staff: 2,
+      total_students: 10,
+      total_applications: 15,
+    }
+
+    vi.mocked(fetchPlatformWideStats).mockResolvedValue(mockStats)
+
+    const dateRange = {
+      preset: 'custom' as const,
+      startDate: null,
+      endDate: null,
+    }
+
+    const { result } = renderHook(() => usePlatformWideStats(dateRange))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(fetchPlatformWideStats).toHaveBeenCalledWith(undefined)
+  })
 })

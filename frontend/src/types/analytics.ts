@@ -1,8 +1,9 @@
 /**
- * Analytics types (E41/E42; Journeys J34/J35).
+ * Analytics types (E41, E42, E43; Journeys J34, J35, J36).
  *
- * Supports branch manager dashboard with date-range filter (E41)
- * and owner cross-branch comparison dashboard (E42).
+ * Supports branch manager dashboard with date-range filter (E41),
+ * owner cross-branch comparison dashboard (E42), and super admin
+ * platform-wide stats dashboard (E43).
  */
 
 /**
@@ -80,7 +81,37 @@ export type DateRange = {
 }
 
 /**
-<<<<<<< HEAD
+ * Query parameters for branch comparison API.
+ */
+export interface BranchComparisonParams {
+  start_date?: string
+  end_date?: string
+}
+
+/**
+ * A single branch in the cross-branch comparison response.
+ */
+export interface BranchComparisonBucket {
+  branch_id: number
+  branch_name: string
+  branch_city: string
+  total_applications: number
+  enrolled_count: number
+  rejected_count: number
+  withdrawn_count: number
+  active_count: number
+}
+
+/**
+ * Response from GET /analytics/branch-comparison
+ */
+export interface BranchComparisonResponse {
+  branches: BranchComparisonBucket[]
+  total_branches: number
+  total_applications: number
+}
+
+/**
  * Metrics for a single tenant in platform-wide stats (E43; Journey J36).
  *
  * Represents aggregated metrics for one consultancy tenant on the platform,
@@ -110,31 +141,10 @@ export type TenantStatsBucket = {
   /** Number of applications withdrawn (terminal stage) */
   withdrawn_count: number
   /** Number of applications still in active stages (not yet terminal) */
-=======
- * Query parameters for branch comparison API.
- */
-export interface BranchComparisonParams {
-  start_date?: string
-  end_date?: string
-}
-
-/**
- * A single branch in the cross-branch comparison response.
- */
-export interface BranchComparisonBucket {
-  branch_id: number
-  branch_name: string
-  branch_city: string
-  total_applications: number
-  enrolled_count: number
-  rejected_count: number
-  withdrawn_count: number
->>>>>>> origin/main
   active_count: number
 }
 
 /**
-<<<<<<< HEAD
  * Response for GET /analytics/platform-wide-stats (E43; Journey J36).
  *
  * Returns aggregated metrics for all tenants on the platform,
@@ -153,12 +163,5 @@ export type PlatformWideStatsResponse = {
   /** Total number of students across all tenants */
   total_students: number
   /** Total number of applications across all tenants */
-=======
- * Response from GET /analytics/branch-comparison
- */
-export interface BranchComparisonResponse {
-  branches: BranchComparisonBucket[]
-  total_branches: number
->>>>>>> origin/main
   total_applications: number
 }
