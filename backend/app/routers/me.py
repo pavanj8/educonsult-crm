@@ -15,25 +15,34 @@ Today this router exposes:
   E22 / Journey J15 and enforces its own tenant + branch + role
   semantics; duplicating that surface here would be a scope-creep
   risk).
+* ``GET /me/plan-usage`` -- the authenticated consultancy owner's own
+  plan and usage summary (E45; Journey J38). Owner-only: returns the
+  tenant's assigned subscription plan (tier + limits) and current
+  usage counts (branches/staff/students).
 """
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.models.branch import Branch
 from app.models.meeting import Meeting
+from app.models.tenant import Tenant
+from app.models.user import User
 from app.rbac.dependencies import get_current_user
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.meeting import MeetingResponse
+from app.schemas.plan import PlanAndUsageResponse
 
 router = APIRouter(prefix="/me", tags=["me"])
 
 _STUDENT_ONLY_DETAIL = "Only students can access this endpoint"
+_OWNER_ONLY_DETAIL = "Only consultancy owners can access this endpoint"
 
 
 def _ensure_student(current_user: AuthenticatedUser) -> None:
@@ -108,4 +117,115 @@ def list_my_meetings(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Meeting service is temporarily unavailable",
+        ) from exc
+
+
+def _ensure_owner(current_user: AuthenticatedUser) -> None:
+    """Reject any caller that is not authenticated as a consultancy owner.
+
+    The plan-usage endpoint (E45; Journey J38) is only rendered for
+    consultancy owners. A student or staff token that hits
+    ``/me/plan-usage`` must be turned away with 403.
+    """
+    if current_user.role != Role.CONSULTANCY_OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_OWNER_ONLY_DETAIL,
+        )
+
+
+@router.get("/plan-usage", response_model=PlanAndUsageResponse)
+def get_my_plan_and_usage(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    db: Session = Depends(get_db),
+) -> PlanAndUsageResponse:
+    """Return the authenticated owner's tenant plan and usage (E45; J38).
+
+    The endpoint returns:
+
+    * The tenant's assigned plan (tier name, code, and limits). If the
+      tenant has no plan assigned yet, ``plan`` is ``null``.
+    * Current usage counts for the tenant (branches, staff, students).
+
+    The endpoint is scoped to the authenticated user's tenant via
+    ``current_user.tenant_id`` and role-gated to ``CONSULTANCY_OWNER`` so
+    only owners can read their own consultancy's billing/usage data.
+
+    Usage counts match the E9 task #107 enforcement semantics:
+    * ``branches`` -- count of ``Branch`` rows for the tenant.
+    * ``staff`` -- count of non-student ``User`` rows (counselors,
+      verifiers, branch managers, visa processors, receptionists).
+    * ``students`` -- count of ``User`` rows with ``role == 'student'``.
+
+    The plan detail is loaded via the ``Tenant.plan`` relationship; if
+    ``tenant.plan_id`` is NULL (no plan assigned), the response
+    ``plan`` field is ``null`` and the frontend displays a "no plan
+    assigned, contact platform admin" message.
+    """
+    _ensure_owner(current_user)
+
+    if current_user.tenant_id is None:
+        # The consultancy owner role requires a tenant_id (RBAC) so
+        # this branch is defensive only.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+    try:
+        # Load the tenant with the plan relationship eager-loaded
+        tenant = (
+            db.query(Tenant)
+            .filter(Tenant.id == current_user.tenant_id)
+            .one_or_none()
+        )
+
+        if tenant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found",
+            )
+
+        # Count branches for this tenant
+        branches_count = db.execute(
+            select(func.count()).select_from(Branch).where(Branch.tenant_id == tenant.id)
+        ).scalar_one()
+
+        # Count staff (non-student users) for this tenant
+        staff_count = db.execute(
+            select(func.count())
+            .select_from(User)
+            .where(
+                User.tenant_id == tenant.id,
+                User.role.in_(
+                    [
+                        Role.BRANCH_MANAGER,
+                        Role.COUNSELOR,
+                        Role.DOCUMENT_VERIFIER,
+                        Role.VISA_PROCESSOR,
+                        Role.RECEPTIONIST,
+                    ]
+                ),
+            )
+        ).scalar_one()
+
+        # Count students for this tenant
+        students_count = db.execute(
+            select(func.count())
+            .select_from(User)
+            .where(User.tenant_id == tenant.id, User.role == Role.STUDENT)
+        ).scalar_one()
+
+        return PlanAndUsageResponse(
+            plan=tenant.plan,
+            usage={
+                "branches": branches_count,
+                "staff": staff_count,
+                "students": students_count,
+            },
+        )
+    except OperationalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Plan and usage service is temporarily unavailable",
         ) from exc

@@ -21,9 +21,17 @@ export type {
 } from './checklist'
 export type { Country, Program, University } from './masterData'
 export type {
+  AnalyticsParams,
+  ConversionFunnelBucket,
+  ConversionFunnelResponse,
+  DateRange,
+  DateRangePreset,
+} from './analytics'
+export type {
   ReceptionistIntakeRequest,
   ReceptionistIntakeResponse,
 } from './receptionistIntake'
 export type { RegisterStudentRequest, RegisterStudentResponse } from './student'
 export type { Tenant, TenantCreateRequest } from './tenant'
+export type { PlanAndUsage, PlanInfo, TenantUsage } from './plan'
 export { DOCUMENT_UPLOAD_STATUS_LABELS } from './checklist'

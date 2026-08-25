@@ -292,3 +292,138 @@ describe('reassignCounselor API client', () => {
     })
   })
 })
+
+describe('updateApplicationLoan API client', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('patches the loan fields and unwraps the nested application response', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const application = {
+      id: 5,
+      tenant_id: 10,
+      student_id: 42,
+      university_id: 1,
+      program_id: 10,
+      stage: 'loan_processing' as const,
+      loan_status: 'approved',
+      loan_lender: 'HDFC Credila',
+      loan_amount: '1500000.00',
+      created_at: '2026-01-15T10:00:00Z',
+      updated_at: '2026-01-15T10:00:00Z',
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ application }),
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const { updateApplicationLoan } = await import('./applications')
+    const res = await updateApplicationLoan(5, {
+      loan_status: 'approved',
+      loan_lender: 'HDFC Credila',
+      loan_amount: '1500000.00',
+    })
+
+    expect(res).toEqual(application)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/loan',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({
+          loan_status: 'approved',
+          loan_lender: 'HDFC Credila',
+          loan_amount: '1500000.00',
+        }),
+      }),
+    )
+    const headers = (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer stored-access-token')
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+
+  it('forwards a partial PATCH body with only the supplied fields', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ application: { id: 5 } }),
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const { updateApplicationLoan } = await import('./applications')
+    await updateApplicationLoan(5, { loan_status: 'disbursed' })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/loan',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ loan_status: 'disbursed' }),
+      }),
+    )
+  })
+
+  it('forwards an explicit null to clear a previously-recorded field', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ application: { id: 5 } }),
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const { updateApplicationLoan } = await import('./applications')
+    await updateApplicationLoan(5, {
+      loan_status: null,
+      loan_lender: null,
+      loan_amount: null,
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/applications/5/loan',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({
+          loan_status: null,
+          loan_lender: null,
+          loan_amount: null,
+        }),
+      }),
+    )
+  })
+
+  it('surfaces the backend detail when the API rejects (422)', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({ detail: 'loan_status too long' }),
+    }) as typeof fetch
+    const { updateApplicationLoan } = await import('./applications')
+    await expect(
+      updateApplicationLoan(5, { loan_status: 'x'.repeat(64) }),
+    ).rejects.toMatchObject({
+      message: 'loan_status too long',
+      status: 422,
+    })
+  })
+
+  it('surfaces the backend detail when the API rejects (403)', async () => {
+    localStorage.setItem('access_token', 'stored-access-token')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ detail: 'Insufficient permissions' }),
+    }) as typeof fetch
+    const { updateApplicationLoan } = await import('./applications')
+    await expect(
+      updateApplicationLoan(5, { loan_status: 'approved' }),
+    ).rejects.toMatchObject({
+      message: 'Insufficient permissions',
+      status: 403,
+    })
+  })
+})

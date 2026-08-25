@@ -107,6 +107,11 @@ class Plan(Base):
     max_branches: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_staff: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_students: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Pricing for Razorpay checkout (E46; Journey J39).
+    # price_in_cents is in smallest currency unit (paisa for INR).
+    price_in_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    # ISO 4217 currency code (default "INR" for home market).
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="INR")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

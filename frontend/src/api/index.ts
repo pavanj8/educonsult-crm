@@ -1,3 +1,4 @@
+export { fetchConversionFunnel, fetchRegistrationsOverTime } from './analytics'
 export { login, refresh, fetchMe, authErrorMessage } from './auth'
 export {
   createAdminChecklistItemTemplate,
@@ -6,6 +7,7 @@ export {
   fetchApplicationChecklist,
   updateAdminChecklistItemTemplate,
 } from './checklist'
+export { fetchBranchComparison, type BranchComparisonParams } from './analytics'
 export { fetchCountries, fetchPrograms, fetchUniversities } from './masterData'
 export {
   listMeetingsForApplication,
@@ -33,3 +35,4 @@ export {
   updateVisaDetail,
   type VisaStageQueueParams,
 } from './visa'
+export { fetchMyPlanAndUsage } from './plans'

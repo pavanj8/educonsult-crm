@@ -8,8 +8,10 @@ import app.models  # noqa: F401 — register ORM models with Base.metadata
 from app.db.database import SQLALCHEMY_DATABASE_URL, SessionLocal, engine
 from app.models.base import Base
 from app.pipeline.default_transitions import seed_default_stage_transitions
+from app.routers.analytics import router as analytics_router
 from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
+from app.routers.billing import router as billing_router
 from app.routers.branches import router as branches_router
 from app.routers.checklist import router as checklist_router
 from app.routers.checklist_templates import router as checklist_templates_router
@@ -96,7 +98,9 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="EduConsult CRM", lifespan=lifespan)
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 app.include_router(applications_router, prefix="/applications", tags=["applications"])
+app.include_router(billing_router, prefix="/billing", tags=["billing"])
 app.include_router(checklist_router, prefix="/applications", tags=["checklist"])
 app.include_router(
     checklist_templates_router,
