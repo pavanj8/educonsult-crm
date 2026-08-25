@@ -1,3 +1,4 @@
+export { fetchConversionFunnel, fetchRegistrationsOverTime } from './analytics'
 export { login, refresh, fetchMe, authErrorMessage } from './auth'
 export {
   createAdminChecklistItemTemplate,
