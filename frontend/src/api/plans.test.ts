@@ -122,6 +122,7 @@ describe('plans API client', () => {
         currency: 'INR',
         plan_code: 'growth',
         plan_name: 'Growth',
+        razorpay_key_id: 'rzp_test_123',
       }
 
       vi.mocked(apiFetch).mockResolvedValue(mockResponse)
@@ -143,6 +144,7 @@ describe('plans API client', () => {
         currency: 'INR',
         plan_code: 'starter',
         plan_name: 'Starter',
+        razorpay_key_id: 'rzp_test_123',
       }
 
       vi.mocked(apiFetch).mockResolvedValue(mockResponse)
@@ -164,6 +166,7 @@ describe('plans API client', () => {
         currency: 'INR',
         plan_code: 'enterprise',
         plan_name: 'Enterprise',
+        razorpay_key_id: 'rzp_test_123',
       }
 
       vi.mocked(apiFetch).mockResolvedValue(mockResponse)

@@ -278,6 +278,7 @@ export default function PlanAndUsagePage() {
                 )}
                 {(() => {
                   const plan = planAndUsage.plan
+                  if (!plan) return null
                   return (
                     <>
                       {PLAN_UPGRADE_PATHS[plan.code]?.map((targetPlanCode) => (

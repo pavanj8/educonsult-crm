@@ -52,6 +52,7 @@ describe('usePlanUpgrade', () => {
       currency: 'INR',
       plan_code: 'growth' as const,
       plan_name: 'Growth',
+      razorpay_key_id: 'rzp_test_123',
     }
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
@@ -97,6 +98,7 @@ describe('usePlanUpgrade', () => {
       currency: 'INR',
       plan_code: 'starter' as const,
       plan_name: 'Starter',
+      razorpay_key_id: 'rzp_test_123',
     }
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
@@ -121,6 +123,7 @@ describe('usePlanUpgrade', () => {
       currency: 'INR',
       plan_code: 'enterprise' as const,
       plan_name: 'Enterprise',
+      razorpay_key_id: 'rzp_test_123',
     }
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
@@ -145,6 +148,7 @@ describe('usePlanUpgrade', () => {
       currency: 'INR',
       plan_code: 'growth' as const,
       plan_name: 'Growth',
+      razorpay_key_id: 'rzp_test_123',
     }
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
@@ -188,6 +192,7 @@ describe('usePlanUpgrade', () => {
       currency: 'INR',
       plan_code: 'growth' as const,
       plan_name: 'Growth',
+      razorpay_key_id: 'rzp_test_123',
     }
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)

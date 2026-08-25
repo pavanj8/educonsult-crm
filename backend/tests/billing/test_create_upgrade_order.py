@@ -34,6 +34,7 @@ def test_create_upgrade_order_as_owner(
         assert data["currency"] == "INR"
         assert data["plan_code"] == "growth"
         assert data["plan_name"] == "Growth"
+        assert data["razorpay_key_id"] == "rzp_test_1234567890abcdef"  # Test key from fixture
 
         # Verify create_order was called with correct parameters
         mock_create_order.assert_called_once()

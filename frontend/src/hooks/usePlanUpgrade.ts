@@ -113,7 +113,7 @@ export function usePlanUpgrade(): UsePlanUpgradeState {
 
         // Step 3: Configure checkout options
         const options: RazorpayCheckoutOptions = {
-          key: '', // Will be set by backend rendering or environment variable
+          key: orderResponse.razorpay_key_id,
           order_id: orderResponse.order_id,
           amount: orderResponse.amount,
           currency: orderResponse.currency,

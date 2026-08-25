@@ -63,6 +63,8 @@ export type UpgradeOrderResponse = {
   plan_code: 'starter' | 'growth' | 'enterprise'
   /** Human-readable plan name for display. */
   plan_name: string
+  /** Razorpay key ID for checkout initialization (server-controlled). */
+  razorpay_key_id: string
 }
 
 /**

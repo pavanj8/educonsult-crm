@@ -263,6 +263,7 @@ def create_upgrade_order(
         currency=razorpay_order.get("currency", plan.currency),
         plan_code=plan.code.value,
         plan_name=plan.name,
+        razorpay_key_id=_key_id,
     )
 
 
