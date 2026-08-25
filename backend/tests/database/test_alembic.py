@@ -9,7 +9,7 @@ import app.db.database as database_module
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "c119bac8fd8a"
-HEAD_REVISION = "add_pricing_to_plans"
+HEAD_REVISION = "u4v5w6x7y8z9"
 
 
 def _alembic_config() -> Config:

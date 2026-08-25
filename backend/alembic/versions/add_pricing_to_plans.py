@@ -1,7 +1,7 @@
 """add pricing to plans
 
-Revision ID: add_pricing_to_plans
-Revises: p8q9r0s1t2u3
+Revision ID: u4v5w6x7y8z9
+Revises: t3u4v5w6x7y8
 Create Date: 2026-12-15 00:00:00.000000
 
 Add pricing columns to the plans table to support Razorpay checkout
@@ -28,7 +28,7 @@ prices ( Starter: ₹4999, Growth: ₹9999, Enterprise: ₹24999 ) so the
 catalog is ready for the E46 Razorpay checkout endpoints.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.sql import table, column
@@ -36,10 +36,10 @@ from sqlalchemy.sql import table, column
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "add_pricing_to_plans"
-down_revision: Union[str, None] = "t3u4v5w6x7y8"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "u4v5w6x7y8z9"
+down_revision: str | None = "t3u4v5w6x7y8"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
