@@ -149,3 +149,92 @@ class BranchComparisonResponse(BaseModel):
         ge=0,
         description="Total applications across all branches (filtered by date range)",
     )
+
+
+class TenantStatsBucket(BaseModel):
+    """Metrics for a single tenant in platform-wide stats (E43; Journey J36).
+
+    Represents aggregated metrics for one consultancy tenant on the platform,
+    used by Super Admins to monitor overall platform health and tenant growth.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    tenant_id: int = Field(description="ID of the tenant")
+    tenant_name: str = Field(description="Name of the tenant consultancy")
+    tenant_slug: str = Field(description="URL-friendly slug identifier of the tenant")
+    plan_code: str | None = Field(
+        description="Subscription plan code (starter/growth/enterprise) if assigned"
+    )
+    branches_count: int = Field(
+        ge=0,
+        description="Number of branches in this tenant",
+    )
+    staff_count: int = Field(
+        ge=0,
+        description="Number of staff accounts in this tenant",
+    )
+    students_count: int = Field(
+        ge=0,
+        description="Number of student accounts in this tenant",
+    )
+    applications_count: int = Field(
+        ge=0,
+        description="Total number of applications in this tenant",
+    )
+    enrolled_count: int = Field(
+        ge=0,
+        description="Number of applications enrolled (terminal stage)",
+    )
+    rejected_count: int = Field(
+        ge=0,
+        description="Number of applications rejected (terminal stage)",
+    )
+    withdrawn_count: int = Field(
+        ge=0,
+        description="Number of applications withdrawn (terminal stage)",
+    )
+    active_count: int = Field(
+        ge=0,
+        description="Number of applications still in active stages (not yet terminal)",
+    )
+
+
+class PlatformWideStatsResponse(BaseModel):
+    """Response for GET /analytics/platform-wide-stats (E43; Journey J36).
+
+    Returns aggregated metrics for all tenants on the platform,
+    allowing Super Admins to monitor overall platform health, tenant
+    growth, and usage patterns.
+
+    The response is ordered by applications_count descending (highest
+    volume tenants first).
+
+    Counts reflect the current state as of the query time, filtered by
+    the optional date range (created_at between start and end dates)
+    which applies to applications and students only.
+    """
+
+    tenants: list[TenantStatsBucket] = Field(
+        description="List of tenant metrics, ordered by applications_count descending"
+    )
+    total_tenants: int = Field(
+        ge=0,
+        description="Total number of tenants on the platform",
+    )
+    total_branches: int = Field(
+        ge=0,
+        description="Total number of branches across all tenants",
+    )
+    total_staff: int = Field(
+        ge=0,
+        description="Total number of staff across all tenants",
+    )
+    total_students: int = Field(
+        ge=0,
+        description="Total number of students across all tenants",
+    )
+    total_applications: int = Field(
+        ge=0,
+        description="Total number of applications across all tenants",
+    )
