@@ -35,3 +35,6 @@ export const CHECKLIST_TEMPLATES_PATH = '/checklist-templates'
  * currency here; the route is guarded to that role.
  */
 export const TENANT_BRANDING_PATH = '/branding'
+
+/** Owner cross-branch comparison dashboard route (E42; Journey J35). */
+export const OWNER_DASHBOARD_PATH = '/owner/dashboard'
