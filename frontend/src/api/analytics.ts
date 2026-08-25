@@ -9,7 +9,6 @@
 import { apiFetch } from './client'
 import type {
   AnalyticsParams,
-  BranchComparisonBucket,
   BranchComparisonResponse,
   ConversionFunnelResponse,
   RegistrationsOverTimeResponse,
