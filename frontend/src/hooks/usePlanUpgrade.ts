@@ -20,11 +20,9 @@ interface UsePlanUpgradeState {
 
 // Declare Razorpay type globally (loaded via external script)
 declare global {
-  interface Window {
-    Razorpay: new (options: RazorpayCheckoutOptions) => {
-      open: () => void
-      close: () => void
-    }
+  var Razorpay: new (options: RazorpayCheckoutOptions) => {
+    open: () => void
+    close: () => void
   }
 }
 

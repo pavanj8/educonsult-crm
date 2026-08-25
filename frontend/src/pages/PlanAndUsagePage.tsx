@@ -276,28 +276,35 @@ export default function PlanAndUsagePage() {
                     Plan changed successfully!
                   </p>
                 )}
-                {planAndUsage.plan && PLAN_UPGRADE_PATHS[planAndUsage.plan.code]?.map((targetPlanCode) => (
-                  <UpgradePlanAction
-                    key={targetPlanCode}
-                    targetPlanCode={targetPlanCode as 'starter' | 'growth' | 'enterprise'}
-                    currentPlanCode={planAndUsage.plan.code}
-                    onSuccess={handleUpgradeSuccess}
-                  />
-                ))}
-                {planAndUsage.plan && PLAN_DOWNGRADE_PATHS[planAndUsage.plan.code]?.map((targetPlanCode) => (
-                  <UpgradePlanAction
-                    key={targetPlanCode}
-                    targetPlanCode={targetPlanCode as 'starter' | 'growth' | 'enterprise'}
-                    currentPlanCode={planAndUsage.plan.code}
-                    onSuccess={handleUpgradeSuccess}
-                  />
-                ))}
-                {planAndUsage.plan && PLAN_UPGRADE_PATHS[planAndUsage.plan.code]?.length === 0 &&
-                  PLAN_DOWNGRADE_PATHS[planAndUsage.plan.code]?.length === 0 && (
-                  <p className="plan-usage__no-upgrade" data-testid="no-upgrade-options">
-                    You are on the highest tier plan.
-                  </p>
-                )}
+                {(() => {
+                  const plan = planAndUsage.plan
+                  return (
+                    <>
+                      {PLAN_UPGRADE_PATHS[plan.code]?.map((targetPlanCode) => (
+                        <UpgradePlanAction
+                          key={`upgrade-${targetPlanCode}`}
+                          targetPlanCode={targetPlanCode as 'starter' | 'growth' | 'enterprise'}
+                          currentPlanCode={plan.code}
+                          onSuccess={handleUpgradeSuccess}
+                        />
+                      ))}
+                      {PLAN_DOWNGRADE_PATHS[plan.code]?.map((targetPlanCode) => (
+                        <UpgradePlanAction
+                          key={`downgrade-${targetPlanCode}`}
+                          targetPlanCode={targetPlanCode as 'starter' | 'growth' | 'enterprise'}
+                          currentPlanCode={plan.code}
+                          onSuccess={handleUpgradeSuccess}
+                        />
+                      ))}
+                      {PLAN_UPGRADE_PATHS[plan.code]?.length === 0 &&
+                        PLAN_DOWNGRADE_PATHS[plan.code]?.length === 0 && (
+                        <p className="plan-usage__no-upgrade" data-testid="no-upgrade-options">
+                          You are on the highest tier plan.
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </section>
           )}

@@ -15,7 +15,7 @@ vi.mock('../api/plans', () => ({
 
 // Mock Razorpay types (must match the hook's declaration)
 // Import the actual types from the plan module
-import type { RazorpayCheckoutOptions, RazorpayPaymentResponse } from '../types/plan'
+import type { RazorpayCheckoutOptions } from '../types/plan'
 
 interface RazorpayInstance {
   open: () => void
@@ -23,16 +23,15 @@ interface RazorpayInstance {
 }
 
 declare global {
-  interface Window {
-    Razorpay?: new (options: RazorpayCheckoutOptions) => RazorpayInstance
-  }
+  var Razorpay: new (options: RazorpayCheckoutOptions) => RazorpayInstance
 }
 
 describe('usePlanUpgrade', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset Razorpay mock
+    // Reset Razorpay mock and related state
     delete (window as any).Razorpay
+    vi.clearAllMocks()
   })
 
   afterEach(() => {
@@ -57,12 +56,16 @@ describe('usePlanUpgrade', () => {
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
 
-    // Mock Razorpay
-    const mockRazorpayInstance = {
-      open: vi.fn(),
-      close: vi.fn(),
+    // Mock Razorpay constructor
+    const mockOpen = vi.fn()
+    const mockClose = vi.fn()
+
+    class MockRazorpay {
+      open = mockOpen
+      close = mockClose
     }
-    window.Razorpay = vi.fn(() => mockRazorpayInstance)
+
+    ;(window as any).Razorpay = MockRazorpay
 
     const onSuccess = vi.fn()
     const { result } = renderHook(() => usePlanUpgrade())
@@ -70,8 +73,7 @@ describe('usePlanUpgrade', () => {
     await result.current.initiateCheckout('growth', onSuccess)
 
     expect(createUpgradeOrder).toHaveBeenCalledWith('growth')
-    expect(window.Razorpay).toHaveBeenCalled()
-    expect(mockRazorpayInstance.open).toHaveBeenCalledTimes(1)
+    expect(mockOpen).toHaveBeenCalledTimes(1)
   })
 
   it('should handle API error during order creation', async () => {
@@ -99,11 +101,11 @@ describe('usePlanUpgrade', () => {
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
 
-    const mockRazorpayInstance = {
-      open: vi.fn(),
-      close: vi.fn(),
+    class MockRazorpayClass {
+      open = vi.fn()
+      close = vi.fn()
     }
-    window.Razorpay = vi.fn(() => mockRazorpayInstance)
+    window.Razorpay = vi.fn((_options: any) => new MockRazorpayClass()) as any
 
     const { result } = renderHook(() => usePlanUpgrade())
 
@@ -123,11 +125,11 @@ describe('usePlanUpgrade', () => {
 
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
 
-    const mockRazorpayInstance = {
-      open: vi.fn(),
-      close: vi.fn(),
+    class MockRazorpayClass {
+      open = vi.fn()
+      close = vi.fn()
     }
-    window.Razorpay = vi.fn(() => mockRazorpayInstance)
+    window.Razorpay = vi.fn((_options: any) => new MockRazorpayClass()) as any
 
     const { result } = renderHook(() => usePlanUpgrade())
 
@@ -148,30 +150,32 @@ describe('usePlanUpgrade', () => {
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
 
     // Mock Razorpay with a spy on the handler
-    let capturedHandler: ((response: any) => void) | null = null
+    let capturedHandler: ((response: any) => void) | undefined = undefined
     const mockRazorpayInstance = {
       open: vi.fn(),
       close: vi.fn(),
     }
-    window.Razorpay = vi.fn((options: any) => {
+    const mockRazorpayConstructor = vi.fn().mockImplementation((options: any) => {
       capturedHandler = options.handler
       return mockRazorpayInstance
     })
+    ;(window as any).Razorpay = mockRazorpayConstructor
 
     const onSuccess = vi.fn()
     const { result } = renderHook(() => usePlanUpgrade())
 
     await result.current.initiateCheckout('growth', onSuccess)
 
+    // Verify the constructor was called and handler was captured
+    expect(mockRazorpayConstructor).toHaveBeenCalled()
+    expect(capturedHandler).toBeDefined()
+
     // Now trigger the handler manually
-    expect(capturedHandler).not.toBeNull()
-    if (capturedHandler) {
-      capturedHandler({
-        razorpay_payment_id: 'pay_123',
-        razorpay_order_id: 'order_123',
-        razorpay_signature: 'signature',
-      })
-    }
+    capturedHandler!({
+      razorpay_payment_id: 'pay_123',
+      razorpay_order_id: 'order_123',
+      razorpay_signature: 'signature',
+    })
 
     expect(onSuccess).toHaveBeenCalled()
     expect(result.current.loading).toBe(false)
@@ -189,26 +193,28 @@ describe('usePlanUpgrade', () => {
     vi.mocked(createUpgradeOrder).mockResolvedValue(mockOrderResponse)
 
     // Mock Razorpay with a spy on the dismiss handler
-    let capturedOnDismiss: (() => void) | null = null
+    let capturedOnDismiss: (() => void) | undefined = undefined
     const mockRazorpayInstance = {
       open: vi.fn(),
       close: vi.fn(),
     }
-    window.Razorpay = vi.fn((options: any) => {
-      capturedOnDismiss = options.modal?.ondismiss || null
+    const mockRazorpayConstructor = vi.fn().mockImplementation((options: any) => {
+      capturedOnDismiss = options.modal?.ondismiss
       return mockRazorpayInstance
     })
+    ;(window as any).Razorpay = mockRazorpayConstructor
 
     const onCancel = vi.fn()
     const { result } = renderHook(() => usePlanUpgrade())
 
     await result.current.initiateCheckout('growth', undefined, onCancel)
 
+    // Verify the constructor was called and dismiss handler was captured
+    expect(mockRazorpayConstructor).toHaveBeenCalled()
+    expect(capturedOnDismiss).toBeDefined()
+
     // Now trigger the dismiss handler manually
-    expect(capturedOnDismiss).not.toBeNull()
-    if (capturedOnDismiss) {
-      capturedOnDismiss()
-    }
+    capturedOnDismiss!()
 
     expect(onCancel).toHaveBeenCalled()
     expect(result.current.loading).toBe(false)
