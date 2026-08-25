@@ -9,6 +9,9 @@ from app.rbac.roles import Role
 from tests.branches.helpers import seed_branch
 from tests.factories.users import make_authenticated_user
 
+# Excel MIME type constant
+EXCEL_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
 
 class TestExportConversionFunnel:
     """Tests for GET /analytics/funnel/export (E44; Journey J37)."""
@@ -135,6 +138,49 @@ class TestExportConversionFunnel:
 
         assert response.status_code == 401
 
+    def test_export_funnel_excel_format(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export funnel in Excel format when format=excel query parameter is provided."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=24, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        response = client.get("/analytics/funnel/export?format=excel")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == EXCEL_MIME_TYPE
+        assert "Content-Disposition" in response.headers
+        assert 'attachment; filename="conversion_funnel.xlsx"' in response.headers["Content-Disposition"]
+        # Excel files should have binary content (not empty text)
+        assert len(response.content) > 0
+
+    def test_export_funnel_default_format_is_csv(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export defaults to CSV format when no format parameter is provided."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=25, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        response = client.get("/analytics/funnel/export")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+        assert 'attachment; filename="conversion_funnel.csv"' in response.headers["Content-Disposition"]
+
 
 class TestExportRegistrationsOverTime:
     """Tests for GET /analytics/registrations/export (E44; Journey J37)."""
@@ -218,6 +264,48 @@ class TestExportRegistrationsOverTime:
         response = client.get("/analytics/registrations/export")
 
         assert response.status_code == 403
+
+    def test_export_registrations_excel_format(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export registrations in Excel format when format=excel query parameter is provided."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=34, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        response = client.get("/analytics/registrations/export?format=excel")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == EXCEL_MIME_TYPE
+        assert "Content-Disposition" in response.headers
+        assert 'attachment; filename="registrations_over_time.xlsx"' in response.headers["Content-Disposition"]
+        assert len(response.content) > 0
+
+    def test_export_registrations_default_format_is_csv(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export defaults to CSV format when no format parameter is provided."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=35, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        response = client.get("/analytics/registrations/export")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+        assert 'attachment; filename="registrations_over_time.csv"' in response.headers["Content-Disposition"]
 
 
 class TestExportBranchComparison:
@@ -344,6 +432,42 @@ class TestExportBranchComparison:
 
         assert response.status_code == 200
 
+    def test_export_branch_comparison_excel_format(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export branch comparison in Excel format when format=excel query parameter is provided."""
+        override_authenticated_user(
+            make_authenticated_user(Role.CONSULTANCY_OWNER, user_id=45, tenant_id=1)
+        )
+
+        response = client.get("/analytics/branch-comparison/export?format=excel")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == EXCEL_MIME_TYPE
+        assert "Content-Disposition" in response.headers
+        assert 'attachment; filename="branch_comparison.xlsx"' in response.headers["Content-Disposition"]
+        assert len(response.content) > 0
+
+    def test_export_branch_comparison_default_format_is_csv(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export defaults to CSV format when no format parameter is provided."""
+        override_authenticated_user(
+            make_authenticated_user(Role.CONSULTANCY_OWNER, user_id=46, tenant_id=1)
+        )
+
+        response = client.get("/analytics/branch-comparison/export")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+        assert 'attachment; filename="branch_comparison.csv"' in response.headers["Content-Disposition"]
+
 
 class TestExportPlatformWideStats:
     """Tests for GET /analytics/platform-wide-stats/export (E44; Journey J37)."""
@@ -444,3 +568,39 @@ class TestExportPlatformWideStats:
         response = client.get("/analytics/platform-wide-stats/export")
 
         assert response.status_code == 403
+
+    def test_export_platform_wide_stats_excel_format(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export platform-wide stats in Excel format when format=excel query parameter is provided."""
+        override_authenticated_user(
+            make_authenticated_user(Role.SUPER_ADMIN, user_id=55, tenant_id=None)
+        )
+
+        response = client.get("/analytics/platform-wide-stats/export?format=excel")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == EXCEL_MIME_TYPE
+        assert "Content-Disposition" in response.headers
+        assert 'attachment; filename="platform_wide_stats.xlsx"' in response.headers["Content-Disposition"]
+        assert len(response.content) > 0
+
+    def test_export_platform_wide_stats_default_format_is_csv(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export defaults to CSV format when no format parameter is provided."""
+        override_authenticated_user(
+            make_authenticated_user(Role.SUPER_ADMIN, user_id=56, tenant_id=None)
+        )
+
+        response = client.get("/analytics/platform-wide-stats/export")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+        assert 'attachment; filename="platform_wide_stats.csv"' in response.headers["Content-Disposition"]

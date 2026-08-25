@@ -3,9 +3,11 @@
 import csv
 from datetime import datetime
 from io import StringIO
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from openpyxl import Workbook
+from openpyxl.styles import Font
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -831,6 +833,41 @@ def _write_csv_response(rows: list[dict], filename: str) -> Response:
     )
 
 
+def _write_excel_response(rows: list[dict], filename: str) -> Response:
+    """Helper to write Excel data to a FastAPI response with appropriate headers."""
+    wb = Workbook()
+    ws = wb.active
+
+    if not rows:
+        ws.append(["No data available"])
+    else:
+        # Write header row with bold font
+        headers = list(rows[0].keys())
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+
+        # Write data rows
+        for row in rows:
+            ws.append([row[key] for key in headers])
+
+    # Save to bytes
+    from io import BytesIO
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    excel_content = output.getvalue()
+
+    return Response(
+        content=excel_content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
 @router.get("/funnel/export", response_class=Response)
 def export_conversion_funnel(
     current_user: Annotated[
@@ -845,16 +882,20 @@ def export_conversion_funnel(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
-    """Export conversion funnel analytics to CSV (E44; Journey J37).
+    """Export conversion funnel analytics to CSV/Excel (E44; Journey J37).
 
-    Returns a CSV file containing the conversion funnel breakdown by stage.
+    Returns a CSV or Excel file containing the conversion funnel breakdown by stage.
     The data is the same as GET /analytics/funnel but formatted for download.
 
     **Permission**: ``ANALYTICS_BRANCH`` (branch manager and above)
 
-    **Response**: ``text/csv`` with ``Content-Disposition: attachment``
+    **Query Parameters**:
+    - ``format``: Export format, either "csv" (default) or "excel"
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
     funnel_data = conversion_funnel(
         current_user=current_user,
@@ -878,8 +919,12 @@ def export_conversion_funnel(
         }
     )
 
-    filename = "conversion_funnel.csv"
-    return _write_csv_response(rows, filename)
+    if format == "excel":
+        filename = "conversion_funnel.xlsx"
+        return _write_excel_response(rows, filename)
+    else:
+        filename = "conversion_funnel.csv"
+        return _write_csv_response(rows, filename)
 
 
 @router.get("/registrations/export", response_class=Response)
@@ -896,16 +941,20 @@ def export_registrations_over_time(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
-    """Export registrations-over-time analytics to CSV (E44; Journey J37).
+    """Export registrations-over-time analytics to CSV/Excel (E44; Journey J37).
 
-    Returns a CSV file containing the time-series of student registrations.
+    Returns a CSV or Excel file containing the time-series of student registrations.
     The data is the same as GET /analytics/registrations but formatted for download.
 
     **Permission**: ``ANALYTICS_BRANCH`` (branch manager and above)
 
-    **Response**: ``text/csv`` with ``Content-Disposition: attachment``
+    **Query Parameters**:
+    - ``format``: Export format, either "csv" (default) or "excel"
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
     registrations_data = registrations_over_time(
         current_user=current_user,
@@ -929,8 +978,12 @@ def export_registrations_over_time(
         }
     )
 
-    filename = "registrations_over_time.csv"
-    return _write_csv_response(rows, filename)
+    if format == "excel":
+        filename = "registrations_over_time.xlsx"
+        return _write_excel_response(rows, filename)
+    else:
+        filename = "registrations_over_time.csv"
+        return _write_csv_response(rows, filename)
 
 
 @router.get("/branch-comparison/export", response_class=Response)
@@ -946,16 +999,20 @@ def export_branch_comparison(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
-    """Export cross-branch comparison analytics to CSV (E44; Journey J37).
+    """Export cross-branch comparison analytics to CSV/Excel (E44; Journey J37).
 
-    Returns a CSV file containing branch comparison metrics.
+    Returns a CSV or Excel file containing branch comparison metrics.
     The data is the same as GET /analytics/branch-comparison but formatted for download.
 
     **Permission**: ``ANALYTICS_CROSS_BRANCH`` (consultancy owner and super admin)
 
-    **Response**: ``text/csv`` with ``Content-Disposition: attachment``
+    **Query Parameters**:
+    - ``format``: Export format, either "csv" (default) or "excel"
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
     comparison_data = branch_comparison(
         current_user=current_user,
@@ -991,8 +1048,12 @@ def export_branch_comparison(
         }
     )
 
-    filename = "branch_comparison.csv"
-    return _write_csv_response(rows, filename)
+    if format == "excel":
+        filename = "branch_comparison.xlsx"
+        return _write_excel_response(rows, filename)
+    else:
+        filename = "branch_comparison.csv"
+        return _write_csv_response(rows, filename)
 
 
 @router.get("/platform-wide-stats/export", response_class=Response)
@@ -1003,16 +1064,20 @@ def export_platform_wide_stats(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
-    """Export platform-wide tenant stats to CSV (E44; Journey J37).
+    """Export platform-wide tenant stats to CSV/Excel (E44; Journey J37).
 
-    Returns a CSV file containing platform-wide tenant metrics.
+    Returns a CSV or Excel file containing platform-wide tenant metrics.
     The data is the same as GET /analytics/platform-wide-stats but formatted for download.
 
     **Permission**: ``SUPER_ADMIN`` only
 
-    **Response**: ``text/csv`` with ``Content-Disposition: attachment``
+    **Query Parameters**:
+    - ``format``: Export format, either "csv" (default) or "excel"
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
     stats_data = platform_wide_stats(
         current_user=current_user,
@@ -1056,5 +1121,9 @@ def export_platform_wide_stats(
         }
     )
 
-    filename = "platform_wide_stats.csv"
-    return _write_csv_response(rows, filename)
+    if format == "excel":
+        filename = "platform_wide_stats.xlsx"
+        return _write_excel_response(rows, filename)
+    else:
+        filename = "platform_wide_stats.csv"
+        return _write_csv_response(rows, filename)
