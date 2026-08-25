@@ -1,9 +1,9 @@
 """Pydantic schemas for billing endpoints (E46; Journey J39).
 
-* E46 task #223 (this ticket) owns ``CreateUpgradeOrderRequest`` and
-  ``UpgradeOrderResponse`` for the plan upgrade order creation endpoint.
-* E46 task #224 will own webhook schemas for payment confirmation.
-* E46 task #225 will own the plan change confirmation schema.
+* E46 task #223 owns ``CreateUpgradeOrderRequest`` and ``UpgradeOrderResponse``
+  for the plan upgrade order creation endpoint.
+* E46 task #224 owns webhook schemas for payment confirmation.
+* E46 task #225 owns the plan change confirmation schema.
 """
 
 from pydantic import BaseModel, Field
@@ -56,4 +56,30 @@ class UpgradeOrderResponse(BaseModel):
     plan_name: str = Field(description="Human-readable plan name")
 
 
-__all__ = ["CreateUpgradeOrderRequest", "UpgradeOrderResponse"]
+class PlanChangeResponse(BaseModel):
+    """Response for successful plan change application (E46 task #225; Journey J39).
+
+    Returned by the webhook handler after applying a plan change.
+    This is primarily for logging and webhook acknowledgment; the
+    tenant will see their updated plan on the next authenticated request.
+
+    Fields:
+    * ``tenant_id`` -- The tenant whose plan was changed.
+    * ``previous_plan_id`` -- The previous plan ID (null if tenant had no plan).
+    * ``new_plan_id`` -- The new plan ID that was applied.
+    * ``plan_code`` -- The plan tier code (starter, growth, enterprise).
+    """
+
+    tenant_id: int = Field(description="Tenant whose plan was changed")
+    previous_plan_id: int | None = Field(
+        description="Previous plan ID (null if tenant had no plan)"
+    )
+    new_plan_id: int = Field(description="New plan ID that was applied")
+    plan_code: str = Field(description="Plan tier code")
+
+
+__all__ = [
+    "CreateUpgradeOrderRequest",
+    "UpgradeOrderResponse",
+    "PlanChangeResponse",
+]

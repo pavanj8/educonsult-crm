@@ -8,6 +8,14 @@ This package contains:
 """
 
 from app.billing.config import razorpay_key_id, razorpay_key_secret
+from app.billing.plan_change import (
+    BillingError,
+    PlanChangeResult,
+    PlanInactive,
+    PlanNotFound,
+    TenantNotFound,
+    apply_plan_change,
+)
 from app.billing.razorpay_client import (
     create_order,
     get_client,
@@ -20,4 +28,10 @@ __all__ = [
     "get_client",
     "create_order",
     "verify_webhook_signature",
+    "apply_plan_change",
+    "PlanChangeResult",
+    "BillingError",
+    "TenantNotFound",
+    "PlanNotFound",
+    "PlanInactive",
 ]
