@@ -302,6 +302,10 @@ def test_webhook_verifies_signature_with_body(mock_verify, client, db_session):
 @patch("app.routers.billing.verify_webhook_signature")
 def test_webhook_returns_503_on_database_error(mock_verify, client, db_session, test_plan, enterprise_plan):
     """Webhook returns 503 when database is unavailable."""
+    from unittest.mock import MagicMock
+    from app.db.database import get_db
+    from app.main import app
+    
     mock_verify.return_value = True
 
     # Create a tenant with no plan yet
@@ -310,13 +314,17 @@ def test_webhook_returns_503_on_database_error(mock_verify, client, db_session, 
     db_session.commit()
     db_session.refresh(tenant)
 
-    # Mock the database to raise error on query
-    with patch("app.routers.billing.get_db") as mock_get_db:
-        # Create a mock session that raises error on execute
-        mock_session = MagicMock()
-        mock_session.execute.side_effect = sqlalchemy_exc.OperationalError("mock", {}, None)
-        mock_get_db.return_value = mock_session
+    # Create a mock session that raises OperationalError on execute
+    mock_session = MagicMock()
+    mock_session.execute.side_effect = sqlalchemy_exc.OperationalError("Connection failed", {}, None)
 
+    def override_get_db():
+        yield mock_session
+
+    # Override the get_db dependency
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
         payload = {
             "event": "payment.captured",
             "payload": {
@@ -335,6 +343,9 @@ def test_webhook_returns_503_on_database_error(mock_verify, client, db_session, 
         )
 
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    finally:
+        # Clean up the override
+        app.dependency_overrides = {}
         assert "temporarily unavailable" in response.json()["detail"]
 
 
