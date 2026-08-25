@@ -32,7 +32,7 @@ router = APIRouter()
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
 
 
-@router.get("/students")
+@router.get("/students/export")
 def export_student_list(
     current_user: Annotated[
         AuthenticatedUser,
@@ -177,7 +177,7 @@ def export_student_list(
         ) from None
 
 
-@router.get("/funnel")
+@router.get("/funnel/export")
 def export_conversion_funnel(
     current_user: Annotated[
         AuthenticatedUser,
