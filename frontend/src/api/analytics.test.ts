@@ -2,23 +2,17 @@
  * Tests for analytics API client (E42; Journey J35).
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { client } from './client'
+import { apiFetch } from './client'
 import { fetchBranchComparison } from './analytics'
 
 // Mock the HTTP client
 vi.mock('./client', () => ({
-  client: {
-    get: vi.fn(),
-  },
+  apiFetch: vi.fn(),
 }))
 
 describe('analytics API', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
   describe('fetchBranchComparison', () => {
     it('should fetch branch comparison data without filters', async () => {
       const mockResponse = {
@@ -38,11 +32,11 @@ describe('analytics API', () => {
         total_applications: 100,
       }
 
-      vi.mocked(client.get).mockResolvedValue(mockResponse)
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
 
       const result = await fetchBranchComparison()
 
-      expect(client.get).toHaveBeenCalledWith('/analytics/branch-comparison')
+      expect(apiFetch).toHaveBeenCalledWith('/analytics/branch-comparison')
       expect(result).toEqual(mockResponse)
     })
 
@@ -53,11 +47,11 @@ describe('analytics API', () => {
         total_applications: 0,
       }
 
-      vi.mocked(client.get).mockResolvedValue(mockResponse)
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
 
       await fetchBranchComparison({ start_date: '2024-01-01' })
 
-      expect(client.get).toHaveBeenCalledWith(
+      expect(apiFetch).toHaveBeenCalledWith(
         '/analytics/branch-comparison?start_date=2024-01-01',
       )
     })
@@ -69,11 +63,11 @@ describe('analytics API', () => {
         total_applications: 0,
       }
 
-      vi.mocked(client.get).mockResolvedValue(mockResponse)
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
 
       await fetchBranchComparison({ end_date: '2024-12-31' })
 
-      expect(client.get).toHaveBeenCalledWith(
+      expect(apiFetch).toHaveBeenCalledWith(
         '/analytics/branch-comparison?end_date=2024-12-31',
       )
     })
@@ -85,14 +79,14 @@ describe('analytics API', () => {
         total_applications: 0,
       }
 
-      vi.mocked(client.get).mockResolvedValue(mockResponse)
+      vi.mocked(apiFetch).mockResolvedValue(mockResponse)
 
       await fetchBranchComparison({
         start_date: '2024-01-01',
         end_date: '2024-12-31',
       })
 
-      expect(client.get).toHaveBeenCalledWith(
+      expect(apiFetch).toHaveBeenCalledWith(
         '/analytics/branch-comparison?start_date=2024-01-01&end_date=2024-12-31',
       )
     })

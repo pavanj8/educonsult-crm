@@ -20,10 +20,6 @@ import { useBranchComparison } from './../hooks/useBranchComparison'
 const mockUseBranchComparison = vi.mocked(useBranchComparison)
 
 describe('OwnerDashboardPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
   const renderWithRouter = (component: React.ReactElement) => {
     const routes = [
       {
@@ -40,6 +36,7 @@ describe('OwnerDashboardPage', () => {
   }
 
   it('should render loading state', () => {
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,
@@ -58,6 +55,7 @@ describe('OwnerDashboardPage', () => {
   })
 
   it('should render error state', () => {
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,
@@ -76,6 +74,7 @@ describe('OwnerDashboardPage', () => {
   })
 
   it('should render empty state', () => {
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,
@@ -94,6 +93,7 @@ describe('OwnerDashboardPage', () => {
   })
 
   it('should render branch comparison table with data', () => {
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [
         {
@@ -134,6 +134,7 @@ describe('OwnerDashboardPage', () => {
   })
 
   it('should render date filter inputs', () => {
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,
@@ -154,6 +155,7 @@ describe('OwnerDashboardPage', () => {
 
   it('should call refetch with date filters on apply', async () => {
     const refetch = vi.fn()
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,
@@ -189,6 +191,7 @@ describe('OwnerDashboardPage', () => {
 
   it('should clear date filters on clear button click', async () => {
     const refetch = vi.fn()
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,
@@ -216,6 +219,7 @@ describe('OwnerDashboardPage', () => {
 
   it('should call reload on refresh button click', async () => {
     const reload = vi.fn()
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [
         {
@@ -247,6 +251,7 @@ describe('OwnerDashboardPage', () => {
   })
 
   it('should disable clear button when no filters are set', () => {
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,
@@ -263,6 +268,7 @@ describe('OwnerDashboardPage', () => {
   })
 
   it('should enable clear button when filters are set', async () => {
+    vi.clearAllMocks()
     mockUseBranchComparison.mockReturnValue({
       branches: [],
       totalBranches: 0,

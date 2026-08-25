@@ -37,8 +37,8 @@ export async function fetchBranchComparison(
   const queryString = searchParams.toString()
   const url = `/analytics/branch-comparison${queryString ? `?${queryString}` : ''}`
 
-  const response = await client.get(url)
-  return response as BranchComparisonResponse
+  const response = await apiFetch<BranchComparisonResponse>(url)
+  return response
 }
 
 export type { BranchComparisonBucket, BranchComparisonResponse }

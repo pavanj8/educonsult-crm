@@ -9,14 +9,6 @@ import { useState } from 'react'
 import { useBranchComparison } from '../hooks/useBranchComparison'
 
 /**
- * Format an ISO date string for display.
- */
-function formatDate(iso: string): string {
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString()
-}
-
-/**
  * Owner dashboard component with branch comparison table and date filter.
  */
 export default function OwnerDashboardPage() {
