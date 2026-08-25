@@ -102,6 +102,7 @@ from app.schemas.billing import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# Order creation error messages
 _DB_UNAVAILABLE_DETAIL = "Billing service is temporarily unavailable"
 _RAZORPAY_UNAVAILABLE_DETAIL = "Payment gateway is temporarily unavailable"
 _PLAN_NOT_FOUND_DETAIL = "Plan not found"
