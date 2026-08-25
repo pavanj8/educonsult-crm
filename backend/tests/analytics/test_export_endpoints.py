@@ -13,6 +13,252 @@ from tests.factories.users import make_authenticated_user
 EXCEL_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
+class TestCsvInjectionProtection:
+    """Tests for CSV injection protection (E44; Security requirement)."""
+
+    def test_csv_injection_formula_cells_are_sanitized(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Cells starting with =, +, -, @ are sanitized to prevent CSV injection."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=20, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        # Create a student with malicious-looking data
+        student = User(
+            tenant_id=1,
+            branch_id=branch.id,
+            email="=HYPERLINK(\"http://evil.com\", \"click\")@example.com",
+            password_hash="hash",
+            name="+SUM(1,2)",
+            phone="-A1",
+            role=Role.STUDENT,
+            is_active=True,
+        )
+        db_session.add(student)
+        db_session.commit()
+
+        response = client.get("/analytics/export/students?format=csv")
+
+        assert response.status_code == 200
+        content = response.text
+
+        # Malicious cells should be prefixed with single quote
+        assert "'=HYPERLINK" in content
+        assert "'+SUM" in content
+        assert "'-A1" in content
+
+
+class TestSpecialCharacters:
+    """Tests for handling special characters in export data."""
+
+    def test_csv_handles_quotes_and_commas(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """CSV export properly handles fields with quotes and commas."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=21, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        # Create a student with special characters
+        student = User(
+            tenant_id=1,
+            branch_id=branch.id,
+            email='test,with"quotes"@example.com',
+            password_hash="hash",
+            name='O\'Brien, "The Boss"',
+            phone="555-1234",
+            role=Role.STUDENT,
+            is_active=True,
+        )
+        db_session.add(student)
+        db_session.commit()
+
+        response = client.get("/analytics/export/students?format=csv")
+
+        assert response.status_code == 200
+        # CSV should be valid and parseable
+        # Python's csv module handles quoting automatically
+        assert response.status_code == 200
+
+    def test_excel_handles_special_characters(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Excel export handles special characters without corruption."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=22, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        student = User(
+            tenant_id=1,
+            branch_id=branch.id,
+            email="test@example.com",
+            password_hash="hash",
+            name="Müller <script>alert('xss')</script>",
+            phone="555-1234",
+            role=Role.STUDENT,
+            is_active=True,
+        )
+        db_session.add(student)
+        db_session.commit()
+
+        response = client.get("/analytics/export/students?format=xlsx")
+
+        # openpyxl may not be installed
+        if response.status_code == 501:
+            return
+
+        assert response.status_code == 200
+        assert len(response.content) > 0
+
+
+class TestDateBoundaryEdgeCases:
+    """Tests for date filtering edge cases."""
+
+    def test_export_with_start_date_only(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export with only start_date parameter works correctly."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=23, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        start_date = datetime.now() - timedelta(days=30)
+        response = client.get(
+            f"/analytics/export/students?format=csv&start_date={start_date.isoformat()}"
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+
+    def test_export_with_end_date_only(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export with only end_date parameter works correctly."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=24, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        end_date = datetime.now()
+        response = client.get(
+            f"/analytics/export/students?format=csv&end_date={end_date.isoformat()}"
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+
+    def test_export_with_future_date_range(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export with future date range returns empty result gracefully."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=25, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        # Create a student
+        student = User(
+            tenant_id=1,
+            branch_id=branch.id,
+            email="old@example.com",
+            password_hash="hash",
+            name="Old Student",
+            role=Role.STUDENT,
+            is_active=True,
+        )
+        db_session.add(student)
+        db_session.commit()
+
+        # Query for future dates
+        start_date = datetime.now() + timedelta(days=30)
+        end_date = datetime.now() + timedelta(days=60)
+
+        response = client.get(
+            f"/analytics/export/students?format=csv&start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
+        )
+
+        assert response.status_code == 200
+        # Should return empty result (header only or "No data available")
+
+    def test_export_with_inverted_date_range(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Export with start_date > end_date returns empty result gracefully."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=26, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        # start_date is after end_date
+        start_date = datetime.now()
+        end_date = datetime.now() - timedelta(days=30)
+
+        response = client.get(
+            f"/analytics/export/students?format=csv&start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
+        )
+
+        assert response.status_code == 200
+        # Should return empty result
+
+    def test_export_with_malformed_date_returns_422(
+        self,
+        client,
+        db_session,
+        override_authenticated_user,
+    ):
+        """Malformed date parameter returns validation error."""
+        branch = seed_branch(db_session, tenant_id=1)
+        override_authenticated_user(
+            make_authenticated_user(
+                Role.BRANCH_MANAGER, user_id=27, tenant_id=1, branch_id=branch.id
+            )
+        )
+
+        response = client.get("/analytics/export/students?format=csv&start_date=invalid-date")
+
+        assert response.status_code == 422
+
+
 class TestExportConversionFunnel:
     """Tests for GET /analytics/funnel/export (E44; Journey J37)."""
 

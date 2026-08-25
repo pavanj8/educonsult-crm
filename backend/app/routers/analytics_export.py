@@ -23,6 +23,22 @@ router = None  # Will be included by main analytics router
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
 
 
+def _sanitize_cell_value(value: str) -> str:
+    """Sanitize cell values to prevent CSV/Excel injection attacks.
+    
+    Cells starting with =, +, -, @ are potential formula injection vectors.
+    Prefix them with a single quote to force Excel/CSV parsers to treat them
+    as literal text rather than executable formulas.
+    
+    Reference: https://owasp.org/www-community/attacks/CSV_Injection
+    """
+    if not isinstance(value, str):
+        return value
+    if value and value[0] in ("=", "+", "-", "@"):
+        return f"'{value}"
+    return value
+
+
 def export_student_list(
     current_user: Annotated[
         AuthenticatedUser,
@@ -157,24 +173,24 @@ def export_student_list(
                 ]
             )
 
-            # Write data rows
+            # Write data rows with CSV injection protection
             for row in result:
-                writer.writerow(
-                    [
-                        row.id,
-                        row.email,
-                        row.name or "",
-                        row.phone or "",
-                        str(row.date_of_birth) if row.date_of_birth else "",
-                        row.branch_name or "",
-                        row.branch_city or "",
-                        row.target_country_id or "",
-                        row.target_university_id or "",
-                        row.target_program_id or "",
-                        row.created_at.isoformat() if row.created_at else "",
-                        "Yes" if row.is_active else "No",
-                    ]
-                )
+                # Sanitize each field to prevent formula injection
+                sanitized_row = [
+                    _sanitize_cell_value(str(row.id)),
+                    _sanitize_cell_value(row.email),
+                    _sanitize_cell_value(row.name or ""),
+                    _sanitize_cell_value(row.phone or ""),
+                    _sanitize_cell_value(str(row.date_of_birth) if row.date_of_birth else ""),
+                    _sanitize_cell_value(row.branch_name or ""),
+                    _sanitize_cell_value(row.branch_city or ""),
+                    _sanitize_cell_value(str(row.target_country_id) if row.target_country_id else ""),
+                    _sanitize_cell_value(str(row.target_university_id) if row.target_university_id else ""),
+                    _sanitize_cell_value(str(row.target_program_id) if row.target_program_id else ""),
+                    _sanitize_cell_value(row.created_at.isoformat() if row.created_at else ""),
+                    _sanitize_cell_value("Yes" if row.is_active else "No"),
+                ]
+                writer.writerow(sanitized_row)
 
             # Reset pointer to beginning
             output.seek(0)
@@ -224,24 +240,23 @@ def export_student_list(
             ]
             ws.append(headers)
 
-            # Write data rows
+            # Write data rows with Excel injection protection
             for row in result:
-                ws.append(
-                    [
-                        row.id,
-                        row.email,
-                        row.name or "",
-                        row.phone or "",
-                        str(row.date_of_birth) if row.date_of_birth else "",
-                        row.branch_name or "",
-                        row.branch_city or "",
-                        row.target_country_id or "",
-                        row.target_university_id or "",
-                        row.target_program_id or "",
-                        row.created_at.isoformat() if row.created_at else "",
-                        "Yes" if row.is_active else "No",
-                    ]
-                )
+                sanitized_row = [
+                    _sanitize_cell_value(str(row.id)),
+                    _sanitize_cell_value(row.email),
+                    _sanitize_cell_value(row.name or ""),
+                    _sanitize_cell_value(row.phone or ""),
+                    _sanitize_cell_value(str(row.date_of_birth) if row.date_of_birth else ""),
+                    _sanitize_cell_value(row.branch_name or ""),
+                    _sanitize_cell_value(row.branch_city or ""),
+                    _sanitize_cell_value(str(row.target_country_id) if row.target_country_id else ""),
+                    _sanitize_cell_value(str(row.target_university_id) if row.target_university_id else ""),
+                    _sanitize_cell_value(str(row.target_program_id) if row.target_program_id else ""),
+                    _sanitize_cell_value(row.created_at.isoformat() if row.created_at else ""),
+                    _sanitize_cell_value("Yes" if row.is_active else "No"),
+                ]
+                ws.append(sanitized_row)
 
             # Save to memory
             output = io.BytesIO()

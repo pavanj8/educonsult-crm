@@ -814,8 +814,28 @@ def platform_wide_stats(
         ) from None
 
 
+def _sanitize_cell_value(value: str) -> str:
+    """Sanitize cell values to prevent CSV/Excel injection attacks.
+    
+    Cells starting with =, +, -, @ are potential formula injection vectors.
+    Prefix them with a single quote to force Excel/CSV parsers to treat them
+    as literal text rather than executable formulas.
+    
+    Reference: https://owasp.org/www-community/attacks/CSV_Injection
+    """
+    if not isinstance(value, str):
+        return value
+    if value and value[0] in ("=", "+", "-", "@"):
+        return f"'{value}"
+    return value
+
+
 def _write_csv_response(rows: list[dict], filename: str) -> Response:
-    """Helper to write CSV data to a FastAPI response with appropriate headers."""
+    """Helper to write CSV data to a FastAPI response with appropriate headers.
+    
+    Applies CSV injection protection by sanitizing cells that start with
+    formula characters (=, +, -, @).
+    """
     if not rows:
         output = StringIO()
         writer = csv.writer(output)
@@ -823,9 +843,20 @@ def _write_csv_response(rows: list[dict], filename: str) -> Response:
         csv_content = output.getvalue()
     else:
         output = StringIO()
-        writer = csv.DictWriter(output, fieldnames=rows[0].keys())
+        fieldnames = rows[0].keys()
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(rows)
+        
+        # Sanitize each row's values to prevent CSV injection
+        sanitized_rows = []
+        for row in rows:
+            sanitized_row = {
+                key: _sanitize_cell_value(str(value)) if value is not None else ""
+                for key, value in row.items()
+            }
+            sanitized_rows.append(sanitized_row)
+        
+        writer.writerows(sanitized_rows)
         csv_content = output.getvalue()
 
     return Response(
@@ -838,7 +869,12 @@ def _write_csv_response(rows: list[dict], filename: str) -> Response:
 
 
 def _write_excel_response(rows: list[dict], filename: str) -> Response:
-    """Helper to write Excel data to a FastAPI response with appropriate headers."""
+    """Helper to write Excel data to a FastAPI response with appropriate headers.
+    
+    Applies Excel injection protection by sanitizing cells that start with
+    formula characters (=, +, -, @). Uses openpyxl's automatic text handling
+    for prefixed values.
+    """
     wb = Workbook()
     ws = wb.active
 
@@ -851,9 +887,13 @@ def _write_excel_response(rows: list[dict], filename: str) -> Response:
         for cell in ws[1]:
             cell.font = Font(bold=True)
 
-        # Write data rows
+        # Write data rows with sanitization
         for row in rows:
-            ws.append([row[key] for key in headers])
+            sanitized_values = [
+                _sanitize_cell_value(str(value)) if value is not None else ""
+                for value in row.values()
+            ]
+            ws.append(sanitized_values)
 
     # Save to bytes
     from io import BytesIO
@@ -1043,12 +1083,12 @@ def export_branch_comparison(
         {
             "Branch ID": "TOTAL",
             "Branch Name": f"{comparison_data.total_branches} branches",
-            "Branch City": "",
+            "Branch City": "N/A",
             "Total Applications": comparison_data.total_applications,
-            "Enrolled": "",
-            "Rejected": "",
-            "Withdrawn": "",
-            "Active": "",
+            "Enrolled": "N/A",
+            "Rejected": "N/A",
+            "Withdrawn": "N/A",
+            "Active": "N/A",
         }
     )
 
@@ -1112,16 +1152,16 @@ def export_platform_wide_stats(
         {
             "Tenant ID": "TOTAL",
             "Tenant Name": f"{stats_data.total_tenants} tenants",
-            "Tenant Slug": "",
-            "Plan Code": "",
+            "Tenant Slug": "N/A",
+            "Plan Code": "N/A",
             "Branches Count": stats_data.total_branches,
             "Staff Count": stats_data.total_staff,
             "Students Count": stats_data.total_students,
             "Applications Count": stats_data.total_applications,
-            "Enrolled": "",
-            "Rejected": "",
-            "Withdrawn": "",
-            "Active": "",
+            "Enrolled": "N/A",
+            "Rejected": "N/A",
+            "Withdrawn": "N/A",
+            "Active": "N/A",
         }
     )
 
