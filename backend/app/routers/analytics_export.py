@@ -18,25 +18,15 @@ from app.rbac.dependencies import require_permission
 from app.rbac.permissions import Permission
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
+from app.utils.export_helpers import (
+    write_csv_response as write_csv_util,
+)
+from app.utils.export_helpers import (
+    write_excel_response as write_excel_util,
+)
 
 router = None  # Will be included by main analytics router
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
-
-
-def _sanitize_cell_value(value: str) -> str:
-    """Sanitize cell values to prevent CSV/Excel injection attacks.
-    
-    Cells starting with =, +, -, @ are potential formula injection vectors.
-    Prefix them with a single quote to force Excel/CSV parsers to treat them
-    as literal text rather than executable formulas.
-    
-    Reference: https://owasp.org/www-community/attacks/CSV_Injection
-    """
-    if not isinstance(value, str):
-        return value
-    if value and value[0] in ("=", "+", "-", "@"):
-        return f"'{value}"
-    return value
 
 
 def export_student_list(
@@ -111,8 +101,6 @@ def export_student_list(
     - filename includes ``students-`` and timestamp
     """
     try:
-        import csv
-        from io import StringIO
 
         # Build the base query with tenant scoping - filter for STUDENT role only
         statement = apply_tenant_scope(select(User), User, current_user)
@@ -150,130 +138,28 @@ def export_student_list(
 
         result = db.execute(statement).all()
 
+        # Convert query results to list of dicts for export helpers
+        rows = []
+        for row in result:
+            rows.append({
+                "Student ID": str(row.id),
+                "Email": row.email,
+                "Name": row.name or "",
+                "Phone": row.phone or "",
+                "Date of Birth": str(row.date_of_birth) if row.date_of_birth else "",
+                "Branch Name": row.branch_name or "",
+                "Branch City": row.branch_city or "",
+                "Target Country ID": str(row.target_country_id) if row.target_country_id else "",
+                "Target University ID": str(row.target_university_id) if row.target_university_id else "",
+                "Target Program ID": str(row.target_program_id) if row.target_program_id else "",
+                "Created At": row.created_at.isoformat() if row.created_at else "",
+                "Is Active": "Yes" if row.is_active else "No",
+            })
+
         if format == "csv":
-            # Generate CSV content
-            output = StringIO()
-            writer = csv.writer(output)
-
-            # Write header
-            writer.writerow(
-                [
-                    "Student ID",
-                    "Email",
-                    "Name",
-                    "Phone",
-                    "Date of Birth",
-                    "Branch Name",
-                    "Branch City",
-                    "Target Country ID",
-                    "Target University ID",
-                    "Target Program ID",
-                    "Created At",
-                    "Is Active",
-                ]
-            )
-
-            # Write data rows with CSV injection protection
-            for row in result:
-                # Sanitize each field to prevent formula injection
-                sanitized_row = [
-                    _sanitize_cell_value(str(row.id)),
-                    _sanitize_cell_value(row.email),
-                    _sanitize_cell_value(row.name or ""),
-                    _sanitize_cell_value(row.phone or ""),
-                    _sanitize_cell_value(str(row.date_of_birth) if row.date_of_birth else ""),
-                    _sanitize_cell_value(row.branch_name or ""),
-                    _sanitize_cell_value(row.branch_city or ""),
-                    _sanitize_cell_value(str(row.target_country_id) if row.target_country_id else ""),
-                    _sanitize_cell_value(str(row.target_university_id) if row.target_university_id else ""),
-                    _sanitize_cell_value(str(row.target_program_id) if row.target_program_id else ""),
-                    _sanitize_cell_value(row.created_at.isoformat() if row.created_at else ""),
-                    _sanitize_cell_value("Yes" if row.is_active else "No"),
-                ]
-                writer.writerow(sanitized_row)
-
-            # Reset pointer to beginning
-            output.seek(0)
-
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"students-{timestamp}.csv"
-
-            return StreamingResponse(
-                output,
-                media_type="text/csv",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                },
-            )
-
+            return write_csv_util(rows, "students")
         else:  # format == "xlsx"
-            import io
-
-            try:
-                from openpyxl import Workbook
-            except ImportError:
-                raise HTTPException(
-                    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                    detail="Excel export requires openpyxl library to be installed",
-                ) from None
-
-            # Create workbook and worksheet
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Students"
-
-            # Write header row
-            headers = [
-                "Student ID",
-                "Email",
-                "Name",
-                "Phone",
-                "Date of Birth",
-                "Branch Name",
-                "Branch City",
-                "Target Country ID",
-                "Target University ID",
-                "Target Program ID",
-                "Created At",
-                "Is Active",
-            ]
-            ws.append(headers)
-
-            # Write data rows with Excel injection protection
-            for row in result:
-                sanitized_row = [
-                    _sanitize_cell_value(str(row.id)),
-                    _sanitize_cell_value(row.email),
-                    _sanitize_cell_value(row.name or ""),
-                    _sanitize_cell_value(row.phone or ""),
-                    _sanitize_cell_value(str(row.date_of_birth) if row.date_of_birth else ""),
-                    _sanitize_cell_value(row.branch_name or ""),
-                    _sanitize_cell_value(row.branch_city or ""),
-                    _sanitize_cell_value(str(row.target_country_id) if row.target_country_id else ""),
-                    _sanitize_cell_value(str(row.target_university_id) if row.target_university_id else ""),
-                    _sanitize_cell_value(str(row.target_program_id) if row.target_program_id else ""),
-                    _sanitize_cell_value(row.created_at.isoformat() if row.created_at else ""),
-                    _sanitize_cell_value("Yes" if row.is_active else "No"),
-                ]
-                ws.append(sanitized_row)
-
-            # Save to memory
-            output = io.BytesIO()
-            wb.save(output)
-            output.seek(0)
-
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"students-{timestamp}.xlsx"
-
-            return StreamingResponse(
-                output,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                },
-            )
+            return write_excel_util(rows, "students", sheet_title="Students")
 
     except (TenantScopeError, BranchScopeError):
         raise HTTPException(

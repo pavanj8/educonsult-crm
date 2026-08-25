@@ -281,7 +281,9 @@ class TestExportConversionFunnel:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="conversion_funnel.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: conversion_funnel-YYYYMMDD_HHMMSS.csv
+        assert "conversion_funnel" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]
 
     def test_export_funnel_csv_content(
         self,
@@ -403,7 +405,9 @@ class TestExportConversionFunnel:
         assert response.status_code == 200
         assert response.headers["content-type"] == EXCEL_MIME_TYPE
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="conversion_funnel.xlsx"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: conversion_funnel-YYYYMMDD_HHMMSS.xlsx
+        assert "conversion_funnel" in response.headers["Content-Disposition"]
+        assert ".xlsx" in response.headers["Content-Disposition"]
         # Excel files should have binary content (not empty text)
         assert len(response.content) > 0
 
@@ -425,7 +429,9 @@ class TestExportConversionFunnel:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
-        assert 'attachment; filename="conversion_funnel.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: conversion_funnel-YYYYMMDD_HHMMSS.csv
+        assert "conversion_funnel" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]
 
 
 class TestExportRegistrationsOverTime:
@@ -450,7 +456,9 @@ class TestExportRegistrationsOverTime:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="registrations_over_time.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: registrations_over_time-YYYYMMDD_HHMMSS.csv
+        assert "registrations_over_time" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]
 
     def test_export_registrations_csv_content(
         self,
@@ -530,7 +538,9 @@ class TestExportRegistrationsOverTime:
         assert response.status_code == 200
         assert response.headers["content-type"] == EXCEL_MIME_TYPE
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="registrations_over_time.xlsx"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: registrations_over_time-YYYYMMDD_HHMMSS.xlsx
+        assert "registrations_over_time" in response.headers["Content-Disposition"]
+        assert ".xlsx" in response.headers["Content-Disposition"]
         assert len(response.content) > 0
 
     def test_export_registrations_default_format_is_csv(
@@ -551,7 +561,9 @@ class TestExportRegistrationsOverTime:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
-        assert 'attachment; filename="registrations_over_time.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: registrations_over_time-YYYYMMDD_HHMMSS.csv
+        assert "registrations_over_time" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]
 
 
 class TestExportBranchComparison:
@@ -573,7 +585,9 @@ class TestExportBranchComparison:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="branch_comparison.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: branch_comparison-YYYYMMDD_HHMMSS.csv
+        assert "branch_comparison" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]
 
     def test_export_branch_comparison_csv_content(
         self,
@@ -694,7 +708,9 @@ class TestExportBranchComparison:
         assert response.status_code == 200
         assert response.headers["content-type"] == EXCEL_MIME_TYPE
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="branch_comparison.xlsx"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: branch_comparison-YYYYMMDD_HHMMSS.xlsx
+        assert "branch_comparison" in response.headers["Content-Disposition"]
+        assert ".xlsx" in response.headers["Content-Disposition"]
         assert len(response.content) > 0
 
     def test_export_branch_comparison_default_format_is_csv(
@@ -712,7 +728,9 @@ class TestExportBranchComparison:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
-        assert 'attachment; filename="branch_comparison.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: branch_comparison-YYYYMMDD_HHMMSS.csv
+        assert "branch_comparison" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]
 
 
 class TestExportPlatformWideStats:
@@ -734,7 +752,9 @@ class TestExportPlatformWideStats:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="platform_wide_stats.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: platform_wide_stats-YYYYMMDD_HHMMSS.csv
+        assert "platform_wide_stats" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]
 
     def test_export_platform_wide_stats_csv_content(
         self,
@@ -831,7 +851,9 @@ class TestExportPlatformWideStats:
         assert response.status_code == 200
         assert response.headers["content-type"] == EXCEL_MIME_TYPE
         assert "Content-Disposition" in response.headers
-        assert 'attachment; filename="platform_wide_stats.xlsx"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: platform_wide_stats-YYYYMMDD_HHMMSS.xlsx
+        assert "platform_wide_stats" in response.headers["Content-Disposition"]
+        assert ".xlsx" in response.headers["Content-Disposition"]
         assert len(response.content) > 0
 
     def test_export_platform_wide_stats_default_format_is_csv(
@@ -849,4 +871,6 @@ class TestExportPlatformWideStats:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
-        assert 'attachment; filename="platform_wide_stats.csv"' in response.headers["Content-Disposition"]
+        # Filename includes timestamp: platform_wide_stats-YYYYMMDD_HHMMSS.csv
+        assert "platform_wide_stats" in response.headers["Content-Disposition"]
+        assert ".csv" in response.headers["Content-Disposition"]

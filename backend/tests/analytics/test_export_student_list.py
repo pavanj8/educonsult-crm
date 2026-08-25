@@ -546,11 +546,9 @@ class TestExportStudentList:
 
         assert response.status_code == 200
         content = response.text
-        lines = content.strip().split("\n")
 
-        # Should have only the header row
-        assert len(lines) == 1
-        assert "Student ID" in lines[0]
+        # Empty exports show "No data available" message
+        assert "No data available" in content
 
     def test_export_orders_by_creation_date_descending(
         self,

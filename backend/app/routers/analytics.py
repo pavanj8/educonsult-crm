@@ -1,13 +1,9 @@
 """Analytics routes (E41, E42, E44; Journey J34, J35, J37)."""
 
-import csv
 from datetime import datetime
-from io import StringIO
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from openpyxl import Workbook
-from openpyxl.styles import Font
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -34,6 +30,10 @@ from app.schemas.analytics import (
     RegistrationsOverTimeBucket,
     RegistrationsOverTimeResponse,
     TenantStatsBucket,
+)
+from app.utils.export_helpers import (
+    write_csv_response,
+    write_excel_response,
 )
 
 router = APIRouter()
@@ -814,104 +814,6 @@ def platform_wide_stats(
         ) from None
 
 
-def _sanitize_cell_value(value: str) -> str:
-    """Sanitize cell values to prevent CSV/Excel injection attacks.
-    
-    Cells starting with =, +, -, @ are potential formula injection vectors.
-    Prefix them with a single quote to force Excel/CSV parsers to treat them
-    as literal text rather than executable formulas.
-    
-    Reference: https://owasp.org/www-community/attacks/CSV_Injection
-    """
-    if not isinstance(value, str):
-        return value
-    if value and value[0] in ("=", "+", "-", "@"):
-        return f"'{value}"
-    return value
-
-
-def _write_csv_response(rows: list[dict], filename: str) -> Response:
-    """Helper to write CSV data to a FastAPI response with appropriate headers.
-    
-    Applies CSV injection protection by sanitizing cells that start with
-    formula characters (=, +, -, @).
-    """
-    if not rows:
-        output = StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["No data available"])
-        csv_content = output.getvalue()
-    else:
-        output = StringIO()
-        fieldnames = rows[0].keys()
-        writer = csv.DictWriter(output, fieldnames=fieldnames)
-        writer.writeheader()
-        
-        # Sanitize each row's values to prevent CSV injection
-        sanitized_rows = []
-        for row in rows:
-            sanitized_row = {
-                key: _sanitize_cell_value(str(value)) if value is not None else ""
-                for key, value in row.items()
-            }
-            sanitized_rows.append(sanitized_row)
-        
-        writer.writerows(sanitized_rows)
-        csv_content = output.getvalue()
-
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        },
-    )
-
-
-def _write_excel_response(rows: list[dict], filename: str) -> Response:
-    """Helper to write Excel data to a FastAPI response with appropriate headers.
-    
-    Applies Excel injection protection by sanitizing cells that start with
-    formula characters (=, +, -, @). Uses openpyxl's automatic text handling
-    for prefixed values.
-    """
-    wb = Workbook()
-    ws = wb.active
-
-    if not rows:
-        ws.append(["No data available"])
-    else:
-        # Write header row with bold font
-        headers = list(rows[0].keys())
-        ws.append(headers)
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
-
-        # Write data rows with sanitization
-        for row in rows:
-            sanitized_values = [
-                _sanitize_cell_value(str(value)) if value is not None else ""
-                for value in row.values()
-            ]
-            ws.append(sanitized_values)
-
-    # Save to bytes
-    from io import BytesIO
-
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    excel_content = output.getvalue()
-
-    return Response(
-        content=excel_content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        },
-    )
-
-
 @router.get("/funnel/export", response_class=Response)
 def export_conversion_funnel(
     current_user: Annotated[
@@ -964,11 +866,9 @@ def export_conversion_funnel(
     )
 
     if format == "excel":
-        filename = "conversion_funnel.xlsx"
-        return _write_excel_response(rows, filename)
+        return write_excel_response(rows, "conversion_funnel")
     else:
-        filename = "conversion_funnel.csv"
-        return _write_csv_response(rows, filename)
+        return write_csv_response(rows, "conversion_funnel")
 
 
 @router.get("/registrations/export", response_class=Response)
@@ -1023,11 +923,9 @@ def export_registrations_over_time(
     )
 
     if format == "excel":
-        filename = "registrations_over_time.xlsx"
-        return _write_excel_response(rows, filename)
+        return write_excel_response(rows, "registrations_over_time")
     else:
-        filename = "registrations_over_time.csv"
-        return _write_csv_response(rows, filename)
+        return write_csv_response(rows, "registrations_over_time")
 
 
 @router.get("/branch-comparison/export", response_class=Response)
@@ -1093,11 +991,9 @@ def export_branch_comparison(
     )
 
     if format == "excel":
-        filename = "branch_comparison.xlsx"
-        return _write_excel_response(rows, filename)
+        return write_excel_response(rows, "branch_comparison")
     else:
-        filename = "branch_comparison.csv"
-        return _write_csv_response(rows, filename)
+        return write_csv_response(rows, "branch_comparison")
 
 
 @router.get("/platform-wide-stats/export", response_class=Response)
@@ -1166,8 +1062,6 @@ def export_platform_wide_stats(
     )
 
     if format == "excel":
-        filename = "platform_wide_stats.xlsx"
-        return _write_excel_response(rows, filename)
+        return write_excel_response(rows, "platform_wide_stats")
     else:
-        filename = "platform_wide_stats.csv"
-        return _write_csv_response(rows, filename)
+        return write_csv_response(rows, "platform_wide_stats")
