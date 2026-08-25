@@ -230,3 +230,51 @@ class TenantBrandingUpdateRequest(BaseModel):
             return normalize_currency_code(candidate)
         except InvalidCurrencyCodeError as exc:
             raise ValueError(str(exc)) from exc
+
+
+class UsageSummary(BaseModel):
+    """Current usage counts for a tenant's resources (E45; Journey J38).
+
+    Surface the actual counts of branches, staff, and students used by
+    a tenant. The owner plan-usage page consumes this to render
+    progress bars against the plan's caps.
+
+    All counts are non-negative integers. The ``unlimited`` flag on
+    each resource indicates whether the plan has ``NULL`` for that
+    cap (Enterprise tier) -- the owner UI should show "Unlimited"
+    instead of a number.
+    """
+
+    branches_used: int = Field(ge=0, description="Current number of branches")
+    branches_limit: int | None = Field(
+        default=None, description="Plan cap for branches (null = unlimited)"
+    )
+    staff_used: int = Field(ge=0, description="Current number of staff accounts")
+    staff_limit: int | None = Field(
+        default=None, description="Plan cap for staff (null = unlimited)"
+    )
+    students_used: int = Field(ge=0, description="Current number of student accounts")
+    students_limit: int | None = Field(
+        default=None, description="Plan cap for students (null = unlimited)"
+    )
+
+
+class PlanAndUsageResponse(BaseModel):
+    """Combined plan and current usage summary for a tenant (E45; Journey J38).
+
+    Returned by ``GET /tenants/me/plan-usage`` for a consultancy owner
+    to view their current subscription tier and how many of the plan's
+    resources they are consuming.
+
+    Fields:
+    * ``plan`` -- the tenant's assigned plan row, or ``None`` if no
+      plan has been assigned yet (the owner UI should prompt the owner
+      to contact the platform in this case).
+    * ``usage`` -- the actual counts of branches/staff/students used
+      by the tenant, compared against the plan's limits.
+    """
+
+    plan: PlanResponse | None = Field(
+        default=None, description="The tenant's assigned subscription plan"
+    )
+    usage: UsageSummary = Field(description="Current usage counts against plan caps")

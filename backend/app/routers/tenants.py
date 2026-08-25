@@ -1,10 +1,10 @@
-"""Tenant management routes (E8; Journey J1; E10 logo upload + branding PATCH; E9 plan assignment)."""
+"""Tenant management routes (E8; Journey J1; E10 logo upload + branding PATCH; E9 plan assignment; E45 plan & usage view)."""
 
 import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, selectinload
 
@@ -21,10 +21,12 @@ from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
 from app.schemas.tenant import (
     AssignPlanRequest,
+    PlanAndUsageResponse,
     PlanResponse,
     TenantBrandingUpdateRequest,
     TenantCreateRequest,
     TenantResponse,
+    UsageSummary,
 )
 from app.storage import (
     LOGO_FILE_TOO_LARGE_DETAIL,
@@ -631,6 +633,162 @@ def assign_tenant_plan(
         .one()
     )
     return refreshed
+
+
+@router.get("/me/plan-usage", response_model=PlanAndUsageResponse)
+def get_my_plan_and_usage(
+    current_user: Annotated[
+        AuthenticatedUser, Depends(require_permission(Permission.BILLING_READ_OWN))
+    ],
+    db: Session = Depends(get_db),
+) -> dict[str, Plan | None, dict]:
+    """Return the current owner's tenant plan and usage summary (E45; Journey J38).
+
+    Consultancy owner only (``billing:read_own`` permission). The endpoint:
+
+    1. Validates the caller has a ``tenant_id`` set (owners always do;
+       the permission check rejects students and other roles).
+    2. Loads the tenant's assigned plan via ``Tenant.plan_id`` (returns
+       ``None`` if the tenant has no plan yet -- the owner UI should
+       prompt the owner to contact the platform).
+    3. Counts the tenant's current usage of branches, staff, and students
+       (the same counts used by the E9 task #107 enforcement layer).
+    4. Returns both the plan details and the current usage summary in
+       a single response.
+
+    Why ``/me/plan-usage`` and not ``/tenants/{id}/plan-usage``
+    -----------------------------------------------------------
+    Journey J38 is explicitly "Consultancy Owner views current plan &
+    usage" -- the actor is the owner viewing their *own* tenant's
+    state, not an admin viewing another tenant. The ``/me`` prefix
+    makes the self-only nature explicit and avoids exposing a
+    cross-tenant enumeration surface. Super admins already have the
+    platform-wide billing status overview (E47, J40) for
+    cross-tenant visibility.
+
+    Errors
+    ------
+    * 401 -- caller is not authenticated.
+    * 403 -- caller lacks ``billing:read_own`` (granted only to
+      ``CONSULTANCY_OWNER``).
+    * 503 -- database is unavailable.
+
+    Traceability
+    ------------
+    * Requirements §4 (Billing & Subscription: 3 tiers).
+    * Journey J38 (Consultancy Owner views current plan & usage).
+    * Epic E45 (Owner Plan & Usage View); this endpoint is the backend half.
+    """
+    from app.models.branch import Branch
+    from app.models.user import User
+
+    if current_user.tenant_id is None:
+        # A CONSULTANCY_OWNER should never have a NULL tenant_id (the
+        # create-tenant endpoint sets it), but we guard defensively --
+        # this is a billing surface, so a missing tenant association
+        # is a hard 500 class error, not a soft 404.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    # Load the tenant with its plan relationship in one query.
+    try:
+        tenant = (
+            db.query(Tenant)
+            .options(selectinload(Tenant.plan))
+            .filter(Tenant.id == current_user.tenant_id)
+            .one()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    # Count branches for this tenant.
+    try:
+        branches_used = (
+            db.execute(
+                select(func.count())
+                .select_from(Branch)
+                .where(Branch.tenant_id == current_user.tenant_id)
+            )
+            .scalar_one()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    # Count staff (all non-student roles) for this tenant.
+    try:
+        staff_used = (
+            db.execute(
+                select(func.count())
+                .select_from(User)
+                .where(
+                    User.tenant_id == current_user.tenant_id,
+                    User.role.in_(
+                        (
+                            "branch_manager",
+                            "counselor",
+                            "document_verifier",
+                            "visa_processor",
+                            "receptionist",
+                        )
+                    ),
+                )
+            )
+            .scalar_one()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    # Count students for this tenant.
+    try:
+        students_used = (
+            db.execute(
+                select(func.count())
+                .select_from(User)
+                .where(
+                    User.tenant_id == current_user.tenant_id,
+                    User.role == "student",
+                )
+            )
+            .scalar_one()
+        )
+    except OperationalError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_DB_UNAVAILABLE_DETAIL,
+        ) from None
+
+    # Extract the plan limits (or None if no plan / unlimited).
+    plan = tenant.plan
+    if plan is not None:
+        branches_limit = plan.max_branches
+        staff_limit = plan.max_staff
+        students_limit = plan.max_students
+    else:
+        branches_limit = None
+        staff_limit = None
+        students_limit = None
+
+    usage = UsageSummary(
+        branches_used=int(branches_used),
+        branches_limit=branches_limit,
+        staff_used=int(staff_used),
+        staff_limit=staff_limit,
+        students_used=int(students_used),
+        students_limit=students_limit,
+    )
+
+    return {"plan": plan, "usage": usage}
 
 
 __all__ = ["router"]
