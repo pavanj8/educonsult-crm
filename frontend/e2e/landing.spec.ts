@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Landing Page CTA Buttons', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/landing')
   })
 
   test('hero section CTA buttons navigate to correct routes', async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe('Landing Page CTA Buttons', () => {
     await expect(page.getByRole('heading', { name: /create student account/i })).toBeVisible()
 
     // Go back to landing page
-    await page.goto('/')
+    await page.goto('/landing')
 
     // "Log In" button should navigate to /login
     await page.getByRole('link', { name: 'Log In' }).click()
@@ -35,7 +35,7 @@ test.describe('Landing Page CTA Buttons', () => {
     await expect(page.getByRole('heading', { name: /create student account/i })).toBeVisible()
 
     // Go back to landing page
-    await page.goto('/')
+    await page.goto('/landing')
 
     // Scroll to CTA section again
     await page.getByRole('heading', { name: 'Ready to Transform Your Consultancy?' }).scrollIntoViewIfNeeded()
@@ -72,7 +72,7 @@ test.describe('Landing Page CTA Buttons', () => {
 
 test.describe('Landing Page Accessibility', () => {
   test('has proper heading structure and aria labels', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/landing')
 
     // Hero section has proper aria-labelledby
     const heroSection = page.locator('[aria-labelledby="hero-heading"]')

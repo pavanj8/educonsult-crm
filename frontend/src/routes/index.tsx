@@ -68,7 +68,7 @@ export function AppRoutes() {
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="app" element={<HomePage />} />
+          <Route path="/" element={<HomePage />} />
           <Route element={<SuperAdminRoute />}>
             <Route path="tenants" element={<TenantsPage />} />
             <Route
