@@ -19,6 +19,7 @@ import VerifierDashboardPage from '../pages/VerifierDashboardPage'
 import VisaProcessorDashboardPage from '../pages/VisaProcessorDashboardPage'
 import CounselorDashboardPage from '../pages/CounselorDashboardPage'
 import BranchManagerDashboardPage from '../pages/BranchManagerDashboardPage'
+import SuperAdminDashboardPage from '../pages/SuperAdminDashboardPage'
 import ChecklistTemplateAdminRoute from './ChecklistTemplateAdminRoute'
 import ConsultancyOwnerRoute from './ConsultancyOwnerRoute'
 import CounselorRoute from './CounselorRoute'
@@ -43,6 +44,7 @@ import {
   VERIFIER_DASHBOARD_PATH,
   VISA_DASHBOARD_PATH,
   BRANCH_MANAGER_DASHBOARD_PATH,
+  SUPER_ADMIN_DASHBOARD_PATH,
 } from './paths'
 
 export function AppRoutes() {
@@ -57,6 +59,10 @@ export function AppRoutes() {
           <Route index element={<HomePage />} />
           <Route element={<SuperAdminRoute />}>
             <Route path="tenants" element={<TenantsPage />} />
+            <Route
+              path={SUPER_ADMIN_DASHBOARD_PATH.slice(1)}
+              element={<SuperAdminDashboardPage />}
+            />
           </Route>
           <Route element={<ConsultancyOwnerRoute />}>
             <Route path="branches" element={<BranchesPage />} />

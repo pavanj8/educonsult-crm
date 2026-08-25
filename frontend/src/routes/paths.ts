@@ -38,3 +38,6 @@ export const TENANT_BRANDING_PATH = '/branding'
 
 /** Branch manager analytics dashboard (E41; Journey J34). */
 export const BRANCH_MANAGER_DASHBOARD_PATH = '/analytics'
+
+/** Super admin platform-wide stats dashboard (E43; Journey J36). */
+export const SUPER_ADMIN_DASHBOARD_PATH = '/admin/analytics'
