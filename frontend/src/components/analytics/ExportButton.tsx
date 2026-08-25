@@ -94,8 +94,14 @@ export function ExportButton({
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Export failed' }))
-        throw new Error(errorData.detail || 'Export failed')
+        // Show user-friendly error message instead of raw backend errors
+        if (response.status === 404) {
+          throw new Error('Export is temporarily unavailable. Please contact support if the problem persists.')
+        } else if (response.status === 403) {
+          throw new Error('You do not have permission to export this data.')
+        } else {
+          throw new Error('Export is temporarily unavailable. Please contact support if the problem persists.')
+        }
       }
 
       // Get filename from Content-Disposition header or generate one

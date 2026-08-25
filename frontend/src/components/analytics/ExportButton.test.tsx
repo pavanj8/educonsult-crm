@@ -175,18 +175,18 @@ describe('ExportButton', () => {
     })
   })
 
-  it('shows error message on export failure', async () => {
+  it('shows user-friendly error message on 404 export failure', async () => {
     const user = userEvent.setup()
 
     globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: false,
-        status: 400,
-        statusText: 'Bad Request',
+        status: 404,
+        statusText: 'Not Found',
         headers: {
           get: () => null,
         },
-        json: () => Promise.resolve({ detail: 'Export failed: insufficient permissions' }),
+        json: () => Promise.resolve({ detail: 'Not Found' }),
       } as unknown as Response),
     ) as any
 
@@ -200,10 +200,44 @@ describe('ExportButton', () => {
     await user.click(button)
 
     await waitFor(() => {
-      expect(screen.getByText('Export failed: insufficient permissions')).toBeInTheDocument()
+      expect(screen.getByText('Export is temporarily unavailable. Please contact support if the problem persists.')).toBeInTheDocument()
     })
 
-    // Error should clear after 5 seconds (testing that it appears at least)
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+
+    createElementSpy2.mockRestore()
+    appendChildSpy2.mockRestore()
+    removeChildSpy2.mockRestore()
+  })
+
+  it('shows user-friendly error message on 403 permission denied', async () => {
+    const user = userEvent.setup()
+
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        headers: {
+          get: () => null,
+        },
+        json: () => Promise.resolve({ detail: 'Forbidden' }),
+      } as unknown as Response),
+    ) as any
+
+    const createElementSpy2 = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any)
+    const appendChildSpy2 = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any)
+    const removeChildSpy2 = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any)
+
+    render(<ExportButton endpoint="/analytics/export/students" format="csv" />)
+
+    const button = screen.getByRole('button', { name: 'Export CSV' })
+    await user.click(button)
+
+    await waitFor(() => {
+      expect(screen.getByText('You do not have permission to export this data.')).toBeInTheDocument()
+    })
+
     expect(screen.getByRole('alert')).toBeInTheDocument()
 
     createElementSpy2.mockRestore()

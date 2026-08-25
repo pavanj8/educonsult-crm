@@ -20,7 +20,13 @@ from app.pipeline.stages import PipelineStage
 from app.rbac.dependencies import require_role
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
-from app.routers.analytics_export import export_student_list
+from app.routers.analytics_export import (
+    export_branch_comparison,
+    export_conversion_funnel,
+    export_platform_stats,
+    export_registrations_over_time,
+    export_student_list,
+)
 from app.schemas.analytics import (
     BranchComparisonBucket,
     BranchComparisonResponse,
@@ -36,8 +42,12 @@ router = APIRouter()
 
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
 
-# Add export endpoint
+# Add export endpoints
 router.add_api_route("/export/students", export_student_list, methods=["GET"])
+router.add_api_route("/export/funnel", export_conversion_funnel, methods=["GET"])
+router.add_api_route("/export/registrations", export_registrations_over_time, methods=["GET"])
+router.add_api_route("/export/branch-comparison", export_branch_comparison, methods=["GET"])
+router.add_api_route("/export/platform-stats", export_platform_stats, methods=["GET"])
 
 
 @router.get("/funnel", response_model=ConversionFunnelResponse)
