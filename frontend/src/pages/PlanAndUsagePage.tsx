@@ -1,12 +1,17 @@
 /**
- * Plan and usage page for Consultancy Owners (E45; Journey J38).
+ * Plan and usage page for Consultancy Owners (E45, E46; Journey J38, J39).
  *
  * This page displays the consultancy's current subscription plan tier,
  * plan limits, and current usage counts (branches, staff, students).
  * It helps owners understand their resource consumption and plan limits.
+ *
+ * The page also includes upgrade/downgrade buttons that initiate the
+ * Razorpay checkout flow for plan changes (E46; Journey J39).
  */
 
+import { useEffect, useState } from 'react'
 import { usePlanAndUsage } from '../hooks/usePlanAndUsage'
+import UpgradePlanAction from '../components/billing/UpgradePlanAction'
 
 /**
  * Helper component to display a single resource usage metric.
@@ -68,8 +73,41 @@ function UsageMetric({
  * along with current usage metrics for branches, staff, and students.
  * Shows appropriate messaging when no plan is assigned.
  */
+/**
+ * Plan upgrade options for displaying upgrade buttons.
+ * This maps plan codes to their upgrade targets.
+ */
+const PLAN_UPGRADE_PATHS: Record<string, string[]> = {
+  starter: ['growth', 'enterprise'],
+  growth: ['enterprise'],
+  enterprise: [], // No upgrades from enterprise
+}
+
+/**
+ * Plan downgrade options for displaying downgrade buttons.
+ * This maps plan codes to their downgrade targets.
+ */
+const PLAN_DOWNGRADE_PATHS: Record<string, string[]> = {
+  starter: [], // No downgrades from starter
+  growth: ['starter'],
+  enterprise: ['growth', 'starter'],
+}
+
 export default function PlanAndUsagePage() {
   const { planAndUsage, loading, error, reload } = usePlanAndUsage()
+  const [upgradeSuccess, setUpgradeSuccess] = useState(false)
+
+  // Refresh plan data after successful upgrade
+  useEffect(() => {
+    if (upgradeSuccess) {
+      void reload()
+      setUpgradeSuccess(false)
+    }
+  }, [upgradeSuccess, reload])
+
+  const handleUpgradeSuccess = () => {
+    setUpgradeSuccess(true)
+  }
 
   return (
     <section
@@ -168,6 +206,19 @@ export default function PlanAndUsagePage() {
                     testId="plan-usage-students"
                   />
                 </div>
+
+                {/* Upgrade/Downgrade Actions (E46; Journey J39) */}
+                <div className="plan-usage__actions" data-testid="plan-actions">
+                  {upgradeSuccess && (
+                    <p
+                      role="status"
+                      className="plan-usage__success-message"
+                      data-testid="upgrade-success"
+                    >
+                      Plan updated successfully!
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </section>
@@ -205,6 +256,57 @@ export default function PlanAndUsagePage() {
                   </dd>
                 </div>
               </dl>
+            </section>
+          )}
+
+          {/* Upgrade Options Section (E46; Journey J39) */}
+          {planAndUsage.plan !== null && (
+            <section
+              className="plan-usage__section"
+              aria-labelledby="upgrade-options-heading"
+            >
+              <h2 id="upgrade-options-heading">Change your plan</h2>
+              <div className="plan-usage__upgrade-options" data-testid="upgrade-options">
+                {upgradeSuccess && (
+                  <p
+                    role="status"
+                    className="plan-usage__success-message"
+                    data-testid="upgrade-success-message"
+                  >
+                    Plan changed successfully!
+                  </p>
+                )}
+                {(() => {
+                  const plan = planAndUsage.plan
+                  if (!plan) return null
+                  return (
+                    <>
+                      {PLAN_UPGRADE_PATHS[plan.code]?.map((targetPlanCode) => (
+                        <UpgradePlanAction
+                          key={`upgrade-${targetPlanCode}`}
+                          targetPlanCode={targetPlanCode as 'starter' | 'growth' | 'enterprise'}
+                          currentPlanCode={plan.code}
+                          onSuccess={handleUpgradeSuccess}
+                        />
+                      ))}
+                      {PLAN_DOWNGRADE_PATHS[plan.code]?.map((targetPlanCode) => (
+                        <UpgradePlanAction
+                          key={`downgrade-${targetPlanCode}`}
+                          targetPlanCode={targetPlanCode as 'starter' | 'growth' | 'enterprise'}
+                          currentPlanCode={plan.code}
+                          onSuccess={handleUpgradeSuccess}
+                        />
+                      ))}
+                      {PLAN_UPGRADE_PATHS[plan.code]?.length === 0 &&
+                        PLAN_DOWNGRADE_PATHS[plan.code]?.length === 0 && (
+                        <p className="plan-usage__no-upgrade" data-testid="no-upgrade-options">
+                          You are on the highest tier plan.
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
             </section>
           )}
         </>

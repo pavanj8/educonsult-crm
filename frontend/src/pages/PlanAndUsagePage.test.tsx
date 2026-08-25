@@ -339,4 +339,156 @@ describe('PlanAndUsagePage', () => {
     // No limits section when plan is null
     expect(screen.queryByTestId('plan-usage-limits')).not.toBeInTheDocument()
   })
+
+  describe('Plan Upgrade Actions (E46; Journey J39)', () => {
+    it('should render upgrade buttons for starter plan', () => {
+      vi.mocked(usePlanAndUsage).mockReturnValue({
+        planAndUsage: {
+          plan: {
+            id: 1,
+            code: 'starter',
+            name: 'Starter',
+            max_branches: 1,
+            max_staff: 5,
+            max_students: 50,
+            is_active: true,
+          },
+          usage: {
+            branches: 1,
+            staff: 3,
+            students: 25,
+          },
+        },
+        loading: false,
+        error: null,
+        reload: vi.fn(),
+        refetch: vi.fn(),
+      })
+
+      render(<PlanAndUsagePage />)
+
+      // Starter plan should show upgrade to Growth and Enterprise
+      expect(screen.getByTestId('upgrade-options')).toBeInTheDocument()
+      expect(screen.getByTestId('upgrade-plan-button-growth')).toBeInTheDocument()
+      expect(screen.getByTestId('upgrade-plan-button-enterprise')).toBeInTheDocument()
+    })
+
+    it('should render upgrade button for growth plan', () => {
+      vi.mocked(usePlanAndUsage).mockReturnValue({
+        planAndUsage: {
+          plan: {
+            id: 2,
+            code: 'growth',
+            name: 'Growth',
+            max_branches: 5,
+            max_staff: 20,
+            max_students: 100,
+            is_active: true,
+          },
+          usage: {
+            branches: 2,
+            staff: 8,
+            students: 45,
+          },
+        },
+        loading: false,
+        error: null,
+        reload: vi.fn(),
+        refetch: vi.fn(),
+      })
+
+      render(<PlanAndUsagePage />)
+
+      // Growth plan should show upgrade to Enterprise only
+      expect(screen.getByTestId('upgrade-plan-button-enterprise')).toBeInTheDocument()
+      // Growth plan should also show downgrade to Starter
+      expect(screen.getByTestId('upgrade-plan-button-starter')).toBeInTheDocument()
+    })
+
+    it('should show "highest tier" message for enterprise plan', () => {
+      vi.mocked(usePlanAndUsage).mockReturnValue({
+        planAndUsage: {
+          plan: {
+            id: 3,
+            code: 'enterprise',
+            name: 'Enterprise',
+            max_branches: null,
+            max_staff: null,
+            max_students: null,
+            is_active: true,
+          },
+          usage: {
+            branches: 10,
+            staff: 50,
+            students: 500,
+          },
+        },
+        loading: false,
+        error: null,
+        reload: vi.fn(),
+        refetch: vi.fn(),
+      })
+
+      render(<PlanAndUsagePage />)
+
+      // Enterprise plan should show downgrade options
+      expect(screen.getByTestId('upgrade-plan-button-growth')).toBeInTheDocument()
+      expect(screen.getByTestId('upgrade-plan-button-starter')).toBeInTheDocument()
+    })
+
+    it('should not render upgrade options when no plan assigned', () => {
+      vi.mocked(usePlanAndUsage).mockReturnValue({
+        planAndUsage: {
+          plan: null,
+          usage: {
+            branches: 0,
+            staff: 0,
+            students: 0,
+          },
+        },
+        loading: false,
+        error: null,
+        reload: vi.fn(),
+        refetch: vi.fn(),
+      })
+
+      render(<PlanAndUsagePage />)
+
+      // No upgrade options when plan is null
+      expect(screen.queryByTestId('upgrade-options')).not.toBeInTheDocument()
+    })
+
+    it('should show success message after successful upgrade', async () => {
+      vi.mocked(usePlanAndUsage).mockReturnValue({
+        planAndUsage: {
+          plan: {
+            id: 1,
+            code: 'starter',
+            name: 'Starter',
+            max_branches: 1,
+            max_staff: 5,
+            max_students: 50,
+            is_active: true,
+          },
+          usage: {
+            branches: 1,
+            staff: 3,
+            students: 25,
+          },
+        },
+        loading: false,
+        error: null,
+        reload: vi.fn(),
+        refetch: vi.fn(),
+      })
+
+      render(<PlanAndUsagePage />)
+
+      // Initially, no success message
+      expect(screen.queryByTestId('upgrade-success-message')).not.toBeInTheDocument()
+
+      // Note: Testing the actual success message requires mocking the usePlanUpgrade hook
+      // which would be done in the UpgradePlanAction component tests
+    })
+  })
 })

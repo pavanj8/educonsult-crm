@@ -52,6 +52,9 @@ class UpgradeOrderResponse(BaseModel):
       Echoed back from the request for confirmation.
     * ``plan_name`` -- Human-readable plan name for display on the checkout
       confirmation screen.
+    * ``razorpay_key_id`` -- Razorpay key ID for checkout initialization.
+      Served by the backend to keep the key server-controlled and secure
+      (test vs live mode selection based on server configuration).
     """
 
     order_id: str = Field(description="Razorpay order ID for checkout")
@@ -59,6 +62,7 @@ class UpgradeOrderResponse(BaseModel):
     currency: str = Field(description="ISO 4217 currency code")
     plan_code: str = Field(description="Target plan tier code")
     plan_name: str = Field(description="Human-readable plan name")
+    razorpay_key_id: str = Field(description="Razorpay key ID for checkout initialization")
 
 
 class PlanChangeResponse(BaseModel):
