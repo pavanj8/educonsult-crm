@@ -36,5 +36,8 @@ export const CHECKLIST_TEMPLATES_PATH = '/checklist-templates'
  */
 export const TENANT_BRANDING_PATH = '/branding'
 
+/** Owner cross-branch comparison dashboard route (E42; Journey J35). */
+export const OWNER_DASHBOARD_PATH = '/owner/dashboard'
+
 /** Branch manager analytics dashboard (E41; Journey J34). */
 export const BRANCH_MANAGER_DASHBOARD_PATH = '/analytics'

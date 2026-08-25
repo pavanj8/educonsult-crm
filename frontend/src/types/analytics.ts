@@ -1,8 +1,19 @@
 /**
- * Analytics types (E41; Journey J34).
+ * Analytics types (E41/E42; Journeys J34/J35).
  *
- * Supports branch manager dashboard with date-range filter.
+ * Supports branch manager dashboard with date-range filter (E41)
+ * and owner cross-branch comparison dashboard (E42).
  */
+
+/**
+ * Query parameters for analytics APIs with optional date range filter.
+ */
+export interface AnalyticsParams {
+  /** Filter applications created on or after this date/time (ISO 8601 format) */
+  start_date?: string
+  /** Filter applications created before or on this date/time (ISO 8601 format) */
+  end_date?: string
+}
 
 /**
  * A single data point in the registrations-over-time series.
@@ -55,16 +66,6 @@ export type ConversionFunnelResponse = {
 }
 
 /**
- * Parameters for analytics API calls with optional date range filter.
- */
-export type AnalyticsParams = {
-  /** Filter applications created on or after this date/time (ISO 8601 format) */
-  start_date?: string
-  /** Filter applications created before or on this date/time (ISO 8601 format) */
-  end_date?: string
-}
-
-/**
  * Date range preset options for the dashboard filter.
  */
 export type DateRangePreset = '7d' | '15d' | '30d' | 'custom'
@@ -76,4 +77,35 @@ export type DateRange = {
   preset: DateRangePreset
   startDate: string | null
   endDate: string | null
+}
+
+/**
+ * Query parameters for branch comparison API.
+ */
+export interface BranchComparisonParams {
+  start_date?: string
+  end_date?: string
+}
+
+/**
+ * A single branch in the cross-branch comparison response.
+ */
+export interface BranchComparisonBucket {
+  branch_id: number
+  branch_name: string
+  branch_city: string
+  total_applications: number
+  enrolled_count: number
+  rejected_count: number
+  withdrawn_count: number
+  active_count: number
+}
+
+/**
+ * Response from GET /analytics/branch-comparison
+ */
+export interface BranchComparisonResponse {
+  branches: BranchComparisonBucket[]
+  total_branches: number
+  total_applications: number
 }
