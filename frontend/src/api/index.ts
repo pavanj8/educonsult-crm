@@ -7,6 +7,7 @@ export {
   fetchApplicationChecklist,
   updateAdminChecklistItemTemplate,
 } from './checklist'
+export { fetchBranchComparison, type BranchComparisonParams } from './analytics'
 export { fetchCountries, fetchPrograms, fetchUniversities } from './masterData'
 export {
   listMeetingsForApplication,

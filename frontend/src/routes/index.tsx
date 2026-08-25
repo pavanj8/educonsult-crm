@@ -7,6 +7,7 @@ import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import MasterDataAdminPage from '../pages/MasterDataAdminPage'
+import OwnerDashboardPage from '../pages/OwnerDashboardPage'
 import ReceptionistIntakePage from '../pages/ReceptionistIntakePage'
 import RegisterStudentPage from '../pages/RegisterStudentPage'
 import NotFoundPage from '../pages/NotFoundPage'
@@ -36,6 +37,7 @@ import {
   COUNSELOR_DASHBOARD_PATH,
   FORGOT_PASSWORD_PATH,
   MASTER_DATA_ADMIN_PATH,
+  OWNER_DASHBOARD_PATH,
   RECEPTIONIST_INTAKE_PATH,
   REGISTER_PATH,
   RESET_PASSWORD_PATH,
@@ -67,6 +69,7 @@ export function AppRoutes() {
           <Route element={<ConsultancyOwnerRoute />}>
             <Route path="branches" element={<BranchesPage />} />
             <Route path={TENANT_BRANDING_PATH.slice(1)} element={<TenantBrandingPage />} />
+            <Route path={OWNER_DASHBOARD_PATH.slice(1)} element={<OwnerDashboardPage />} />
           </Route>
           <Route element={<StaffManagerRoute />}>
             <Route path="staff" element={<StaffPage />} />
