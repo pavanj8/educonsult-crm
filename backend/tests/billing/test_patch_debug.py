@@ -32,20 +32,11 @@ def test_patch_works(razorpay_test_credentials):
 
 def test_patch_in_router_call(db_session, auth_client, owner_user, owner_tenant, test_plan, razorpay_test_credentials):
     """Test if patching works when calling through the router."""
-    from app.billing.razorpay_client import create_order
-
     mock_response = {"id": "order_123", "amount": 100000, "currency": "INR"}
 
-    print(f"create_order id before patch: {id(create_order)}")
-
-    # The patch in the router uses "app.billing.razorpay_client.create_order"
-    # But the router imports it as: from app.billing.razorpay_client import create_order
-    # So we need to patch where it's used
+    # Patch at the router's import location
     with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_response
-
-        print(f"create_order id inside patch: {id(create_order)}")
-        print(f"mock id: {id(mock_create_order)}")
 
         response = auth_client.post(
             "/billing/create-upgrade-order",

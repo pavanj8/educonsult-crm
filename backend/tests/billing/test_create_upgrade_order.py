@@ -17,6 +17,7 @@ def test_create_upgrade_order_as_owner(
         "status": "created",
     }
 
+    # Patch at the router's import location
     with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
@@ -55,6 +56,7 @@ def test_create_upgrade_order_plan_code_normalized(
         "status": "created",
     }
 
+    # Patch at the router's import location
     with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
@@ -130,6 +132,7 @@ def test_create_upgrade_order_razorpay_unavailable(
     db_session, auth_client, owner_user, owner_tenant, test_plan, razorpay_test_credentials
 ):
     """Razorpay service errors return 503."""
+    # Patch at the router's import location
     with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.side_effect = Exception("Razorpay API error")
 
@@ -239,6 +242,7 @@ def test_create_upgrade_order_enterprise_to_growth(
         "status": "created",
     }
 
+    # Patch at the router's import location
     with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
@@ -264,6 +268,7 @@ def test_create_upgrade_order_multiple_orders_same_plan(
         "status": "created",
     }
 
+    # Patch at the router's import location
     with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 

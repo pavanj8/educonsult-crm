@@ -20,7 +20,8 @@ def test_endpoint_with_fixture(
         "status": "created",
     }
 
-    with patch("app.billing.razorpay_client.create_order") as mock_create_order:
+    # Patch at the router's import location
+    with patch("app.routers.billing.create_order") as mock_create_order:
         mock_create_order.return_value = mock_order_response
 
         response = auth_client.post(
