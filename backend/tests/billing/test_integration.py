@@ -20,9 +20,9 @@ def test_create_upgrade_order_endpoint_exists(client):
 
 
 def test_webhook_endpoint_exists(client):
-    """Verify the POST /billing/webhooks/razorpay endpoint exists."""
+    """Verify the POST /billing/webhook endpoint exists."""
     # Webhook without signature should return 401, not 404
-    response = client.post("/billing/webhooks/razorpay", json={"event": "payment.captured"})
+    response = client.post("/billing/webhook", json={"event": "payment.captured"})
     # Should get 401 (invalid signature) rather than 404 (not found)
     # This proves the endpoint is registered
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
