@@ -19,6 +19,15 @@ def test_create_upgrade_order_endpoint_exists(client):
     assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
 
+def test_webhook_endpoint_exists(client):
+    """Verify the POST /billing/webhooks/razorpay endpoint exists."""
+    # Webhook without signature should return 401, not 404
+    response = client.post("/billing/webhooks/razorpay", json={"event": "payment.captured"})
+    # Should get 401 (invalid signature) rather than 404 (not found)
+    # This proves the endpoint is registered
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
 def test_plans_seed_exists(db_session):
     """Verify that plans can be created in the database."""
     from app.models.plan import Plan, PlanTier

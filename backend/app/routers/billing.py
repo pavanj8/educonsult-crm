@@ -1,212 +1,12 @@
-<<<<<<< HEAD
-"""Billing routes for Razorpay payment webhooks (E46; Journey J39).
-
-* POST /webhooks/razorpay -- Razorpay webhook handler for payment confirmation
-
-This endpoint receives and processes webhook events from Razorpay when payments
-are completed. The webhook:
-
-* Verifies the webhook signature to ensure it comes from Razorpay.
-* Validates the payload contains a tenant_id in the notes.
-* For payment.captured events, applies the plan change to the tenant.
-* Returns 200 OK for successful processing or 400/401 for validation errors.
-
-Security considerations:
-* Webhooks must be verified using the Razorpay signature to prevent forgery.
-* The webhook endpoint does NOT require authentication (Razorpay doesn't send JWT tokens).
-* Tenant ID is extracted from the order notes (set during order creation).
-"""
-
-import logging
-
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
-
-from app.billing.razorpay_client import verify_webhook_signature
-from app.db.database import get_db
-from app.models.plan import Plan
-from app.models.tenant import Tenant
-from app.schemas.billing import WebhookErrorResponse
-
-router = APIRouter()
-
-_logger = logging.getLogger(__name__)
-
-# Razorpay sends the signature in this header
-_RAZORPAY_SIGNATURE_HEADER = "X-Razorpay-Signature"
-
-# Expected webhook event types
-_EVENT_PAYMENT_CAPTURED = "payment.captured"
-
-# Error messages
-_ERROR_INVALID_SIGNATURE = "Invalid webhook signature"
-_ERROR_MISSING_TENANT = "Webhook payload missing tenant_id in notes"
-_ERROR_TENANT_NOT_FOUND = "Tenant not found"
-_ERROR_PLAN_NOT_FOUND = "Plan not found"
-_ERROR_UNSUPPORTED_EVENT = "Unsupported webhook event type"
-_ERROR_DB_UNAVAILABLE = "Database temporarily unavailable"
-
-
-@router.post(
-    "/webhooks/razorpay",
-    status_code=status.HTTP_200_OK,
-    responses={
-        200: {"description": "Webhook processed successfully"},
-        400: {"model": WebhookErrorResponse, "description": "Invalid webhook payload"},
-        401: {"model": WebhookErrorResponse, "description": "Invalid signature"},
-    },
-)
-async def razorpay_webhook(
-    request: Request,
-    db: Session = Depends(get_db),
-) -> dict[str, str]:
-    """Handle Razorpay webhook events for payment confirmation (E46; Journey J39).
-
-    This endpoint processes payment.captured events from Razorpay to apply
-    plan upgrades/downgrades after successful payment. The webhook:
-
-    1. Extracts the raw request body and X-Razorpay-Signature header.
-    2. Verifies the signature using the Razorpay key secret.
-    3. Parses the JSON payload and validates it contains tenant_id in notes.
-    4. For payment.captured events, applies the plan change to the tenant.
-    5. Returns 200 OK on success, or 401/400 for validation failures.
-
-    The webhook does NOT require authentication - Razorpay doesn't send
-    JWT tokens. Security is provided by signature verification.
-
-    Returns:
-        {"status": "ok"} on successful processing.
-
-    Raises:
-        HTTPException: 401 if signature is invalid, 400 for other validation errors.
-    """
-    # Read raw body for signature verification
-    raw_body = await request.body()
-    body_str = raw_body.decode("utf-8")
-
-    # Get signature from header
-    signature = request.headers.get(_RAZORPAY_SIGNATURE_HEADER)
-    if not signature:
-        _logger.warning("Webhook request missing signature header")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=_ERROR_INVALID_SIGNATURE,
-        )
-
-    # Verify webhook signature
-    if not verify_webhook_signature(body_str, signature):
-        _logger.warning("Webhook signature verification failed")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=_ERROR_INVALID_SIGNATURE,
-        )
-
-    # Parse JSON payload
-    try:
-        payload = await request.json()
-    except Exception:
-        _logger.warning("Webhook payload is not valid JSON")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid JSON payload",
-        ) from None
-
-    # Extract event type and payload
-    event_type = payload.get("event")
-    event_data = payload.get("payload", {})
-    event_note = event_data.get("payment", {}).get("notes", {})
-
-    # Validate tenant_id in notes
-    tenant_id = event_note.get("tenant_id")
-    if not tenant_id:
-        _logger.warning("Webhook payload missing tenant_id in notes")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_ERROR_MISSING_TENANT,
-        )
-
-    # Only process payment.captured events
-    if event_type != _EVENT_PAYMENT_CAPTURED:
-        _logger.info(f"Received unsupported event type: {event_type}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_ERROR_UNSUPPORTED_EVENT,
-        )
-
-    # Get plan_code from notes
-    plan_code = event_note.get("plan_code")
-    if not plan_code:
-        _logger.warning("Webhook payload missing plan_code in notes")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Webhook payload missing plan_code in notes",
-        )
-
-    # Fetch tenant
-    try:
-        tenant = db.get(Tenant, int(tenant_id))
-    except (ValueError, TypeError):
-        _logger.warning(f"Invalid tenant_id in webhook: {tenant_id}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid tenant_id",
-        ) from None
-    except OperationalError:
-        _logger.error("Database error during webhook processing")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_ERROR_DB_UNAVAILABLE,
-        ) from None
-
-    if tenant is None:
-        _logger.warning(f"Tenant not found: {tenant_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_ERROR_TENANT_NOT_FOUND,
-        )
-
-    # Fetch plan
-    try:
-        plan = db.query(Plan).filter(Plan.code == plan_code).one_or_none()
-    except OperationalError:
-        _logger.error("Database error during plan lookup")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_ERROR_DB_UNAVAILABLE,
-        ) from None
-
-    if plan is None:
-        _logger.warning(f"Plan not found: {plan_code}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_ERROR_PLAN_NOT_FOUND,
-        )
-
-    # Apply plan change
-    _logger.info(f"Applying plan change for tenant {tenant.id}: {plan.code}")
-    tenant.plan_id = plan.id
-
-    try:
-        db.commit()
-    except OperationalError:
-        db.rollback()
-        _logger.error("Database error during plan update")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_ERROR_DB_UNAVAILABLE,
-        ) from None
-
-    _logger.info(f"Successfully applied plan {plan.code} to tenant {tenant.id}")
-    return {"status": "ok"}
-=======
 """Billing routes for plan upgrade checkout (E46; Journey J39).
 
-* E46 task #223 (this ticket) owns the ``POST /billing/create-upgrade-order``
-  endpoint that creates a Razorpay order for plan upgrades/downgrades.
-* E46 task #224 will own the ``POST /billing/webhook`` endpoint for payment
-  confirmation.
-* E46 task #225 will own the plan change application logic.
+This module contains:
+
+* E46 task #223: ``POST /billing/create-upgrade-order`` endpoint that creates
+  a Razorpay order for plan upgrades/downgrades.
+* E46 task #224: ``POST /billing/webhooks/razorpay`` endpoint that processes
+  payment confirmation webhooks from Razorpay.
+* E46 task #225: Plan change application logic (called by webhook handler).
 
 Endpoint design
 ---------------
@@ -222,30 +22,46 @@ permission). It:
 5. Returns the Razorpay order details (``order_id``, ``amount``, ``currency``)
    plus the target plan details for frontend display.
 
-The endpoint is idempotent in the sense that calling it multiple times with
-the same ``plan_code`` creates separate Razorpay orders (each order is a
-unique checkout attempt). This is intentional: a user may initiate checkout,
-cancel, and try again without completing payment.
+The webhook handler processes payment.captured events from Razorpay to apply
+plan upgrades/downgrades after successful payment. It:
+
+1. Verifies the webhook signature to ensure it comes from Razorpay.
+2. Validates the payload contains tenant_id and plan_code in the notes.
+3. Verifies multi-tenant scoping by checking the tenant exists.
+4. Implements idempotency to prevent replay attacks.
+5. Applies the plan change to the tenant.
+6. Returns 200 OK for successful processing or 400/401 for validation errors.
 
 Security
 --------
 
-* The endpoint requires the ``billing:manage`` permission, which is granted
-  only to ``CONSULTANCY_OWNER`` (see :mod:`app.rbac.permissions`).
+* The order creation endpoint requires the ``billing:manage`` permission,
+  which is granted only to ``CONSULTANCY_OWNER`` (see :mod:`app.rbac.permissions`).
 * The ``tenant_id`` from the JWT is embedded in the Razorpay order notes
   for webhook reconciliation (task #224).
-* The ``plan_code`` is validated against the catalog before creating the
-  order, ensuring only valid, active plans can be purchased.
+* The webhook endpoint does NOT require authentication (Razorpay doesn't send
+  JWT tokens). Security is provided by signature verification.
+* The webhook implements idempotency by checking if the plan change is already
+  applied before updating, preventing duplicate processing.
+* Multi-tenant scoping is verified by ensuring the tenant exists before applying
+  any changes.
 
 Error handling
 --------------
 
+Order creation errors:
 * 401 -- caller is not authenticated.
 * 403 -- caller lacks ``billing:manage`` permission.
 * 404 -- ``plan_code`` is unknown (not in the catalog).
 * 409 -- plan exists but is inactive (``is_active=False``).
 * 422 -- ``plan_code`` is missing, empty, or not a valid tier code.
 * 503 -- database or Razorpay service is unavailable.
+
+Webhook errors:
+* 401 -- signature verification failed.
+* 400 -- invalid payload, unsupported event, or missing required fields.
+* 404 -- tenant or plan not found.
+* 503 -- database temporarily unavailable.
 
 Traceability
 ------------
@@ -255,28 +71,49 @@ Traceability
 * Epic E46 (Plan Upgrade/Downgrade Checkout (Razorpay)).
 """
 
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.billing.config import razorpay_key_id
-from app.billing.razorpay_client import create_order
+from app.billing.razorpay_client import create_order, verify_webhook_signature
 from app.db.database import get_db
 from app.models.plan import Plan, PlanTier
+from app.models.tenant import Tenant
 from app.rbac import Permission
 from app.rbac.dependencies import require_permission
 from app.rbac.user import AuthenticatedUser
-from app.schemas.billing import CreateUpgradeOrderRequest, UpgradeOrderResponse
+from app.schemas.billing import (
+    CreateUpgradeOrderRequest,
+    UpgradeOrderResponse,
+    WebhookErrorResponse,
+)
 
 router = APIRouter()
 
+_logger = logging.getLogger(__name__)
+
+# Order creation error messages
 _DB_UNAVAILABLE_DETAIL = "Billing service is temporarily unavailable"
 _RAZORPAY_UNAVAILABLE_DETAIL = "Payment gateway is temporarily unavailable"
 _PLAN_NOT_FOUND_DETAIL = "Plan not found"
 _PLAN_RETIRED_DETAIL = "Plan is no longer active"
 _NO_TENANT_DETAIL = "User account is not associated with a tenant"
 _KEY_ID_MISSING_DETAIL = "Payment gateway is not configured"
+
+# Webhook constants
+_RAZORPAY_SIGNATURE_HEADER = "X-Razorpay-Signature"
+_EVENT_PAYMENT_CAPTURED = "payment.captured"
+_ERROR_INVALID_SIGNATURE = "Invalid webhook signature"
+_ERROR_MISSING_TENANT = "Webhook payload missing tenant_id in notes"
+_ERROR_MISSING_PLAN = "Webhook payload missing plan_code in notes"
+_ERROR_TENANT_NOT_FOUND = "Tenant not found"
+_ERROR_PLAN_NOT_FOUND = "Plan not found"
+_ERROR_UNSUPPORTED_EVENT = "Unsupported webhook event type"
+_ERROR_DB_UNAVAILABLE = "Database temporarily unavailable"
 
 
 def _resolve_plan_for_order(plan_code: str, db: Session) -> Plan:
@@ -434,5 +271,187 @@ def create_upgrade_order(
     )
 
 
+@router.post(
+    "/webhooks/razorpay",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Webhook processed successfully"},
+        400: {"model": WebhookErrorResponse, "description": "Invalid webhook payload"},
+        401: {"model": WebhookErrorResponse, "description": "Invalid signature"},
+    },
+)
+async def razorpay_webhook(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Handle Razorpay webhook events for payment confirmation (E46 task #224; Journey J39).
+
+    This endpoint processes payment.captured events from Razorpay to apply
+    plan upgrades/downgrades after successful payment. The webhook:
+
+    1. Extracts the raw request body and X-Razorpay-Signature header.
+    2. Verifies the signature using the Razorpay key secret.
+    3. Parses the JSON payload and validates it contains tenant_id and plan_code in notes.
+    4. Verifies multi-tenant scoping by checking the tenant exists.
+    5. Implements idempotency by checking if the plan is already applied.
+    6. For payment.captured events, applies the plan change to the tenant.
+    7. Returns 200 OK on success, or 401/400 for validation failures.
+
+    The webhook does NOT require authentication - Razorpay doesn't send
+    JWT tokens. Security is provided by signature verification and multi-tenant
+    scoping checks.
+
+    Idempotency protection
+    ----------------------
+    To prevent replay attacks and duplicate processing:
+    * The handler checks if the tenant's current plan_id already matches the
+      target plan before applying any change.
+    * This ensures that duplicate webhook delivery (which Razorpay may do on
+      retry) will not cause double-billing or inconsistent state.
+
+    Multi-tenant scoping
+    --------------------
+    The webhook verifies that the tenant_id extracted from the notes corresponds
+    to a valid tenant in the database. This prevents a malicious actor from
+    injecting arbitrary tenant_id values to upgrade other tenants.
+
+    Returns:
+        {"status": "ok"} on successful processing.
+
+    Raises:
+        HTTPException: 401 if signature is invalid, 400/404/503 for other errors.
+    """
+    # Read raw body for signature verification
+    raw_body = await request.body()
+    body_str = raw_body.decode("utf-8")
+
+    # Get signature from header
+    signature = request.headers.get(_RAZORPAY_SIGNATURE_HEADER)
+    if not signature:
+        _logger.warning("Webhook request missing signature header")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_ERROR_INVALID_SIGNATURE,
+        )
+
+    # Verify webhook signature
+    if not verify_webhook_signature(body_str, signature):
+        _logger.warning("Webhook signature verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_ERROR_INVALID_SIGNATURE,
+        )
+
+    # Parse JSON payload
+    try:
+        payload = await request.json()
+    except Exception:
+        _logger.warning("Webhook payload is not valid JSON")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON payload",
+        ) from None
+
+    # Extract event type and payload
+    event_type = payload.get("event")
+    event_data = payload.get("payload", {})
+    event_note = event_data.get("payment", {}).get("notes", {})
+
+    # Validate tenant_id in notes
+    tenant_id = event_note.get("tenant_id")
+    if not tenant_id:
+        _logger.warning("Webhook payload missing tenant_id in notes")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_ERROR_MISSING_TENANT,
+        )
+
+    # Validate plan_code in notes
+    plan_code = event_note.get("plan_code")
+    if not plan_code:
+        _logger.warning("Webhook payload missing plan_code in notes")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_ERROR_MISSING_PLAN,
+        )
+
+    # Only process payment.captured events
+    if event_type != _EVENT_PAYMENT_CAPTURED:
+        _logger.info(f"Received unsupported event type: {event_type}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_ERROR_UNSUPPORTED_EVENT,
+        )
+
+    # Parse tenant_id as integer
+    try:
+        tenant_id_int = int(tenant_id)
+    except (ValueError, TypeError):
+        _logger.warning(f"Invalid tenant_id in webhook: {tenant_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid tenant_id",
+        ) from None
+
+    # Fetch tenant with row lock for idempotency check
+    try:
+        # Use SELECT FOR UPDATE to prevent concurrent webhook processing
+        tenant = db.execute(
+            db.query(Tenant).filter(Tenant.id == tenant_id_int).with_for_update()
+        ).scalar_one_or_none()
+    except OperationalError:
+        _logger.error("Database error during tenant lookup")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_ERROR_DB_UNAVAILABLE,
+        ) from None
+
+    if tenant is None:
+        _logger.warning(f"Tenant not found: {tenant_id_int}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_ERROR_TENANT_NOT_FOUND,
+        )
+
+    # Fetch plan
+    try:
+        plan = db.query(Plan).filter(Plan.code == plan_code).one_or_none()
+    except OperationalError:
+        _logger.error("Database error during plan lookup")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_ERROR_DB_UNAVAILABLE,
+        ) from None
+
+    if plan is None:
+        _logger.warning(f"Plan not found: {plan_code}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_ERROR_PLAN_NOT_FOUND,
+        )
+
+    # IDEMPOTENCY CHECK: If tenant already has this plan, skip update
+    # This prevents duplicate processing of the same webhook
+    if tenant.plan_id == plan.id:
+        _logger.info(f"Tenant {tenant.id} already has plan {plan.code}, skipping update")
+        return {"status": "ok"}
+
+    # Apply plan change
+    _logger.info(f"Applying plan change for tenant {tenant.id}: {plan.code}")
+    tenant.plan_id = plan.id
+
+    try:
+        db.commit()
+    except OperationalError:
+        db.rollback()
+        _logger.error("Database error during plan update")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_ERROR_DB_UNAVAILABLE,
+        ) from None
+
+    _logger.info(f"Successfully applied plan {plan.code} to tenant {tenant.id}")
+    return {"status": "ok"}
+
+
 __all__ = ["router"]
->>>>>>> origin/main

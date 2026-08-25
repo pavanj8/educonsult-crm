@@ -1,27 +1,15 @@
 """Pydantic schemas for billing endpoints (E46; Journey J39).
 
-<<<<<<< HEAD
-Webhook schemas for Razorpay payment confirmation.
-=======
-* E46 task #223 (this ticket) owns ``CreateUpgradeOrderRequest`` and
-  ``UpgradeOrderResponse`` for the plan upgrade order creation endpoint.
-* E46 task #224 will own webhook schemas for payment confirmation.
-* E46 task #225 will own the plan change confirmation schema.
->>>>>>> origin/main
+This module contains:
+
+* E46 task #223: ``CreateUpgradeOrderRequest`` and ``UpgradeOrderResponse``
+  for the plan upgrade order creation endpoint.
+* E46 task #224: ``WebhookErrorResponse`` for the webhook handler.
 """
 
 from pydantic import BaseModel, Field
 
 
-<<<<<<< HEAD
-class WebhookErrorResponse(BaseModel):
-    """Response returned when webhook validation fails."""
-
-    detail: str = Field(description="Error message describing why the webhook was rejected")
-
-
-__all__ = ["WebhookErrorResponse"]
-=======
 class CreateUpgradeOrderRequest(BaseModel):
     """Request body for ``POST /billing/create-upgrade-order`` (E46 task #223; Journey J39).
 
@@ -69,5 +57,18 @@ class UpgradeOrderResponse(BaseModel):
     plan_name: str = Field(description="Human-readable plan name")
 
 
-__all__ = ["CreateUpgradeOrderRequest", "UpgradeOrderResponse"]
->>>>>>> origin/main
+class WebhookErrorResponse(BaseModel):
+    """Response returned when webhook validation fails (E46 task #224; Journey J39).
+
+    This schema is used for both 400 (invalid payload) and 401 (invalid signature)
+    error responses from the webhook endpoint.
+    """
+
+    detail: str = Field(description="Error message describing why the webhook was rejected")
+
+
+__all__ = [
+    "CreateUpgradeOrderRequest",
+    "UpgradeOrderResponse",
+    "WebhookErrorResponse",
+]
