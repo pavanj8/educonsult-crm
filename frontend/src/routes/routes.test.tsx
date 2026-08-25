@@ -85,7 +85,7 @@ describe('AppRouter routes', () => {
     localStorage.clear()
   })
 
-  it('redirects unauthenticated users to the public login page', async () => {
+  it('redirects unauthenticated users from protected routes to the public login page', async () => {
     renderAppAt('/')
 
     await waitFor(() => {

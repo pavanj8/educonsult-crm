@@ -58,14 +58,17 @@ import {
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Public routes */}
+      <Route path={LANDING_PATH} element={<LandingPage />} />
       <Route path={LOGIN_PATH} element={<LoginPage />} />
       <Route path={REGISTER_PATH} element={<RegisterStudentPage />} />
       <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPasswordPage />} />
       <Route path={RESET_PASSWORD_PATH} element={<ResetPasswordPage />} />
-      <Route path={LANDING_PATH} element={<LandingPage />} />
+
+      {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route index element={<HomePage />} />
+          <Route path="/" element={<HomePage />} />
           <Route element={<SuperAdminRoute />}>
             <Route path="tenants" element={<TenantsPage />} />
             <Route
