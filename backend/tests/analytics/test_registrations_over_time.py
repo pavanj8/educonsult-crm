@@ -11,7 +11,7 @@ from tests.factories.users import make_authenticated_user
 
 
 class TestRegistrationsOverTime:
-    """Black-box tests for GET /analytics/registrations (E41; Journey J34)."""
+    """Black-box tests for GET /analytics/registrations-over-time (E41; Journey J34)."""
 
     def test_branch_manager_can_view_registrations_for_their_branch(
         self,
@@ -74,7 +74,7 @@ class TestRegistrationsOverTime:
         db_session.commit()
 
         # Call the registrations endpoint
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 200
         data = response.json()
@@ -145,7 +145,7 @@ class TestRegistrationsOverTime:
         end_date = now.isoformat()
 
         response = client.get(
-            f"/analytics/registrations?start_date={start_date}&end_date={end_date}"
+            f"/analytics/registrations-over-time?start_date={start_date}&end_date={end_date}"
         )
 
         assert response.status_code == 200
@@ -195,7 +195,7 @@ class TestRegistrationsOverTime:
 
         db_session.commit()
 
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 200
         data = response.json()
@@ -217,7 +217,7 @@ class TestRegistrationsOverTime:
             )
         )
 
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 403
 
@@ -228,7 +228,7 @@ class TestRegistrationsOverTime:
     ):
         """Unauthenticated requests are rejected."""
         app.dependency_overrides.pop(get_current_user, None)
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 401
 
@@ -246,7 +246,7 @@ class TestRegistrationsOverTime:
             )
         )
 
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 200
         data = response.json()
@@ -283,7 +283,7 @@ class TestRegistrationsOverTime:
         db_session.add(other_student)
         db_session.commit()
 
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 200
         data = response.json()
@@ -335,7 +335,7 @@ class TestRegistrationsOverTime:
         db_session.commit()
 
         # Branch manager of branch1 queries the registrations
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 200
         data = response.json()
@@ -404,7 +404,7 @@ class TestRegistrationsOverTime:
 
         db_session.commit()
 
-        response = client.get("/analytics/registrations")
+        response = client.get("/analytics/registrations-over-time")
 
         assert response.status_code == 200
         data = response.json()

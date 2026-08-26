@@ -4,12 +4,19 @@ import ChecklistView from './ChecklistView'
 import { useApplicationChecklist } from '../../hooks/useApplicationChecklist'
 import { PIPELINE_STAGE_LABELS } from '../../types/application'
 import type { Application } from '../../types/application'
+import LoanOptInAction from '../applications/LoanOptInAction'
 
 interface ApplicationRowProps {
   application: Application
   universityName: string
   programName: string | null
   createdAt: string
+  /**
+   * Called after a successful loan-tracking opt-in / opt-out so the
+   * host dashboard can refresh its application list. Mirrors the
+   * contract used by ``ReassignCounselorAction`` (E20; frontend #154).
+   */
+  onLoanOptInChanged?: (applicationId: number, loanOptIn: boolean) => void
 }
 
 function formatDate(iso: string): string {
@@ -38,6 +45,7 @@ export default function ApplicationRow({
   universityName,
   programName,
   createdAt,
+  onLoanOptInChanged,
 }: ApplicationRowProps) {
   const [expanded, setExpanded] = useState(false)
   const { items, loading, error, reload } = useApplicationChecklist(
@@ -65,6 +73,15 @@ export default function ApplicationRow({
           </span>
         </td>
         <td className="application-table__cell">{formatDate(createdAt)}</td>
+        <td className="application-table__cell application-table__cell--loan">
+          <span
+            className="application-table__loan-status"
+            data-testid={`application-loan-opt-in-${application.id}`}
+            data-loan-opt-in={application.loan_opt_in ? 'true' : 'false'}
+          >
+            {application.loan_opt_in ? 'Opted in' : 'Not opted in'}
+          </span>
+        </td>
         <td className="application-table__cell application-table__cell--actions">
           <button
             type="button"
@@ -84,7 +101,7 @@ export default function ApplicationRow({
           data-testid={`application-checklist-row-${application.id}`}
         >
           <td
-            colSpan={5}
+            colSpan={6}
             className="application-table__checklist-cell"
             id={`application-checklist-${application.id}`}
           >
@@ -94,6 +111,11 @@ export default function ApplicationRow({
               loading={loading}
               error={error}
               onReload={reload}
+            />
+            <LoanOptInAction
+              applicationId={application.id}
+              loanOptIn={application.loan_opt_in}
+              onChanged={onLoanOptInChanged}
             />
           </td>
         </tr>
