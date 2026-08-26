@@ -28,7 +28,7 @@ class RegistrationsOverTimeBucket(BaseModel):
 
 
 class RegistrationsOverTimeResponse(BaseModel):
-    """Response for GET /analytics/registrations (E41; Journey J34).
+    """Response for GET /analytics/registrations-over-time (E41; Journey J34).
 
     Returns a time-series of student registrations grouped by date,
     ordered chronologically from oldest to newest. The counts reflect

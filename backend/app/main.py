@@ -100,11 +100,7 @@ app = FastAPI(title="EduConsult CRM", lifespan=lifespan)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 app.include_router(applications_router, prefix="/applications", tags=["applications"])
-<<<<<<< HEAD
-app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
-=======
 app.include_router(billing_router, prefix="/billing", tags=["billing"])
->>>>>>> origin/main
 app.include_router(checklist_router, prefix="/applications", tags=["checklist"])
 app.include_router(
     checklist_templates_router,
