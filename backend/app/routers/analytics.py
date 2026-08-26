@@ -177,7 +177,7 @@ def conversion_funnel(
         ) from None
 
 
-@router.get("/registrations", response_model=RegistrationsOverTimeResponse)
+@router.get("/registrations-over-time", response_model=RegistrationsOverTimeResponse)
 def registrations_over_time(
     current_user: Annotated[
         AuthenticatedUser,
@@ -871,7 +871,7 @@ def export_conversion_funnel(
         return write_csv_response(rows, "conversion_funnel")
 
 
-@router.get("/registrations/export", response_class=Response)
+@router.get("/registrations-over-time/export", response_class=Response)
 def export_registrations_over_time(
     current_user: Annotated[
         AuthenticatedUser,

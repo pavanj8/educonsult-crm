@@ -435,7 +435,7 @@ class TestExportConversionFunnel:
 
 
 class TestExportRegistrationsOverTime:
-    """Tests for GET /analytics/registrations/export (E44; Journey J37)."""
+    """Tests for GET /analytics/registrations-over-time/export (E44; Journey J37)."""
 
     def test_export_registrations_returns_csv(
         self,
@@ -451,7 +451,7 @@ class TestExportRegistrationsOverTime:
             )
         )
 
-        response = client.get("/analytics/registrations/export")
+        response = client.get("/analytics/registrations-over-time/export")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
@@ -474,7 +474,7 @@ class TestExportRegistrationsOverTime:
             )
         )
 
-        response = client.get("/analytics/registrations/export")
+        response = client.get("/analytics/registrations-over-time/export")
 
         content = response.text
         assert "Date" in content
@@ -498,7 +498,7 @@ class TestExportRegistrationsOverTime:
         end_date = datetime.now()
 
         response = client.get(
-            f"/analytics/registrations/export?start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
+            f"/analytics/registrations-over-time/export?start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
         )
 
         assert response.status_code == 200
@@ -515,7 +515,7 @@ class TestExportRegistrationsOverTime:
             make_authenticated_user(Role.COUNSELOR, user_id=33, tenant_id=1, branch_id=branch.id)
         )
 
-        response = client.get("/analytics/registrations/export")
+        response = client.get("/analytics/registrations-over-time/export")
 
         assert response.status_code == 403
 
@@ -533,7 +533,7 @@ class TestExportRegistrationsOverTime:
             )
         )
 
-        response = client.get("/analytics/registrations/export?format=excel")
+        response = client.get("/analytics/registrations-over-time/export?format=excel")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == EXCEL_MIME_TYPE
@@ -557,7 +557,7 @@ class TestExportRegistrationsOverTime:
             )
         )
 
-        response = client.get("/analytics/registrations/export")
+        response = client.get("/analytics/registrations-over-time/export")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
