@@ -178,10 +178,10 @@ export function getAnalyticsExportUrl(
   const queryString = searchParams.toString()
 
   const endpoints = {
-    funnel: '/analytics/export/funnel',
-    registrations: '/analytics/export/registrations',
-    'branch-comparison': '/analytics/export/branch-comparison',
-    'platform-stats': '/analytics/export/platform-stats',
+    funnel: '/analytics/funnel/export',
+    registrations: '/analytics/registrations-over-time/export',
+    'branch-comparison': '/analytics/branch-comparison/export',
+    'platform-stats': '/analytics/platform-stats/export',
   }
 
   return `${endpoints[exportType]}${queryString ? `?${queryString}` : ''}`

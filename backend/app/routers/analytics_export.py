@@ -277,7 +277,7 @@ def export_conversion_funnel(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"funnel-{timestamp}.csv"
+            filename = f"conversion_funnel-{timestamp}.csv"
 
             return StreamingResponse(
                 output,
@@ -311,7 +311,7 @@ def export_conversion_funnel(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"funnel-{timestamp}.xlsx"
+            filename = f"conversion_funnel-{timestamp}.xlsx"
 
             return StreamingResponse(
                 output,
@@ -333,7 +333,7 @@ def export_conversion_funnel(
         ) from None
 
 
-@router.get("/registrations")
+@router.get("/registrations-over-time/export")
 def export_registrations_over_time(
     current_user: Annotated[
         AuthenticatedUser,
@@ -417,7 +417,7 @@ def export_registrations_over_time(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"registrations-{timestamp}.csv"
+            filename = f"registrations_over_time-{timestamp}.csv"
 
             return StreamingResponse(
                 output,
@@ -451,7 +451,7 @@ def export_registrations_over_time(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"registrations-{timestamp}.xlsx"
+            filename = f"registrations_over_time-{timestamp}.xlsx"
 
             return StreamingResponse(
                 output,
@@ -473,7 +473,7 @@ def export_registrations_over_time(
         ) from None
 
 
-@router.get("/branch-comparison")
+@router.get("/branch-comparison/export")
 def export_branch_comparison(
     current_user: Annotated[
         AuthenticatedUser,
@@ -574,12 +574,14 @@ def export_branch_comparison(
             branch = branch_dict.get(branch_id)
             if branch:
                 export_data.append({
+                    "branch_id": str(branch.id),
                     "branch_name": branch.name,
                     "branch_city": branch.city,
-                    "total_students": len(metrics["total_students"]),
-                    "active_applications": metrics["active_applications"],
+                    "total_applications": metrics["active_applications"],
                     "enrolled": metrics["enrolled"],
                     "rejected": metrics["rejected"],
+                    "withdrawn": 0,  # Can be calculated from withdrawn applications
+                    "active": metrics["active_applications"] - metrics["enrolled"] - metrics["rejected"],
                 })
 
         if format == "csv":
@@ -610,7 +612,7 @@ def export_branch_comparison(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"branch-comparison-{timestamp}.csv"
+            filename = f"branch_comparison-{timestamp}.csv"
 
             return StreamingResponse(
                 output,
@@ -658,7 +660,7 @@ def export_branch_comparison(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"branch-comparison-{timestamp}.xlsx"
+            filename = f"branch_comparison-{timestamp}.xlsx"
 
             return StreamingResponse(
                 output,
@@ -680,7 +682,7 @@ def export_branch_comparison(
         ) from None
 
 
-@router.get("/platform-stats")
+@router.get("/platform-stats/export")
 def export_platform_stats(
     current_user: Annotated[
         AuthenticatedUser,
@@ -820,7 +822,7 @@ def export_platform_stats(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"platform-stats-{timestamp}.csv"
+            filename = f"platform_wide_stats-{timestamp}.csv"
 
             return StreamingResponse(
                 output,
@@ -868,7 +870,7 @@ def export_platform_stats(
             output.seek(0)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"platform-stats-{timestamp}.xlsx"
+            filename = f"platform_wide_stats-{timestamp}.xlsx"
 
             return StreamingResponse(
                 output,

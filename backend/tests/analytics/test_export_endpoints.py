@@ -44,7 +44,7 @@ class TestCsvInjectionProtection:
         db_session.add(student)
         db_session.commit()
 
-        response = client.get("/analytics/export/students?format=csv")
+        response = client.get("/analytics/students/export?format=csv")
 
         assert response.status_code == 200
         content = response.text
@@ -86,7 +86,7 @@ class TestSpecialCharacters:
         db_session.add(student)
         db_session.commit()
 
-        response = client.get("/analytics/export/students?format=csv")
+        response = client.get("/analytics/students/export?format=csv")
 
         assert response.status_code == 200
         # CSV should be valid and parseable
@@ -120,7 +120,7 @@ class TestSpecialCharacters:
         db_session.add(student)
         db_session.commit()
 
-        response = client.get("/analytics/export/students?format=xlsx")
+        response = client.get("/analytics/students/export?format=xlsx")
 
         # openpyxl may not be installed
         if response.status_code == 501:
@@ -149,7 +149,7 @@ class TestDateBoundaryEdgeCases:
 
         start_date = datetime.now() - timedelta(days=30)
         response = client.get(
-            f"/analytics/export/students?format=csv&start_date={start_date.isoformat()}"
+            f"/analytics/students/export?format=csv&start_date={start_date.isoformat()}"
         )
 
         assert response.status_code == 200
@@ -171,7 +171,7 @@ class TestDateBoundaryEdgeCases:
 
         end_date = datetime.now()
         response = client.get(
-            f"/analytics/export/students?format=csv&end_date={end_date.isoformat()}"
+            f"/analytics/students/export?format=csv&end_date={end_date.isoformat()}"
         )
 
         assert response.status_code == 200
@@ -209,7 +209,7 @@ class TestDateBoundaryEdgeCases:
         end_date = datetime.now() + timedelta(days=60)
 
         response = client.get(
-            f"/analytics/export/students?format=csv&start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
+            f"/analytics/students/export?format=csv&start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
         )
 
         assert response.status_code == 200
@@ -234,7 +234,7 @@ class TestDateBoundaryEdgeCases:
         end_date = datetime.now() - timedelta(days=30)
 
         response = client.get(
-            f"/analytics/export/students?format=csv&start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
+            f"/analytics/students/export?format=csv&start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
         )
 
         assert response.status_code == 200
@@ -254,7 +254,7 @@ class TestDateBoundaryEdgeCases:
             )
         )
 
-        response = client.get("/analytics/export/students?format=csv&start_date=invalid-date")
+        response = client.get("/analytics/students/export?format=csv&start_date=invalid-date")
 
         assert response.status_code == 422
 
