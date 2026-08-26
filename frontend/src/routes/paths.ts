@@ -1,3 +1,6 @@
+/** Marketing landing page path (E53; Requirements §10). */
+export const LANDING_PATH = '/landing'
+
 /** Public auth route paths. */
 
 export const REGISTER_PATH = '/register'
@@ -35,3 +38,18 @@ export const CHECKLIST_TEMPLATES_PATH = '/checklist-templates'
  * currency here; the route is guarded to that role.
  */
 export const TENANT_BRANDING_PATH = '/branding'
+
+/** Owner cross-branch comparison dashboard route (E42; Journey J35). */
+export const OWNER_DASHBOARD_PATH = '/owner/dashboard'
+
+/** Branch manager analytics dashboard (E41; Journey J34). */
+export const BRANCH_MANAGER_DASHBOARD_PATH = '/analytics'
+
+/** Super admin platform-wide stats dashboard (E43; Journey J36). */
+export const SUPER_ADMIN_DASHBOARD_PATH = '/admin/analytics'
+
+/** Plan and usage page for Consultancy Owners (E45; Journey J38). */
+export const PLAN_AND_USAGE_PATH = '/plan-usage'
+
+/** Super admin billing status overview (E47; Journey J40). */
+export const BILLING_STATUS_PATH = '/admin/billing-status'

@@ -47,6 +47,8 @@ from app.models.plan import Plan, PlanTier
 #: (Requirements §4 explicitly says Enterprise is "unlimited/custom";
 #: we model that with NULL on the column rather than a magic
 #: ``2**31 - 1`` sentinel, see :mod:`app.models.plan`).
+#: Prices are in paisa (smallest currency unit for INR) for Razorpay
+#: checkout (E46; Journey J39).
 DEFAULT_PLANS: tuple[dict, ...] = (
     {
         "code": PlanTier.STARTER,
@@ -58,6 +60,8 @@ DEFAULT_PLANS: tuple[dict, ...] = (
         "max_branches": 1,
         "max_staff": 5,
         "max_students": 50,
+        "price_in_cents": 499900,  # ₹4,999
+        "currency": "INR",
     },
     {
         "code": PlanTier.GROWTH,
@@ -69,6 +73,8 @@ DEFAULT_PLANS: tuple[dict, ...] = (
         "max_branches": 5,
         "max_staff": 25,
         "max_students": 500,
+        "price_in_cents": 999900,  # ₹9,999
+        "currency": "INR",
     },
     {
         "code": PlanTier.ENTERPRISE,
@@ -80,6 +86,8 @@ DEFAULT_PLANS: tuple[dict, ...] = (
         "max_branches": None,
         "max_staff": None,
         "max_students": None,
+        "price_in_cents": 2499900,  # ₹24,999
+        "currency": "INR",
     },
 )
 
@@ -106,6 +114,8 @@ def seed_default_plans(session: Session) -> int:
                 max_branches=entry["max_branches"],
                 max_staff=entry["max_staff"],
                 max_students=entry["max_students"],
+                price_in_cents=entry["price_in_cents"],
+                currency=entry["currency"],
                 is_active=True,
                 created_at=now,
                 updated_at=now,

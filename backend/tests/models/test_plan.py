@@ -33,6 +33,8 @@ def test_plan_model_has_required_columns():
         "max_branches",
         "max_staff",
         "max_students",
+        "price_in_cents",
+        "currency",
         "is_active",
         "created_at",
         "updated_at",
@@ -201,3 +203,66 @@ def test_plan_tier_enum_values_match_requirements():
     a breaking change.
     """
     assert {tier.value for tier in PlanTier} == {"starter", "growth", "enterprise"}
+
+
+def test_plan_pricing_fields_persist(db_session):
+    """Pricing fields (price_in_cents, currency) persist correctly."""
+    now = datetime.now(timezone.utc)
+    plan = Plan(
+        code=PlanTier.STARTER,
+        name="Starter",
+        description="Single-branch tier",
+        max_branches=1,
+        max_staff=5,
+        max_students=50,
+        price_in_cents=499900,  # ₹4,999
+        currency="INR",
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(plan)
+    db_session.commit()
+    db_session.refresh(plan)
+
+    assert plan.price_in_cents == 499900
+    assert plan.currency == "INR"
+
+
+def test_plan_price_in_cents_defaults_to_zero(db_session):
+    """price_in_cents defaults to 0 when not specified."""
+    now = datetime.now(timezone.utc)
+    plan = Plan(
+        code=PlanTier.STARTER,
+        name="Starter",
+        max_branches=1,
+        max_staff=5,
+        max_students=50,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(plan)
+    db_session.commit()
+    db_session.refresh(plan)
+
+    # Column has server_default="0" in the migration
+    assert plan.price_in_cents == 0
+
+
+def test_plan_currency_defaults_to_inr(db_session):
+    """currency defaults to INR when not specified."""
+    now = datetime.now(timezone.utc)
+    plan = Plan(
+        code=PlanTier.STARTER,
+        name="Starter",
+        max_branches=1,
+        max_staff=5,
+        max_students=50,
+        price_in_cents=499900,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(plan)
+    db_session.commit()
+    db_session.refresh(plan)
+
+    assert plan.currency == "INR"
