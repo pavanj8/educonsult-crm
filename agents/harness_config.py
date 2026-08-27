@@ -26,7 +26,10 @@ _DEFAULTS: dict = {
         "dir": "backend", "app_module": "app.main:app", "health_path": "/health",
         "requirements": "requirements.txt", "lint": "ruff check .", "test": "python -m pytest -q",
     },
-    "frontend": {"dir": "frontend", "lint": "npm run lint", "build": "npm run build"},
+    "frontend": {
+        "dir": "frontend", "lint": "npm run lint", "build": "npm run build",
+        "test": "npm run test",
+    },
     # Where the Dev/Test/Review/Planner agents run: "github" (GitHub Actions
     # runners, the default) or "local" (this machine, via agents/run_local.py).
     "execution": {"mode": "github"},
@@ -125,6 +128,9 @@ def _emit_shell() -> None:
         "FRONTEND_DIR": c["frontend"]["dir"],
         "FRONTEND_LINT": c["frontend"]["lint"],
         "FRONTEND_BUILD": c["frontend"]["build"],
+        # .get(): a project config written before frontend tests were gated
+        # still loads instead of raising KeyError on every check.sh run.
+        "FRONTEND_TEST": c["frontend"].get("test", "npm run test"),
     }
     for k, v in pairs.items():
         print(f"export HARNESS_{k}={shlex.quote(str(v))}")

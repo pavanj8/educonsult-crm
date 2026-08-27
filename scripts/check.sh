@@ -7,7 +7,7 @@
 # a new project points this at its own stack without editing this file.
 #
 # Modes (default "all"):
-#   backend-lint | backend-test | frontend-lint | frontend-build
+#   backend-lint | backend-test | frontend-lint | frontend-build | frontend-test
 #   backend | frontend | all
 set -uo pipefail
 
@@ -23,6 +23,7 @@ BE_LINT="${HARNESS_BACKEND_LINT:-ruff check .}"
 BE_TEST="${HARNESS_BACKEND_TEST:-python -m pytest -q}"
 FE_LINT="${HARNESS_FRONTEND_LINT:-npm run lint}"
 FE_BUILD="${HARNESS_FRONTEND_BUILD:-npm run build}"
+FE_TEST="${HARNESS_FRONTEND_TEST:-npm run test}"
 
 # Local runs (execution.mode=local, agents/run_local.py) install deps into a
 # backend venv; CI installs them globally and has no venv. Prefer the venv when
@@ -38,17 +39,19 @@ be_lint()  { echo "== backend: $BE_LINT =="; ( cd "$ROOT/$BE_DIR" && eval "$BE_L
 be_test()  { echo "== backend: $BE_TEST =="; ( cd "$ROOT/$BE_DIR" && eval "$BE_TEST" ) || rc=1; }
 fe_lint()  { echo "== frontend: $FE_LINT =="; ( cd "$ROOT/$FE_DIR" && eval "$FE_LINT" ) || rc=1; }
 fe_build() { echo "== frontend: $FE_BUILD =="; ( cd "$ROOT/$FE_DIR" && eval "$FE_BUILD" ) || rc=1; }
+fe_test()  { echo "== frontend: $FE_TEST =="; ( cd "$ROOT/$FE_DIR" && eval "$FE_TEST" ) || rc=1; }
 
 case "$MODE" in
   backend-lint)   be_lint ;;
   backend-test)   be_test ;;
   frontend-lint)  fe_lint ;;
   frontend-build) fe_build ;;
+  frontend-test)  fe_test ;;
   backend)   has_backend  && { be_lint; be_test; } || echo "(no $BE_DIR/ — skipped)" ;;
-  frontend)  has_frontend && { fe_lint; fe_build; } || echo "(no $FE_DIR/ — skipped)" ;;
+  frontend)  has_frontend && { fe_lint; fe_build; fe_test; } || echo "(no $FE_DIR/ — skipped)" ;;
   all)
     has_backend  && { be_lint; be_test; }  || echo "(no $BE_DIR/ — skipped)"
-    has_frontend && { fe_lint; fe_build; } || echo "(no $FE_DIR/ — skipped)"
+    has_frontend && { fe_lint; fe_build; fe_test; } || echo "(no $FE_DIR/ — skipped)"
     ;;
   *) echo "unknown mode: $MODE"; exit 2 ;;
 esac
