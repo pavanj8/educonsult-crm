@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -119,6 +120,44 @@ describe('AppRouter routes', () => {
     expect(screen.getByTestId('login-email')).toBeInTheDocument()
     // The attempted path is carried so login can return them to it.
     expect(screen.getByTestId('redirect-from')).toHaveTextContent('/staff')
+    expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+  })
+
+  it('signs out from inside the app shell and ends up signed out on a public page', async () => {
+    // Pins the real end-to-end behaviour, which a unit test of AccountMenu on
+    // its own cannot see: sign-out clears the session and ProtectedRoute
+    // decides the destination, which from the app root is the landing page.
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/me')) {
+        return new Response(JSON.stringify(mockUser), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }) as typeof fetch
+    localStorage.setItem('access_token', 'token')
+    localStorage.setItem('refresh_token', 'refresh')
+
+    renderAppAt('/')
+
+    const trigger = await screen.findByTestId('account-menu-trigger')
+    await userEvent.click(trigger)
+    await userEvent.click(screen.getByTestId('account-menu-signout'))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /Streamline Your Education Consultancy/i }),
+      ).toBeInTheDocument()
+    })
+    expect(localStorage.getItem('access_token')).toBeNull()
+    expect(localStorage.getItem('refresh_token')).toBeNull()
+    // The app shell is gone, so the session really has ended.
+    expect(screen.queryByTestId('account-menu-trigger')).not.toBeInTheDocument()
     expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
   })
 

@@ -2208,7 +2208,7 @@
 /* Secondary / inline actions inside tables and forms. */
 [class$='__edit'],
 [class$='__cancel'],
-[class$='__actions'] button:not([class$='__submit']) {
+[class$='__actions']:not(.app-header__actions) button:not([class$='__submit']) {
   padding: 0.375rem 0.75rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -2223,7 +2223,7 @@
 
 [class$='__edit']:hover,
 [class$='__cancel']:hover,
-[class$='__actions'] button:not([class$='__submit']):hover {
+[class$='__actions']:not(.app-header__actions) button:not([class$='__submit']):hover {
   background: var(--color-primary-50);
   border-color: var(--color-primary-300);
   color: var(--color-primary-700);
@@ -2558,4 +2558,148 @@
   grid-column: 1 / -1;
   font-size: 0.6875rem;
   color: var(--text-subtle);
+}
+
+/* ---- Account menu -------------------------------------------------------
+ * Sits on the brand-coloured header, so the trigger is drawn with
+ * translucent layers of --brand-color-contrast rather than fixed greys, the
+ * same approach the nav links use. The dropdown panel is a normal light
+ * surface, since it overlays the page rather than the header.
+ */
+
+.account-menu {
+  position: relative;
+}
+
+.account-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.625rem 0.25rem 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--brand-color-contrast) 24%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--brand-color-contrast) 10%, transparent);
+  color: var(--brand-color-contrast);
+  font-size: var(--text-xs);
+  font-weight: 550;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.account-menu__trigger:hover {
+  background: color-mix(in srgb, var(--brand-color-contrast) 20%, transparent);
+  border-color: color-mix(in srgb, var(--brand-color-contrast) 40%, transparent);
+}
+
+.account-menu__trigger:focus-visible {
+  outline: 2px solid var(--brand-color-contrast);
+  outline-offset: 2px;
+}
+
+.account-menu__avatar {
+  display: grid;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: var(--radius-full);
+  background: var(--brand-color-contrast);
+  color: var(--brand-color);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.account-menu__role {
+  white-space: nowrap;
+}
+
+.account-menu__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
+  min-width: 14rem;
+  padding: 0.375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.account-menu__identity {
+  padding: 0.5rem 0.625rem 0.625rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-menu__email {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.account-menu__meta {
+  margin: 0.125rem 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.account-menu__signout {
+  display: block;
+  width: 100%;
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-danger-700);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  transition: background-color var(--transition-fast);
+}
+
+.account-menu__signout:hover {
+  background: var(--color-danger-50);
+}
+
+@media (max-width: 40rem) {
+  /* Keep the header row short on a phone: the role label is repeated inside
+   * the panel, so the avatar alone is enough to open it. */
+  .account-menu__role {
+    display: none;
+  }
+
+  .account-menu__trigger {
+    padding: 0.25rem;
+  }
+}
+
+/* The notification bell predates the dark app header: a solid white box with
+ * a light border read fine on the old white chrome, but on the brand colour it
+ * lands as a bright slab next to the translucent nav. Match the account menu's
+ * treatment so the two header controls belong together, and keep drawing from
+ * --brand-color-contrast so it still works on a tenant's own colour.
+ */
+.notification-bell__button {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-color: color-mix(in srgb, var(--brand-color-contrast) 24%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--brand-color-contrast) 10%, transparent);
+  color: var(--brand-color-contrast);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.notification-bell__button:hover {
+  background: color-mix(in srgb, var(--brand-color-contrast) 20%, transparent);
+  border-color: color-mix(in srgb, var(--brand-color-contrast) 40%, transparent);
+}
+
+.notification-bell__button:focus-visible {
+  outline: 2px solid var(--brand-color-contrast);
+  outline-offset: 2px;
 }

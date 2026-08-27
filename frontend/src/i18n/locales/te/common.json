@@ -14,6 +14,10 @@
       "myApplications": "నా దరఖాస్తులు",
       "intake": "ఇంటేక్",
       "visaQueue": "వీసా క్యూ"
+    },
+    "account": {
+      "menu": "ఖాతా మెను",
+      "signOut": "సైన్ అవుట్"
     }
   },
   "home": {

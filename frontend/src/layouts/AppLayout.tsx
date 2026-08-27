@@ -2,6 +2,7 @@ import { Link, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import LanguageSwitcher from '../components/i18n/LanguageSwitcher'
+import AccountMenu from '../components/auth/AccountMenu'
 import NotificationBell from '../components/notifications/NotificationBell'
 import {
   CHECKLIST_TEMPLATES_PATH,
@@ -138,6 +139,7 @@ export default function AppLayout() {
         <div className="app-header__actions">
           <LanguageSwitcher />
           <NotificationBell />
+          <AccountMenu />
         </div>
       </header>
       <main className="app-main">
