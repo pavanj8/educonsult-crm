@@ -22,6 +22,15 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>
   registerStudent: (payload: RegisterStudentRequest) => Promise<void>
   logout: () => void
+  /**
+   * True once the user has deliberately signed out in this browsing session,
+   * as opposed to simply never having signed in. ProtectedRoute uses it to
+   * choose between the landing page (a visitor) and the login form (someone
+   * who just left, most likely to come back as a different user). Resets on a
+   * page load, so a returning visitor is not permanently routed past the
+   * landing page.
+   */
+  hasSignedOut: boolean
   refreshSession: () => Promise<boolean>
   clearError: () => void
 }
@@ -32,11 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hasSignedOut, setHasSignedOut] = useState(false)
 
   const logout = useCallback(() => {
     clearTokens()
     setUser(null)
     setError(null)
+    setHasSignedOut(true)
   }, [])
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
@@ -152,10 +163,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       registerStudent,
       logout,
+      // Derived rather than reset at each of the four places a session can be
+      // established (login, register, refresh, restore-on-load): you cannot be
+      // signed out while signed in, so a successful auth clears it for free.
+      hasSignedOut: user === null && hasSignedOut,
       refreshSession,
       clearError,
     }),
-    [user, isLoading, error, login, registerStudent, logout, refreshSession, clearError],
+    [
+      user,
+      isLoading,
+      error,
+      login,
+      registerStudent,
+      logout,
+      hasSignedOut,
+      refreshSession,
+      clearError,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

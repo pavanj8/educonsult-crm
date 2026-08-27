@@ -59,6 +59,20 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
   })
 
+  it('sends a user who has just signed out to the login form, not the landing page', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      isLoading: false,
+      hasSignedOut: true,
+    })
+
+    renderProtected('/')
+
+    // Same path as the visitor case above; only the intent differs.
+    expect(screen.getByText('Login page')).toBeInTheDocument()
+    expect(screen.queryByText('Landing page')).not.toBeInTheDocument()
+  })
+
   it('redirects unauthenticated users from a protected deep link to login', () => {
     mockUseAuth.mockReturnValue({
       isAuthenticated: false,
