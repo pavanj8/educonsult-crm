@@ -775,10 +775,10 @@ class TestExportPlatformWideStats:
         assert "Tenant Name" in content
         assert "Tenant Slug" in content
         assert "Plan Code" in content
-        assert "Branches Count" in content
-        assert "Staff Count" in content
-        assert "Students Count" in content
-        assert "Applications Count" in content
+        assert "Total Branches" in content
+        assert "Total Staff" in content
+        assert "Total Students" in content
+        assert "Total Applications" in content
         assert "Enrolled" in content
         assert "Rejected" in content
         assert "Withdrawn" in content

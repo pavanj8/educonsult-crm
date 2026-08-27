@@ -77,6 +77,10 @@ class TestExportConversionFunnel:
         lines = content.strip().split("\n")
         assert "Stage" in lines[0]  # Header
         assert "Count" in lines[0]
+        assert "Percentage" in lines[0]
+        # Shares are of the total, so the column adds up rather than each row
+        # being a step-over-previous rate.
+        assert "%" in lines[1]
 
     def test_export_funnel_xlsx_success(
         self, client, db_session, override_authenticated_user
@@ -430,7 +434,9 @@ class TestExportPlatformStats:
         lines = content.strip().split("\n")
         assert "Tenant Name" in lines[0]
         assert "Plan Code" in lines[0]
-        assert "Branches Count" in lines[0]
+        assert "Total Branches" in lines[0]
+        assert "Total Staff" in lines[0]
+        assert "Total Students" in lines[0]
 
     def test_export_platform_stats_xlsx_success(
         self, client, db_session, override_authenticated_user
