@@ -26,6 +26,9 @@ describe('MarkWithdrawnAction', () => {
   it('blocks submit and shows a validation error when the reason is empty', async () => {
     render(<MarkWithdrawnAction applicationId={5} />)
     await userEvent.click(screen.getByTestId('mark-withdrawn-open-5'))
+    // Bypass native HTML validation to exercise our JS-side guard.
+    const form = screen.getByTestId('mark-withdrawn-form-5') as HTMLFormElement
+    form.noValidate = true
     await userEvent.click(screen.getByTestId('mark-withdrawn-submit-5'))
     expect(screen.getByTestId('mark-withdrawn-validation-5')).toHaveTextContent(/required/i)
     expect(markWithdrawnMock).not.toHaveBeenCalled()

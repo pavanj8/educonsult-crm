@@ -180,7 +180,11 @@ describe('AppLayout — brand color theming (E10 / J3 / #113)', () => {
     ).toBeInTheDocument()
     const logo = screen.getByTestId('app-header-logo')
     expect(logo).toHaveAttribute('src', 'https://cdn.example.test/apex/logo.png')
-    expect(logo).toHaveAttribute('alt', 'Apex EduConsult logo')
+    // The logo is decorative: the adjacent <h1> above already announces the
+    // tenant name, so AppLayout gives the image an empty alt and hides it from
+    // assistive tech rather than announcing the brand twice per page.
+    expect(logo).toHaveAttribute('alt', '')
+    expect(logo).toHaveAttribute('aria-hidden', 'true')
     expect(logo).toHaveAttribute('referrerPolicy', 'no-referrer')
     expect(logo).toHaveAttribute('loading', 'lazy')
 

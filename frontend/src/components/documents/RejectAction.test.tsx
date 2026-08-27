@@ -22,6 +22,9 @@ describe('RejectAction', () => {
   it('blocks submit and shows a validation error when the comment is empty', async () => {
     const onReject = renderAction()
     await userEvent.click(screen.getByTestId('reject-open-7'))
+    // Bypass native HTML validation to exercise our JS-side guard.
+    const form = screen.getByTestId('reject-form-7') as HTMLFormElement
+    form.noValidate = true
     await userEvent.click(screen.getByTestId('reject-submit-7'))
 
     expect(screen.getByTestId('reject-validation-7')).toHaveTextContent(/required/i)
