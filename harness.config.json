@@ -14,7 +14,8 @@
   "frontend": {
     "dir": "frontend",
     "lint": "npm run lint",
-    "build": "npm run build"
+    "build": "npm run build",
+    "test": "npm run test"
   },
   "execution": {
     "mode": "github"
@@ -38,5 +39,11 @@
       }
     }
   },
-  "protected_paths": ["docs/", "agents/", ".github/", ".cursor/", "scripts/"]
+  "protected_paths": [
+    "docs/",
+    "agents/",
+    ".github/",
+    ".cursor/",
+    "scripts/"
+  ]
 }

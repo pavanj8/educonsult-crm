@@ -121,10 +121,11 @@ def _dev_gate() -> tuple[int, str]:
 
 
 def _frontend_gate() -> tuple[int, str]:
-    """Run `check.sh frontend` (oxlint + tsc + vite build) when the ticket changed
-    frontend source, so type errors are caught IN-RUN and fed back for the agent
-    to fix (docs/adr/0033). Skips silently when there is no frontend, no frontend
-    change, or deps can't be installed (CI still catches those cases)."""
+    """Run `check.sh frontend` (oxlint + tsc + vite build + vitest) when the
+    ticket changed frontend source, so type and test failures are caught IN-RUN
+    and fed back for the agent to fix (docs/adr/0033). Skips silently when there
+    is no frontend, no frontend change, or deps can't be installed (CI still
+    catches those cases)."""
     fe_dir = REPO_ROOT / _frontend_dir()
     if not (fe_dir / "package.json").exists():
         return 0, ""
