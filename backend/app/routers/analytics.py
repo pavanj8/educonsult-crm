@@ -1,9 +1,9 @@
 """Analytics routes (E41, E42, E44; Journey J34, J35, J37)."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -20,6 +20,7 @@ from app.pipeline.stages import PipelineStage
 from app.rbac.dependencies import require_role
 from app.rbac.roles import Role
 from app.rbac.user import AuthenticatedUser
+from app.routers.analytics_export import export_student_list
 from app.schemas.analytics import (
     BranchComparisonBucket,
     BranchComparisonResponse,
@@ -30,10 +31,17 @@ from app.schemas.analytics import (
     RegistrationsOverTimeResponse,
     TenantStatsBucket,
 )
+from app.utils.export_helpers import (
+    write_csv_response,
+    write_excel_response,
+)
 
 router = APIRouter()
 
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
+
+# Add export endpoint
+router.add_api_route("/export/students", export_student_list, methods=["GET"])
 
 
 @router.get("/funnel", response_model=ConversionFunnelResponse)
@@ -804,3 +812,256 @@ def platform_wide_stats(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=_DB_UNAVAILABLE_DETAIL,
         ) from None
+
+
+@router.get("/funnel/export", response_class=Response)
+def export_conversion_funnel(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(
+            require_role(
+                Role.BRANCH_MANAGER,
+                Role.CONSULTANCY_OWNER,
+                Role.SUPER_ADMIN,
+            )
+        ),
+    ],
+    start_date: Annotated[datetime | None, Query()] = None,
+    end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
+    db: Session = Depends(get_db),
+) -> Response:
+    """Export conversion funnel analytics to CSV/Excel (E44; Journey J37).
+
+    Returns a CSV or Excel file containing the conversion funnel breakdown by stage.
+    The data is the same as GET /analytics/funnel but formatted for download.
+
+    **Permission**: ``ANALYTICS_BRANCH`` (branch manager and above)
+
+    **Query Parameters**:
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
+    """
+    funnel_data = conversion_funnel(
+        current_user=current_user,
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
+
+    rows = [
+        {
+            "Stage": bucket.stage,
+            "Count": bucket.count,
+        }
+        for bucket in funnel_data.funnel
+    ]
+
+    rows.append(
+        {
+            "Stage": "TOTAL",
+            "Count": funnel_data.total_applications,
+        }
+    )
+
+    if format in ("excel", "xlsx"):
+        return write_excel_response(rows, "conversion_funnel")
+    else:
+        return write_csv_response(rows, "conversion_funnel")
+
+
+@router.get("/registrations-over-time/export", response_class=Response)
+def export_registrations_over_time(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(
+            require_role(
+                Role.BRANCH_MANAGER,
+                Role.CONSULTANCY_OWNER,
+                Role.SUPER_ADMIN,
+            )
+        ),
+    ],
+    start_date: Annotated[datetime | None, Query()] = None,
+    end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
+    db: Session = Depends(get_db),
+) -> Response:
+    """Export registrations-over-time analytics to CSV/Excel (E44; Journey J37).
+
+    Returns a CSV or Excel file containing the time-series of student registrations.
+    The data is the same as GET /analytics/registrations but formatted for download.
+
+    **Permission**: ``ANALYTICS_BRANCH`` (branch manager and above)
+
+    **Query Parameters**:
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
+    """
+    registrations_data = registrations_over_time(
+        current_user=current_user,
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
+
+    rows = [
+        {
+            "Date": bucket.date,
+            "Count": bucket.count,
+        }
+        for bucket in registrations_data.data
+    ]
+
+    rows.append(
+        {
+            "Date": "TOTAL",
+            "Count": registrations_data.total_registrations,
+        }
+    )
+
+    if format in ("excel", "xlsx"):
+        return write_excel_response(rows, "registrations_over_time")
+    else:
+        return write_csv_response(rows, "registrations_over_time")
+
+
+@router.get("/branch-comparison/export", response_class=Response)
+def export_branch_comparison(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(
+            require_role(
+                Role.CONSULTANCY_OWNER,
+                Role.SUPER_ADMIN,
+            )
+        ),
+    ],
+    start_date: Annotated[datetime | None, Query()] = None,
+    end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
+    db: Session = Depends(get_db),
+) -> Response:
+    """Export cross-branch comparison analytics to CSV/Excel (E44; Journey J37).
+
+    Returns a CSV or Excel file containing branch comparison metrics.
+    The data is the same as GET /analytics/branch-comparison but formatted for download.
+
+    **Permission**: ``ANALYTICS_CROSS_BRANCH`` (consultancy owner and super admin)
+
+    **Query Parameters**:
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
+    """
+    comparison_data = branch_comparison(
+        current_user=current_user,
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
+
+    rows = [
+        {
+            "Branch ID": bucket.branch_id,
+            "Branch Name": bucket.branch_name,
+            "Branch City": bucket.branch_city,
+            "Total Applications": bucket.total_applications,
+            "Enrolled": bucket.enrolled_count,
+            "Rejected": bucket.rejected_count,
+            "Withdrawn": bucket.withdrawn_count,
+            "Active": bucket.active_count,
+        }
+        for bucket in comparison_data.branches
+    ]
+
+    rows.append(
+        {
+            "Branch ID": "TOTAL",
+            "Branch Name": f"{comparison_data.total_branches} branches",
+            "Branch City": "N/A",
+            "Total Applications": comparison_data.total_applications,
+            "Enrolled": "N/A",
+            "Rejected": "N/A",
+            "Withdrawn": "N/A",
+            "Active": "N/A",
+        }
+    )
+
+    if format in ("excel", "xlsx"):
+        return write_excel_response(rows, "branch_comparison")
+    else:
+        return write_csv_response(rows, "branch_comparison")
+
+
+@router.get("/platform-wide-stats/export", response_class=Response)
+def export_platform_wide_stats(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_role(Role.SUPER_ADMIN)),
+    ],
+    start_date: Annotated[datetime | None, Query()] = None,
+    end_date: Annotated[datetime | None, Query()] = None,
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
+    db: Session = Depends(get_db),
+) -> Response:
+    """Export platform-wide tenant stats to CSV/Excel (E44; Journey J37).
+
+    Returns a CSV or Excel file containing platform-wide tenant metrics.
+    The data is the same as GET /analytics/platform-wide-stats but formatted for download.
+
+    **Permission**: ``SUPER_ADMIN`` only
+
+    **Query Parameters**:
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
+
+    **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
+    """
+    stats_data = platform_wide_stats(
+        current_user=current_user,
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
+
+    rows = [
+        {
+            "Tenant ID": bucket.tenant_id,
+            "Tenant Name": bucket.tenant_name,
+            "Tenant Slug": bucket.tenant_slug,
+            "Plan Code": bucket.plan_code or "",
+            "Branches Count": bucket.branches_count,
+            "Staff Count": bucket.staff_count,
+            "Students Count": bucket.students_count,
+            "Applications Count": bucket.applications_count,
+            "Enrolled": bucket.enrolled_count,
+            "Rejected": bucket.rejected_count,
+            "Withdrawn": bucket.withdrawn_count,
+            "Active": bucket.active_count,
+        }
+        for bucket in stats_data.tenants
+    ]
+
+    rows.append(
+        {
+            "Tenant ID": "TOTAL",
+            "Tenant Name": f"{stats_data.total_tenants} tenants",
+            "Tenant Slug": "N/A",
+            "Plan Code": "N/A",
+            "Branches Count": stats_data.total_branches,
+            "Staff Count": stats_data.total_staff,
+            "Students Count": stats_data.total_students,
+            "Applications Count": stats_data.total_applications,
+            "Enrolled": "N/A",
+            "Rejected": "N/A",
+            "Withdrawn": "N/A",
+            "Active": "N/A",
+        }
+    )
+
+    if format in ("excel", "xlsx"):
+        return write_excel_response(rows, "platform_wide_stats")
+    else:
+        return write_csv_response(rows, "platform_wide_stats")

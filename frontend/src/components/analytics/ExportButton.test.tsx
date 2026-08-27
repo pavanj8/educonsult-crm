@@ -31,10 +31,25 @@ describe('ExportButton', () => {
     mockLink.download = ''
     mockLink.click.mockClear()
 
-    // Set up mocks before rendering
-    createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any)
-    appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node)
-    removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node)
+    // Intercept only the anchor the component creates to trigger the download.
+    // Every other element -- notably React Testing Library's own container --
+    // must still be a real DOM node, so delegate to the originals.
+    const realCreateElement = document.createElement.bind(document)
+    createElementSpy = vi
+      .spyOn(document, 'createElement')
+      .mockImplementation((tagName: any, options?: any) =>
+        tagName === 'a' ? (mockLink as any) : realCreateElement(tagName, options),
+      )
+
+    const realAppendChild = document.body.appendChild.bind(document.body)
+    appendChildSpy = vi
+      .spyOn(document.body, 'appendChild')
+      .mockImplementation((node: any) => (node === mockLink ? node : realAppendChild(node)))
+
+    const realRemoveChild = document.body.removeChild.bind(document.body)
+    removeChildSpy = vi
+      .spyOn(document.body, 'removeChild')
+      .mockImplementation((node: any) => (node === mockLink ? node : realRemoveChild(node)))
   })
 
   afterEach(() => {
@@ -190,10 +205,6 @@ describe('ExportButton', () => {
       } as unknown as Response),
     ) as any
 
-    const createElementSpy2 = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any)
-    const appendChildSpy2 = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any)
-    const removeChildSpy2 = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any)
-
     render(<ExportButton endpoint="/analytics/export/students" format="csv" />)
 
     const button = screen.getByRole('button', { name: 'Export CSV' })
@@ -204,10 +215,6 @@ describe('ExportButton', () => {
     })
 
     expect(screen.getByRole('alert')).toBeInTheDocument()
-
-    createElementSpy2.mockRestore()
-    appendChildSpy2.mockRestore()
-    removeChildSpy2.mockRestore()
   })
 
   it('shows user-friendly error message on 403 permission denied', async () => {
@@ -225,10 +232,6 @@ describe('ExportButton', () => {
       } as unknown as Response),
     ) as any
 
-    const createElementSpy2 = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any)
-    const appendChildSpy2 = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any)
-    const removeChildSpy2 = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any)
-
     render(<ExportButton endpoint="/analytics/export/students" format="csv" />)
 
     const button = screen.getByRole('button', { name: 'Export CSV' })
@@ -239,10 +242,6 @@ describe('ExportButton', () => {
     })
 
     expect(screen.getByRole('alert')).toBeInTheDocument()
-
-    createElementSpy2.mockRestore()
-    appendChildSpy2.mockRestore()
-    removeChildSpy2.mockRestore()
   })
 
   it('uses Excel media type for xlsx format', async () => {
@@ -264,10 +263,6 @@ describe('ExportButton', () => {
     globalThis.URL.createObjectURL = vi.fn(() => 'blob:url') as any
     globalThis.URL.revokeObjectURL = vi.fn() as any
 
-    const createElementSpy2 = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any)
-    const appendChildSpy2 = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any)
-    const removeChildSpy2 = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any)
-
     render(<ExportButton endpoint="/analytics/export/students" format="xlsx" />)
 
     const button = screen.getByRole('button', { name: 'Export Excel' })
@@ -283,10 +278,6 @@ describe('ExportButton', () => {
         }),
       )
     })
-
-    createElementSpy2.mockRestore()
-    appendChildSpy2.mockRestore()
-    removeChildSpy2.mockRestore()
   })
 
   it('generates default filename when Content-Disposition is missing', async () => {
@@ -308,10 +299,6 @@ describe('ExportButton', () => {
     globalThis.URL.createObjectURL = vi.fn(() => 'blob:url') as any
     globalThis.URL.revokeObjectURL = vi.fn() as any
 
-    const createElementSpy2 = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any)
-    const appendChildSpy2 = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any)
-    const removeChildSpy2 = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any)
-
     render(<ExportButton endpoint="/analytics/export/students" format="csv" />)
 
     const button = screen.getByRole('button', { name: 'Export CSV' })
@@ -320,9 +307,5 @@ describe('ExportButton', () => {
     await waitFor(() => {
       expect(mockLink.download).toBe('export.csv')
     })
-
-    createElementSpy2.mockRestore()
-    appendChildSpy2.mockRestore()
-    removeChildSpy2.mockRestore()
   })
 })

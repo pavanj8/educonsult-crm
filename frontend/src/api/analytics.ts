@@ -181,7 +181,7 @@ export function getAnalyticsExportUrl(
     funnel: '/analytics/funnel/export',
     registrations: '/analytics/registrations-over-time/export',
     'branch-comparison': '/analytics/branch-comparison/export',
-    'platform-stats': '/analytics/platform-stats/export',
+    'platform-stats': '/analytics/platform-wide-stats/export',
   }
 
   return `${endpoints[exportType]}${queryString ? `?${queryString}` : ''}`

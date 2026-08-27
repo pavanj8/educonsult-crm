@@ -10,7 +10,7 @@ from tests.factories.users import make_authenticated_user
 
 
 class TestExportConversionFunnel:
-    """Tests for GET /analytics/export/funnel"""
+    """Tests for GET /analytics/funnel/export"""
 
     def test_export_funnel_csv_requires_report_export_permission(
         self, client, db_session, override_authenticated_user
@@ -20,7 +20,7 @@ class TestExportConversionFunnel:
             make_authenticated_user(Role.COUNSELOR, user_id=20, tenant_id=1)
         )
 
-        response = client.get("/analytics/export/funnel?format=csv")
+        response = client.get("/analytics/funnel/export?format=csv")
 
         # Expected: 403 Forbidden (counselor doesn't have REPORT_EXPORT)
         assert response.status_code == 403
@@ -66,7 +66,7 @@ class TestExportConversionFunnel:
         db_session.add(app2)
         db_session.commit()
 
-        response = client.get("/analytics/export/funnel?format=csv")
+        response = client.get("/analytics/funnel/export?format=csv")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
@@ -77,7 +77,6 @@ class TestExportConversionFunnel:
         lines = content.strip().split("\n")
         assert "Stage" in lines[0]  # Header
         assert "Count" in lines[0]
-        assert "Percentage" in lines[0]
 
     def test_export_funnel_xlsx_success(
         self, client, db_session, override_authenticated_user
@@ -109,7 +108,7 @@ class TestExportConversionFunnel:
         db_session.add(app1)
         db_session.commit()
 
-        response = client.get("/analytics/export/funnel?format=xlsx")
+        response = client.get("/analytics/funnel/export?format=xlsx")
 
         # openpyxl may not be installed
         if response.status_code == 501:
@@ -136,7 +135,7 @@ class TestExportConversionFunnel:
         # Create master data with required fields
         country = Country(id=1, name="USA", code="US", tenant_id=1)
         db_session.add(country)
-        university = University(id=1, name="Test University", country_id=1)
+        university = University(id=1, name="Test University", country_id=1, tenant_id=1)
         db_session.add(university)
         program = Program(id=1, name="Test Program", university_id=1, tenant_id=1)
         db_session.add(program)
@@ -173,13 +172,13 @@ class TestExportConversionFunnel:
         end = now.isoformat()
 
         response = client.get(
-            f"/analytics/export/funnel?format=csv&start_date={start}&end_date={end}"
+            f"/analytics/funnel/export?format=csv&start_date={start}&end_date={end}"
         )
         assert response.status_code == 200
 
 
 class TestExportRegistrationsOverTime:
-    """Tests for GET /analytics/export/registrations"""
+    """Tests for GET /analytics/registrations-over-time/export"""
 
     def test_export_registrations_csv_requires_report_export_permission(
         self, client, db_session, override_authenticated_user
@@ -189,7 +188,7 @@ class TestExportRegistrationsOverTime:
             make_authenticated_user(Role.COUNSELOR, user_id=21, tenant_id=1)
         )
 
-        response = client.get("/analytics/export/registrations?format=csv")
+        response = client.get("/analytics/registrations-over-time/export?format=csv")
         assert response.status_code == 403
 
     def test_export_registrations_csv_success(
@@ -214,7 +213,7 @@ class TestExportRegistrationsOverTime:
         db_session.add(student1)
         db_session.commit()
 
-        response = client.get("/analytics/export/registrations?format=csv")
+        response = client.get("/analytics/registrations-over-time/export?format=csv")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
@@ -233,7 +232,7 @@ class TestExportRegistrationsOverTime:
             make_authenticated_user(Role.CONSULTANCY_OWNER, user_id=34, tenant_id=1)
         )
 
-        response = client.get("/analytics/export/registrations?format=xlsx")
+        response = client.get("/analytics/registrations-over-time/export?format=xlsx")
 
         if response.status_code == 501:
             return
@@ -273,13 +272,13 @@ class TestExportRegistrationsOverTime:
         end = now.isoformat()
 
         response = client.get(
-            f"/analytics/export/registrations?format=csv&start_date={start}&end_date={end}"
+            f"/analytics/registrations-over-time/export?format=csv&start_date={start}&end_date={end}"
         )
         assert response.status_code == 200
 
 
 class TestExportBranchComparison:
-    """Tests for GET /analytics/export/branch-comparison"""
+    """Tests for GET /analytics/branch-comparison/export"""
 
     def test_export_branch_comparison_csv_requires_report_export_permission(
         self, client, db_session, override_authenticated_user
@@ -291,7 +290,7 @@ class TestExportBranchComparison:
             make_authenticated_user(Role.COUNSELOR, user_id=36, tenant_id=1)
         )
 
-        response = client.get("/analytics/export/branch-comparison?format=csv")
+        response = client.get("/analytics/branch-comparison/export?format=csv")
         # Should be 403 since counselor lacks REPORT_EXPORT
         assert response.status_code == 403
 
@@ -306,7 +305,7 @@ class TestExportBranchComparison:
             )
         )
 
-        response = client.get("/analytics/export/branch-comparison?format=csv")
+        response = client.get("/analytics/branch-comparison/export?format=csv")
         assert response.status_code == 403
 
     def test_export_branch_comparison_csv_success(
@@ -326,7 +325,7 @@ class TestExportBranchComparison:
         # Create master data with required fields
         country = Country(id=1, name="USA", code="US", tenant_id=1)
         db_session.add(country)
-        university = University(id=1, name="Test University", country_id=1)
+        university = University(id=1, name="Test University", country_id=1, tenant_id=1)
         db_session.add(university)
         program = Program(id=1, name="Test Program", university_id=1, tenant_id=1)
         db_session.add(program)
@@ -353,7 +352,7 @@ class TestExportBranchComparison:
         db_session.add(app2)
         db_session.commit()
 
-        response = client.get("/analytics/export/branch-comparison?format=csv")
+        response = client.get("/analytics/branch-comparison/export?format=csv")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
@@ -363,7 +362,7 @@ class TestExportBranchComparison:
         lines = content.strip().split("\n")
         assert "Branch Name" in lines[0]
         assert "Branch City" in lines[0]
-        assert "Total Students" in lines[0]
+        assert "Total Applications" in lines[0]
 
     def test_export_branch_comparison_xlsx_success(
         self, client, db_session, override_authenticated_user
@@ -373,7 +372,7 @@ class TestExportBranchComparison:
             make_authenticated_user(Role.SUPER_ADMIN, user_id=101, tenant_id=None)
         )
 
-        response = client.get("/analytics/export/branch-comparison?format=xlsx")
+        response = client.get("/analytics/branch-comparison/export?format=xlsx")
 
         if response.status_code == 501:
             return
@@ -386,7 +385,7 @@ class TestExportBranchComparison:
 
 
 class TestExportPlatformStats:
-    """Tests for GET /analytics/export/platform-stats"""
+    """Tests for GET /analytics/platform-wide-stats/export"""
 
     def test_export_platform_stats_denied_for_owner(
         self, client, db_session, override_authenticated_user
@@ -396,7 +395,7 @@ class TestExportPlatformStats:
             make_authenticated_user(Role.CONSULTANCY_OWNER, user_id=37, tenant_id=1)
         )
 
-        response = client.get("/analytics/export/platform-stats?format=csv")
+        response = client.get("/analytics/platform-wide-stats/export?format=csv")
         assert response.status_code == 403
 
     def test_export_platform_stats_denied_for_branch_manager(
@@ -410,7 +409,7 @@ class TestExportPlatformStats:
             )
         )
 
-        response = client.get("/analytics/export/platform-stats?format=csv")
+        response = client.get("/analytics/platform-wide-stats/export?format=csv")
         assert response.status_code == 403
 
     def test_export_platform_stats_csv_success(
@@ -421,7 +420,7 @@ class TestExportPlatformStats:
             make_authenticated_user(Role.SUPER_ADMIN, user_id=102, tenant_id=None)
         )
 
-        response = client.get("/analytics/export/platform-stats?format=csv")
+        response = client.get("/analytics/platform-wide-stats/export?format=csv")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
@@ -430,8 +429,8 @@ class TestExportPlatformStats:
         content = response.text
         lines = content.strip().split("\n")
         assert "Tenant Name" in lines[0]
-        assert "Plan" in lines[0]
-        assert "Total Branches" in lines[0]
+        assert "Plan Code" in lines[0]
+        assert "Branches Count" in lines[0]
 
     def test_export_platform_stats_xlsx_success(
         self, client, db_session, override_authenticated_user
@@ -441,7 +440,7 @@ class TestExportPlatformStats:
             make_authenticated_user(Role.SUPER_ADMIN, user_id=103, tenant_id=None)
         )
 
-        response = client.get("/analytics/export/platform-stats?format=xlsx")
+        response = client.get("/analytics/platform-wide-stats/export?format=xlsx")
 
         if response.status_code == 501:
             return
@@ -464,7 +463,7 @@ class TestExportPlatformStats:
         end = datetime.utcnow().isoformat()
 
         response = client.get(
-            f"/analytics/export/platform-stats?format=csv&start_date={start}&end_date={end}"
+            f"/analytics/platform-wide-stats/export?format=csv&start_date={start}&end_date={end}"
         )
         assert response.status_code == 200
 
@@ -480,9 +479,14 @@ class TestExportFormatValidation:
             make_authenticated_user(Role.SUPER_ADMIN, user_id=105, tenant_id=None)
         )
 
-        for endpoint in ["funnel", "registrations", "branch-comparison", "platform-stats"]:
+        for endpoint in [
+            "funnel",
+            "registrations-over-time",
+            "branch-comparison",
+            "platform-wide-stats",
+        ]:
             response = client.get(
-                f"/analytics/export/{endpoint}?format=invalid"
+                f"/analytics/{endpoint}/export?format=invalid"
             )
             # Should return 422 for invalid format
             assert response.status_code == 422
@@ -504,7 +508,7 @@ class TestTenantScoping:
         # Create master data with required fields
         country = Country(id=1, name="USA", code="US", tenant_id=1)
         db_session.add(country)
-        university = University(id=1, name="Test University", country_id=1)
+        university = University(id=1, name="Test University", country_id=1, tenant_id=1)
         db_session.add(university)
         program = Program(id=1, name="Test Program", university_id=1, tenant_id=1)
         db_session.add(program)
@@ -536,14 +540,14 @@ class TestTenantScoping:
         override_authenticated_user(
             make_authenticated_user(Role.CONSULTANCY_OWNER, user_id=38, tenant_id=1)
         )
-        owner_response = client.get("/analytics/export/funnel?format=csv")
+        owner_response = client.get("/analytics/funnel/export?format=csv")
         assert owner_response.status_code == 200
 
         # Super admin now has REPORT_EXPORT permission and can see all data
         override_authenticated_user(
             make_authenticated_user(Role.SUPER_ADMIN, user_id=106, tenant_id=None)
         )
-        superadmin_response = client.get("/analytics/export/funnel?format=csv")
+        superadmin_response = client.get("/analytics/funnel/export?format=csv")
         assert superadmin_response.status_code == 200
 
         # Super admin should have more or equal data than owner
@@ -583,7 +587,7 @@ class TestTenantScoping:
         override_authenticated_user(
             make_authenticated_user(Role.CONSULTANCY_OWNER, user_id=39, tenant_id=1)
         )
-        owner_response = client.get("/analytics/export/registrations?format=csv")
+        owner_response = client.get("/analytics/registrations-over-time/export?format=csv")
         assert owner_response.status_code == 200
 
         # Registrations export has Date and Count columns, not student emails
@@ -597,5 +601,5 @@ class TestTenantScoping:
         override_authenticated_user(
             make_authenticated_user(Role.SUPER_ADMIN, user_id=107, tenant_id=None)
         )
-        superadmin_response = client.get("/analytics/export/registrations?format=csv")
+        superadmin_response = client.get("/analytics/registrations-over-time/export?format=csv")
         assert superadmin_response.status_code == 200

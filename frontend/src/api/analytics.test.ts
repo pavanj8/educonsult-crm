@@ -451,27 +451,27 @@ describe('analytics API', () => {
   describe('getAnalyticsExportUrl (E44; Journey J37)', () => {
     it('returns URL for funnel export with csv format by default', () => {
       const url = getAnalyticsExportUrl('funnel')
-      expect(url).toBe('/analytics/export/funnel?format=csv')
+      expect(url).toBe('/analytics/funnel/export?format=csv')
     })
 
     it('returns URL for registrations export', () => {
       const url = getAnalyticsExportUrl('registrations')
-      expect(url).toBe('/analytics/export/registrations?format=csv')
+      expect(url).toBe('/analytics/registrations-over-time/export?format=csv')
     })
 
     it('returns URL for branch comparison export', () => {
       const url = getAnalyticsExportUrl('branch-comparison')
-      expect(url).toBe('/analytics/export/branch-comparison?format=csv')
+      expect(url).toBe('/analytics/branch-comparison/export?format=csv')
     })
 
     it('returns URL for platform stats export', () => {
       const url = getAnalyticsExportUrl('platform-stats')
-      expect(url).toBe('/analytics/export/platform-stats?format=csv')
+      expect(url).toBe('/analytics/platform-wide-stats/export?format=csv')
     })
 
     it('returns URL with xlsx format', () => {
       const url = getAnalyticsExportUrl('funnel', 'xlsx')
-      expect(url).toBe('/analytics/export/funnel?format=xlsx')
+      expect(url).toBe('/analytics/funnel/export?format=xlsx')
     })
 
     it('includes date range parameters', () => {

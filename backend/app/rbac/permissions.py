@@ -85,7 +85,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.TENANT_UPDATE,
             Permission.BILLING_PLATFORM,
             Permission.ANALYTICS_PLATFORM,
-            Permission.REPORT_EXPORT,
             Permission.NOTIFICATION_READ,
             # NOTE_CREATE / NOTE_READ so Super Admins can author
             # platform-level audit notes on any tenant's student.
