@@ -850,10 +850,22 @@ def export_conversion_funnel(
         db=db,
     )
 
+    # A conversion funnel without conversion rates makes the reader compute
+    # them by hand, which is the point of exporting it (#500). Percentage is of
+    # the total, so the column sums to 100 and each row reads as "this share of
+    # everything in range reached this stage".
+    total = funnel_data.total_applications
+
+    def _share(count: int) -> str:
+        if total == 0:
+            return "0.0%"
+        return f"{count / total * 100:.1f}%"
+
     rows = [
         {
             "Stage": bucket.stage,
             "Count": bucket.count,
+            "Percentage": _share(bucket.count),
         }
         for bucket in funnel_data.funnel
     ]
@@ -861,7 +873,8 @@ def export_conversion_funnel(
     rows.append(
         {
             "Stage": "TOTAL",
-            "Count": funnel_data.total_applications,
+            "Count": total,
+            "Percentage": _share(total),
         }
     )
 
@@ -1032,10 +1045,10 @@ def export_platform_wide_stats(
             "Tenant Name": bucket.tenant_name,
             "Tenant Slug": bucket.tenant_slug,
             "Plan Code": bucket.plan_code or "",
-            "Branches Count": bucket.branches_count,
-            "Staff Count": bucket.staff_count,
-            "Students Count": bucket.students_count,
-            "Applications Count": bucket.applications_count,
+            "Total Branches": bucket.branches_count,
+            "Total Staff": bucket.staff_count,
+            "Total Students": bucket.students_count,
+            "Total Applications": bucket.applications_count,
             "Enrolled": bucket.enrolled_count,
             "Rejected": bucket.rejected_count,
             "Withdrawn": bucket.withdrawn_count,
@@ -1050,10 +1063,10 @@ def export_platform_wide_stats(
             "Tenant Name": f"{stats_data.total_tenants} tenants",
             "Tenant Slug": "N/A",
             "Plan Code": "N/A",
-            "Branches Count": stats_data.total_branches,
-            "Staff Count": stats_data.total_staff,
-            "Students Count": stats_data.total_students,
-            "Applications Count": stats_data.total_applications,
+            "Total Branches": stats_data.total_branches,
+            "Total Staff": stats_data.total_staff,
+            "Total Students": stats_data.total_students,
+            "Total Applications": stats_data.total_applications,
             "Enrolled": "N/A",
             "Rejected": "N/A",
             "Withdrawn": "N/A",
