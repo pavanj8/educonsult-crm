@@ -1,41 +1,11 @@
-:root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #1a1a1a;
-  background-color: #ffffff;
-
-  /* E10 / Journey J3 — app shell theming.
-   *
-   * ``--brand-color`` and ``--brand-color-contrast`` are written at
-   * runtime by BrandingProvider (:file:`frontend/src/store/brandingStore.tsx`)
-   * whenever the authenticated user is associated with a tenant that
-   * has supplied a branding profile. The defaults below mirror the
-   * pre-E10 platform chrome (a white header with dark text) so the
-   * unauthenticated / unbranded renders look exactly the same as
-   * before this task. The provider overwrites both variables when a
-   * tenant profile is available and clears them on unmount / logout.
-   */
-  --brand-color: #ffffff;
-  --brand-color-contrast: #1a1a1a;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-}
-
+@import './styles/theme.css';
 .auth-loading {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .login-page {
@@ -55,7 +25,7 @@ body {
 
 .login-page p {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .app-layout {
@@ -66,7 +36,7 @@ body {
 
 .app-header {
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -165,20 +135,20 @@ body {
 
 .language-switcher__select {
   padding: 0.375rem 0.5rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #111827;
+  background: var(--surface);
+  color: var(--text);
   font-size: 0.8125rem;
   cursor: pointer;
 }
 
 .language-switcher__select:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .language-switcher__select:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -195,19 +165,19 @@ body {
   width: 2.5rem;
   height: 2.5rem;
   padding: 0;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-body);
   cursor: pointer;
 }
 
 .notification-bell__button:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .notification-bell__button:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -224,8 +194,8 @@ body {
   height: 1.125rem;
   padding: 0 0.25rem;
   border-radius: 9999px;
-  background: #dc2626;
-  color: #ffffff;
+  background: var(--color-danger-600);
+  color: var(--text-inverse);
   font-size: 0.625rem;
   font-weight: 600;
   line-height: 1.125rem;
@@ -242,9 +212,9 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 }
 
@@ -254,7 +224,7 @@ body {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .notification-center__title {
@@ -266,7 +236,7 @@ body {
 .notification-center__mark-all {
   border: none;
   background: none;
-  color: #2563eb;
+  color: var(--color-primary-600);
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
@@ -281,11 +251,11 @@ body {
   margin: 0;
   padding: 1rem;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .notification-center__status--error {
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .notification-center__list {
@@ -301,7 +271,7 @@ body {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--surface-hover);
 }
 
 .notification-item:last-child {
@@ -309,7 +279,7 @@ body {
 }
 
 .notification-item--unread {
-  background: #eff6ff;
+  background: var(--color-primary-50);
 }
 
 .notification-item__content {
@@ -321,33 +291,33 @@ body {
   margin: 0 0 0.25rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .notification-item__message {
   margin: 0 0 0.25rem;
   font-size: 0.8125rem;
-  color: #4b5563;
+  color: var(--color-neutral-600);
 }
 
 .notification-item__time {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-subtle);
 }
 
 .notification-item__mark-read {
   flex-shrink: 0;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-body);
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
   cursor: pointer;
 }
 
 .notification-item__mark-read:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 /* Login page */
@@ -357,16 +327,16 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .login-page__card {
   width: 100%;
   max-width: 24rem;
   padding: 2rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
 }
 
@@ -383,19 +353,19 @@ body {
 .login-page__subtitle {
   margin: -0.75rem 0 1.5rem;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
   text-align: center;
 }
 
 .login-page__footer {
   margin: 1.25rem 0 0;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
   text-align: center;
 }
 
 .login-page__link {
-  color: #2563eb;
+  color: var(--color-primary-600);
   font-weight: 500;
   text-decoration: none;
 }
@@ -405,7 +375,7 @@ body {
 }
 
 .login-page__link:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -421,7 +391,7 @@ body {
   gap: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .login-form__section {
@@ -440,53 +410,53 @@ body {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .login-form__field input,
 .login-form__field select {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 1rem;
 }
 
 .login-form__field input:focus-visible,
 .login-form__field select:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .login-form__error {
   margin: 0;
   font-size: 0.875rem;
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .login-form__hint {
   margin: 0.25rem 0 0;
   font-size: 0.8125rem;
-  color: #64748b;
+  color: var(--color-neutral-500);
 }
 
 .login-form__submit {
   margin-top: 0.5rem;
   padding: 0.625rem 1rem;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--color-primary-600);
   border-radius: 0.375rem;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--color-primary-600);
+  color: var(--text-inverse);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .login-form__submit:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--color-primary-700);
 }
 
 .login-form__submit:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -507,7 +477,7 @@ body {
 
 .access-denied p {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Tenants page */
@@ -526,7 +496,7 @@ body {
 
 .tenants-page__subtitle {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -542,11 +512,11 @@ body {
 .tenants-page__status {
   margin: 0;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .tenants-page__status--error {
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .tenant-form {
@@ -562,51 +532,51 @@ body {
   gap: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .tenant-form__field input {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 1rem;
 }
 
 .tenant-form__field input:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .tenant-form__error {
   margin: 0;
   font-size: 0.875rem;
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .tenant-form__success {
   margin: 0;
   font-size: 0.875rem;
-  color: #059669;
+  color: var(--color-success-600);
 }
 
 .tenant-form__submit {
   align-self: flex-start;
   padding: 0.625rem 1rem;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--color-primary-600);
   border-radius: 0.375rem;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--color-primary-600);
+  color: var(--text-inverse);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .tenant-form__submit:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--color-primary-700);
 }
 
 .tenant-form__submit:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -629,17 +599,17 @@ body {
 .tenant-table td {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .tenant-table th {
   font-weight: 600;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--text-body);
+  background: var(--surface-sunken);
 }
 
 .tenant-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 /* Branches page */
@@ -658,7 +628,7 @@ body {
 
 .branches-page__subtitle {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -674,11 +644,11 @@ body {
 .branches-page__status {
   margin: 0;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .branches-page__status--error {
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .branch-form {
@@ -694,31 +664,31 @@ body {
   gap: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .branch-form__field input {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 1rem;
 }
 
 .branch-form__field input:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .branch-form__error {
   margin: 0;
   font-size: 0.875rem;
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .branch-form__success {
   margin: 0;
   font-size: 0.875rem;
-  color: #059669;
+  color: var(--color-success-600);
 }
 
 .branch-form__actions {
@@ -730,21 +700,21 @@ body {
 .branch-form__submit {
   align-self: flex-start;
   padding: 0.625rem 1rem;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--color-primary-600);
   border-radius: 0.375rem;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--color-primary-600);
+  color: var(--text-inverse);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .branch-form__submit:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--color-primary-700);
 }
 
 .branch-form__submit:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -756,21 +726,21 @@ body {
 .branch-form__cancel {
   align-self: flex-start;
   padding: 0.625rem 1rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-body);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .branch-form__cancel:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .branch-form__cancel:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -793,36 +763,36 @@ body {
 .branch-table td {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .branch-table th {
   font-weight: 600;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--text-body);
+  background: var(--surface-sunken);
 }
 
 .branch-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .branch-table__edit {
   padding: 0.25rem 0.625rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-body);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .branch-table__edit:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .branch-table__edit:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -842,7 +812,7 @@ body {
 
 .staff-page__subtitle {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -868,59 +838,59 @@ body {
   gap: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .staff-form__field input,
 .staff-form__field select {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 1rem;
 }
 
 .staff-form__field input:focus-visible,
 .staff-form__field select:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .staff-form__branch-note {
   margin: 0;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .staff-form__error {
   margin: 0;
   font-size: 0.875rem;
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .staff-form__success {
   margin: 0;
   font-size: 0.875rem;
-  color: #059669;
+  color: var(--color-success-600);
 }
 
 .staff-form__submit {
   align-self: flex-start;
   padding: 0.625rem 1rem;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--color-primary-600);
   border-radius: 0.375rem;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--color-primary-600);
+  color: var(--text-inverse);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .staff-form__submit:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--color-primary-700);
 }
 
 .staff-form__submit:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -932,15 +902,15 @@ body {
 .staff-page__status {
   margin: 0 0 0.75rem;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .staff-page__status--error {
-  color: #b91c1c;
+  color: var(--color-danger-700);
 }
 
 .staff-page__status--success {
-  color: #047857;
+  color: var(--color-success-700);
 }
 
 .staff-table-wrapper {
@@ -957,21 +927,21 @@ body {
 .staff-table td {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .staff-table th {
   font-weight: 600;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--text-body);
+  background: var(--surface-sunken);
 }
 
 .staff-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .staff-table__row--inactive {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .staff-table__status {
@@ -983,13 +953,13 @@ body {
 }
 
 .staff-table__status--active {
-  background: #d1fae5;
-  color: #047857;
+  background: var(--color-success-100);
+  color: var(--color-success-700);
 }
 
 .staff-table__status--inactive {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--surface-hover);
+  color: var(--text-muted);
 }
 
 .staff-table__actions {
@@ -1001,10 +971,10 @@ body {
 .staff-table__edit,
 .staff-table__toggle {
   padding: 0.25rem 0.625rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-body);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -1012,12 +982,12 @@ body {
 
 .staff-table__toggle:hover:not(:disabled),
 .staff-table__edit:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .staff-table__toggle:focus-visible,
 .staff-table__edit:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -1054,7 +1024,7 @@ body {
 
 .student-dashboard__subtitle {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -1070,17 +1040,17 @@ body {
 .student-dashboard__hint {
   margin: 0 0 1rem;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .student-dashboard__status {
   margin: 0;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .student-dashboard__status--error {
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .application-table-wrapper {
@@ -1097,17 +1067,17 @@ body {
 .application-table td {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .application-table th {
   font-weight: 600;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--text-body);
+  background: var(--surface-sunken);
 }
 
 .application-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .application-table__stage {
@@ -1116,8 +1086,8 @@ body {
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 600;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
 }
 
 .application-form {
@@ -1133,58 +1103,58 @@ body {
   gap: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .application-form__field select {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 1rem;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .application-form__field select:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .application-form__field select:disabled {
-  background: #f3f4f6;
-  color: #9ca3af;
+  background: var(--surface-hover);
+  color: var(--text-subtle);
   cursor: not-allowed;
 }
 
 .application-form__error {
   margin: 0;
   font-size: 0.875rem;
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .application-form__success {
   margin: 0;
   font-size: 0.875rem;
-  color: #059669;
+  color: var(--color-success-600);
 }
 
 .application-form__submit {
   align-self: flex-start;
   padding: 0.625rem 1rem;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--color-primary-600);
   border-radius: 0.375rem;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--color-primary-600);
+  color: var(--text-inverse);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .application-form__submit:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--color-primary-700);
 }
 
 .application-form__submit:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -1195,26 +1165,26 @@ body {
 
 .application-table__checklist-toggle {
   padding: 0.375rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #1f2937;
+  background: var(--surface);
+  color: var(--text-strong);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .application-table__checklist-toggle:hover {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .application-table__checklist-toggle:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .application-table__checklist-row {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .application-table__checklist-cell {
@@ -1222,8 +1192,8 @@ body {
 }
 
 .checklist-view {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 1rem;
 }
@@ -1244,16 +1214,16 @@ body {
 
 .checklist-view__reload {
   padding: 0.25rem 0.5rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #1f2937;
+  background: var(--surface);
+  color: var(--text-strong);
   font-size: 0.75rem;
   cursor: pointer;
 }
 
 .checklist-view__reload:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .checklist-view__reload:disabled {
@@ -1264,11 +1234,11 @@ body {
 .checklist-view__status {
   margin: 0;
   font-size: 0.875rem;
-  color: #4b5563;
+  color: var(--color-neutral-600);
 }
 
 .checklist-view__status--error {
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .checklist-view__list {
@@ -1281,10 +1251,10 @@ body {
 }
 
 .checklist-item {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.375rem;
   padding: 0.75rem;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .checklist-item__header {
@@ -1304,13 +1274,13 @@ body {
 .checklist-item__required {
   font-size: 0.75rem;
   font-weight: 500;
-  color: #b91c1c;
+  color: var(--color-danger-700);
 }
 
 .checklist-item__description {
   margin: 0.25rem 0 0;
   font-size: 0.8125rem;
-  color: #4b5563;
+  color: var(--color-neutral-600);
 }
 
 .checklist-item__status {
@@ -1323,44 +1293,44 @@ body {
 }
 
 .checklist-item__status--not-uploaded {
-  color: #4b5563;
-  background: #f3f4f6;
-  border-color: #d1d5db;
+  color: var(--color-neutral-600);
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
 }
 
 .checklist-item__status--pending {
-  color: #92400e;
-  background: #fef3c7;
-  border-color: #fde68a;
+  color: var(--color-warning-800);
+  background: var(--color-warning-100);
+  border-color: var(--color-warning-200);
 }
 
 .checklist-item__status--approved {
-  color: #065f46;
-  background: #d1fae5;
-  border-color: #6ee7b7;
+  color: var(--color-success-800);
+  background: var(--color-success-100);
+  border-color: var(--color-success-300);
 }
 
 .checklist-item__status--rejected {
-  color: #991b1b;
-  background: #fee2e2;
-  border-color: #fca5a5;
+  color: var(--color-danger-800);
+  background: var(--color-danger-100);
+  border-color: var(--color-danger-300);
 }
 
 .checklist-item__upload {
   margin-top: 0.5rem;
   font-size: 0.8125rem;
-  color: #1f2937;
+  color: var(--text-strong);
 }
 
 .checklist-item__filename-label,
 .checklist-item__rejection-label {
   font-weight: 600;
-  color: #4b5563;
+  color: var(--color-neutral-600);
 }
 
 .checklist-item__uploaded-at {
   margin: 0.125rem 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.75rem;
 }
 
@@ -1368,9 +1338,9 @@ body {
   margin: 0.5rem 0 0;
   padding: 0.5rem;
   border-radius: 0.375rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #7f1d1d;
+  background: var(--color-danger-50);
+  border: 1px solid var(--color-danger-200);
+  color: var(--color-danger-900);
 }
 
 .checklist-item__upload-control {
@@ -1379,48 +1349,48 @@ body {
   flex-direction: column;
   gap: 0.375rem;
   font-size: 0.8125rem;
-  color: #1f2937;
+  color: var(--text-strong);
 }
 
 .checklist-item__upload-trigger {
   align-self: flex-start;
   padding: 0.375rem 0.75rem;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--color-primary-600);
   border-radius: 0.375rem;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--color-primary-600);
+  color: var(--text-inverse);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .checklist-item__upload-trigger:hover {
-  background: #1d4ed8;
+  background: var(--color-primary-700);
 }
 
 .checklist-item__upload-trigger:focus-within,
 .checklist-item__upload-trigger:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .checklist-item__upload-filename {
   margin: 0;
   font-size: 0.75rem;
-  color: #4b5563;
+  color: var(--color-neutral-600);
   word-break: break-all;
 }
 
 .checklist-item__upload-status {
   margin: 0;
   font-size: 0.75rem;
-  color: #2563eb;
+  color: var(--color-primary-600);
 }
 
 .checklist-item__upload-error {
   margin: 0;
   font-size: 0.75rem;
-  color: #b91c1c;
+  color: var(--color-danger-700);
 }
 
 /* Upcoming meetings widget (E23; Journey J16; student dashboard) */
@@ -1443,31 +1413,31 @@ body {
 
 .upcoming-meetings__reload {
   padding: 0.25rem 0.625rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-body);
   font-size: 0.75rem;
   cursor: pointer;
 }
 
 .upcoming-meetings__reload:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .upcoming-meetings__reload:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .upcoming-meetings__status {
   margin: 0;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .upcoming-meetings__status--error {
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .upcoming-meetings__list {
@@ -1481,9 +1451,9 @@ body {
 
 .upcoming-meetings__item {
   padding: 0.75rem 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #f9fafb;
+  background: var(--surface-sunken);
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -1491,19 +1461,19 @@ body {
 
 .upcoming-meetings__when {
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
   font-size: 0.875rem;
 }
 
 .upcoming-meetings__duration {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .upcoming-meetings__location,
 .upcoming-meetings__notes {
   font-size: 0.8125rem;
-  color: #374151;
+  color: var(--text-body);
   /* Belt-and-braces: ``notes`` is already capped server-side at
    * 2000 chars by ``MeetingCreate`` / ``MeetingUpdate`` (E22; J15),
    * but force-wrap here so an unusually long unbroken run typed by
@@ -1515,7 +1485,7 @@ body {
 
 .upcoming-meetings__label {
   font-weight: 600;
-  color: #374151;
+  color: var(--text-body);
 }
 
 /* Branch manager analytics dashboard (E41; Journey J34) */
@@ -1539,9 +1509,9 @@ body {
 .branch-manager-dashboard__filter {
   margin-bottom: 2rem;
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .date-range-controls {
@@ -1553,24 +1523,24 @@ body {
 
 .date-range-label {
   font-weight: 600;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .date-range-select {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 0.875rem;
-  background: #ffffff;
+  background: var(--surface);
   cursor: pointer;
 }
 
 .date-range-select:hover {
-  border-color: #9ca3af;
+  border-color: var(--text-subtle);
 }
 
 .date-range-select:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -1590,32 +1560,32 @@ body {
 .custom-date-field label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .date-input {
   padding: 0.375rem 0.5rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 0.875rem;
 }
 
 .date-input:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .date-range-display {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .date-range-display strong {
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .analytics-content {
@@ -1626,9 +1596,9 @@ body {
 
 .analytics-summary {
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .analytics-summary h2 {
@@ -1644,30 +1614,30 @@ body {
 
 .summary-card {
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.375rem;
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .summary-card dt {
   margin: 0 0 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .summary-value {
   margin: 0;
   font-size: 1.75rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
 }
 
 .conversion-funnel-section {
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .conversion-funnel-section h2 {
@@ -1689,13 +1659,13 @@ body {
 .funnel-table td {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .funnel-table th {
   font-weight: 600;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--text-body);
+  background: var(--surface-sunken);
 }
 
 .funnel-table th:last-child {
@@ -1703,12 +1673,12 @@ body {
 }
 
 .funnel-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .count-cell {
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
   white-space: nowrap;
 }
 
@@ -1719,7 +1689,7 @@ body {
 
 .bar {
   height: 1.5rem;
-  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(90deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
   border-radius: 0.25rem;
   transition: width 0.3s ease;
   min-width: 0.25rem;
@@ -1758,9 +1728,9 @@ body {
 .owner-dashboard__filters {
   margin-bottom: 2rem;
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .owner-dashboard__filter-row {
@@ -1776,39 +1746,39 @@ body {
   gap: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .owner-dashboard__filter-row input[type='date'] {
   padding: 0.375rem 0.5rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
   font-size: 0.875rem;
 }
 
 .owner-dashboard__filter-row input[type='date']:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
 .owner-dashboard__filter-row button {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 0.375rem;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-body);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .owner-dashboard__filter-row button:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #9ca3af;
+  background: var(--surface-sunken);
+  border-color: var(--text-subtle);
 }
 
 .owner-dashboard__filter-row button:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -1823,21 +1793,21 @@ body {
   gap: 2rem;
   margin-bottom: 1.5rem;
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .owner-dashboard__summary p {
   margin: 0;
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .owner-dashboard__summary strong {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
 }
 
 .owner-dashboard__table {
@@ -1850,17 +1820,17 @@ body {
 .owner-dashboard__table td {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .owner-dashboard__table th {
   font-weight: 600;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--text-body);
+  background: var(--surface-sunken);
 }
 
 .owner-dashboard__table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .owner-dashboard__table .numeric {
@@ -1889,16 +1859,16 @@ body {
 .super-admin-dashboard__filter {
   margin-bottom: 2rem;
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .platform-summary {
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--surface);
   margin-bottom: 2rem;
 }
 
@@ -1909,9 +1879,9 @@ body {
 
 .tenant-list-section {
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .tenant-list-section h2 {
@@ -1933,27 +1903,27 @@ body {
 .tenant-table td {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .tenant-table th {
   font-weight: 600;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--text-body);
+  background: var(--surface-sunken);
 }
 
 .tenant-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-sunken);
 }
 
 .tenant-name {
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .tenant-slug {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .plan-badge {
@@ -1966,25 +1936,25 @@ body {
 }
 
 .plan-badge--starter {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
 }
 
 .plan-badge--growth {
-  background: #d1fae5;
-  color: #047857;
+  background: var(--color-success-100);
+  color: var(--color-success-700);
 }
 
 .plan-badge--enterprise {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-warning-100);
+  color: var(--color-warning-800);
 }
 
 .numeric-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .text-cell {
@@ -1992,9 +1962,489 @@ body {
 }
 
 .text-muted {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .plan-cell {
   white-space: nowrap;
+}
+
+/* ==========================================================================
+ * Design-system polish layer
+ *
+ * Appended last so it refines the page-scoped rules above without rewriting
+ * them. Selectors deliberately lean on the naming conventions the pages
+ * already share (``*-form``, ``*-table-wrapper``, ``*-form__submit``,
+ * ``*-page__status``) so a page that was never opened during this work still
+ * picks the treatment up.
+ * ========================================================================== */
+
+/* ---- App shell ---------------------------------------------------------- */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 0.875rem 1.75rem;
+  /* The header sits on the brand colour, so a translucent light rule reads as
+   * an edge on both the default indigo and any tenant colour, where a fixed
+   * grey border would disappear. */
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-color-contrast) 14%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-header h1 {
+  font-size: var(--text-lg);
+  font-weight: 680;
+  letter-spacing: var(--tracking-tight);
+}
+
+.app-header__brand {
+  gap: 2rem;
+}
+
+.app-header__nav {
+  gap: 0.125rem;
+  flex-wrap: wrap;
+}
+
+.app-header__nav a {
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  opacity: 0.82;
+  white-space: nowrap;
+  transition:
+    background-color var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.app-header__nav a:hover {
+  text-decoration: none;
+  opacity: 1;
+  background: color-mix(in srgb, var(--brand-color-contrast) 12%, transparent);
+}
+
+.app-main {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding: 2rem 1.75rem 4rem;
+}
+
+.language-switcher__select {
+  border-color: color-mix(in srgb, var(--brand-color-contrast) 30%, transparent);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-fast);
+}
+
+/* ---- Page rhythm -------------------------------------------------------- */
+
+.app-main > h1:first-child,
+.app-main > section > h1:first-child {
+  margin-top: 0;
+  font-size: var(--text-2xl);
+}
+
+.app-main h2 {
+  font-size: var(--text-lg);
+  margin-top: 2rem;
+}
+
+/* ---- Surfaces ----------------------------------------------------------- */
+
+[class$='-form']:not(.login-form),
+[class$='-table-wrapper'],
+.analytics-summary,
+.conversion-funnel-section,
+.branch-manager-dashboard__filter {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+[class$='-form']:not(.login-form),
+.analytics-summary,
+.conversion-funnel-section,
+.branch-manager-dashboard__filter {
+  padding: 1.5rem;
+}
+
+[class$='-table-wrapper'] {
+  /* `auto` rather than `hidden`: still clips the rounded corners, but keeps
+   * the horizontal scroll these wrappers rely on for wide tables. */
+  overflow: auto;
+}
+
+/* Record-management pages were capped at 48rem, which is a comfortable measure
+ * for a two-field form but leaves their tables squeezed into half the window.
+ * Let the page fill the centred container and cap the forms instead, so dense
+ * tables get the width and forms keep a readable line length. */
+.tenants-page,
+.branches-page,
+.staff-page {
+  max-width: 100%;
+}
+
+[class$='-form']:not(.login-form) {
+  max-width: 36rem;
+}
+
+.login-page__card {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---- Tables ------------------------------------------------------------- */
+
+.app-main table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.app-main thead th {
+  padding: 0.75rem 1rem;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 620;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.app-main tbody td {
+  padding: 0.8125rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-body);
+}
+
+.app-main tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.app-main tbody tr {
+  transition: background-color var(--transition-fast);
+}
+
+.app-main tbody tr:hover {
+  background: var(--surface-sunken);
+}
+
+/* ---- Form controls ------------------------------------------------------ */
+
+.app-main input:not([type='checkbox']):not([type='radio']),
+.app-main select,
+.app-main textarea,
+.login-form input,
+.login-form select,
+.login-form textarea {
+  width: 100%;
+  padding: 0.5625rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.app-main input:not([type='checkbox']):not([type='radio']):focus,
+.app-main select:focus,
+.app-main textarea:focus,
+.login-form input:focus,
+.login-form select:focus,
+.login-form textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  /* Soft halo rather than a hard outline: it reads as focus without shifting
+   * layout, and the :focus-visible ring in theme.css still covers keyboard
+   * traversal of non-input controls. */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-500) 22%, transparent);
+}
+
+.app-main label,
+.login-form label {
+  font-weight: 550;
+  color: var(--text-strong);
+}
+
+/* ---- Buttons ------------------------------------------------------------ */
+
+[class$='__submit'],
+[class$='__upload-trigger'] {
+  padding: 0.5625rem 1.125rem;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 600;
+  box-shadow: var(--shadow-primary);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+[class$='__submit']:hover:not(:disabled),
+[class$='__upload-trigger']:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px rgb(79 70 229 / 0.24),
+    0 10px 22px rgb(79 70 229 / 0.28);
+}
+
+[class$='__submit']:active:not(:disabled),
+[class$='__upload-trigger']:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-xs);
+}
+
+[class$='__submit']:disabled {
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+/* Secondary / inline actions inside tables and forms. */
+[class$='__edit'],
+[class$='__cancel'],
+[class$='__actions'] button:not([class$='__submit']) {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-body);
+  font-weight: 550;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+[class$='__edit']:hover,
+[class$='__cancel']:hover,
+[class$='__actions'] button:not([class$='__submit']):hover {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-300);
+  color: var(--color-primary-700);
+}
+
+/* ---- Status messages ---------------------------------------------------- */
+
+[class*='-page__status'],
+[class$='__error'],
+[class$='__success'] {
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+}
+
+[class*='-page__status']:not(:empty),
+[class$='__error']:not(:empty),
+[class$='__success']:not(:empty) {
+  padding: 0.625rem 0.875rem;
+  /* The accent edge gives the message a direction to read from and keeps the
+   * tint from looking like an inert filled box. */
+  border-left: 3px solid currentColor;
+}
+
+[class*='__status--error']:not(:empty),
+[class$='__error']:not(:empty) {
+  background: var(--color-danger-50);
+  color: var(--color-danger-700);
+}
+
+[class*='__status--success']:not(:empty),
+[class$='__success']:not(:empty) {
+  background: var(--color-success-50);
+  color: var(--color-success-700);
+}
+
+/* ---- Responsive shell ---------------------------------------------------
+ * The nav is a single row of role-dependent links, so on a narrow window it
+ * previously wrapped into a stack several lines tall and pushed the content
+ * down. Below the desktop breakpoint let the brand block and the nav share a
+ * column and give the nav its own horizontal scroll instead.
+ */
+
+@media (max-width: 60rem) {
+  .app-header {
+    padding: 0.75rem 1rem;
+    gap: 0.5rem 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* The nav is markup-nested inside the brand block. Dissolving that wrapper
+   * promotes the logo, title and nav to direct children of the header, so the
+   * title can sit beside the actions on the first row and the nav can take a
+   * scrollable row of its own -- no markup change needed. */
+  .app-header__brand {
+    display: contents;
+  }
+
+  .app-header h1 {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app-header__actions {
+    order: 1;
+    flex: 0 0 auto;
+  }
+
+  .app-header__nav {
+    order: 2;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Bleed to the header edges so the scrolled row does not look inset. */
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
+  }
+
+  .app-header__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-main {
+    padding: 1.5rem 1rem 3rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .app-header h1 {
+    font-size: var(--text-md);
+  }
+
+  [class$='-form']:not(.login-form),
+  .analytics-summary,
+  .conversion-funnel-section,
+  .branch-manager-dashboard__filter {
+    padding: 1.125rem;
+  }
+
+  .app-main thead th,
+  .app-main tbody td {
+    padding-inline: 0.75rem;
+  }
+}
+
+/* ---- Auth pages ---------------------------------------------------------
+ * The card inherits ``text-align: center`` from ``.login-page``, which centres
+ * field labels and help text and makes the form read as a splash screen rather
+ * than something to fill in. Centre the heading only and left-align the form.
+ */
+
+.login-page__card {
+  text-align: left;
+}
+
+.login-page__card h1 {
+  text-align: center;
+  margin-bottom: 1.75rem;
+  font-size: var(--text-xl);
+}
+
+.login-form {
+  gap: 1.125rem;
+}
+
+.login-form__submit {
+  margin-top: 0.25rem;
+  padding-block: 0.6875rem;
+}
+
+/* The links stacked directly under the submit button with no separation. */
+.login-page__card > p,
+.login-page__links {
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.login-form__hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 450;
+}
+
+/* ---- Dashboard headers and toolbar actions ------------------------------
+ * The analytics dashboards put their title and a cluster of actions in a flex
+ * row, but the buttons themselves ship unstyled: ``.export-button`` has no
+ * rules at all and the refresh control has no class, so they rendered as raw
+ * browser buttons of differing heights, overlapping the title.
+ */
+
+[class$='-dashboard__header'] {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+[class$='-dashboard__header'] h1 {
+  font-size: var(--text-2xl);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+[class$='-dashboard__header'] > :not(h1) {
+  /* Shrinkable, not fixed: with `0 0 auto` the toolbar kept its max-content
+   * width on narrow screens and pushed the whole page into horizontal scroll,
+   * which also stopped the header bar short of the viewport edge. */
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* .header-actions ships with no rules, so it stayed display:block and stacked
+ * its buttons down the right-hand side of every analytics dashboard. */
+.header-actions,
+[class$='__actions']:not(.app-header__actions) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.export-button,
+[class$='-dashboard__header'] button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.4375rem 0.875rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-body);
+  font-size: var(--text-sm);
+  font-weight: 550;
+  white-space: nowrap;
+  box-shadow: var(--shadow-xs);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.export-button:hover:not(:disabled),
+[class$='-dashboard__header'] button:hover:not(:disabled) {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-300);
+  color: var(--color-primary-700);
+}
+
+.export-button:disabled,
+[class$='-dashboard__header'] button:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+/* Bare status/error text rendered straight into a dashboard body. */
+.analytics-content > p,
+[class$='-dashboard'] > p {
+  color: var(--text-muted);
 }

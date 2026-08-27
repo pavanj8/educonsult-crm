@@ -1,0 +1,244 @@
+/**
+ * EduConsult CRM — design system foundation.
+ *
+ * Everything visual resolves through the tokens below. Page-level rules in
+ * ``index.css`` reference the semantic aliases (``--surface``, ``--text``,
+ * ``--border`` ...) rather than raw hex, so the whole product re-themes from
+ * this one file.
+ *
+ * Palette rationale: education consultancy work is a long, high-stakes,
+ * document-heavy process, so the chrome stays calm and the colour is spent
+ * where it carries meaning. Indigo reads as institutional and trustworthy and
+ * carries the brand; amber is reserved as an accent for achievement moments;
+ * slate neutrals keep dense tables legible without the flat grey of the
+ * previous palette.
+ *
+ * Tenant branding (E10 / Journey J3) still wins: BrandingProvider overwrites
+ * ``--brand-color`` / ``--brand-color-contrast`` at runtime, and the app shell
+ * reads those, so a branded tenant's header replaces the default indigo.
+ */
+
+:root {
+  /* ---- Primitives: indigo (brand) ---- */
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+  --color-primary-950: #1e1b4b;
+
+  /* ---- Primitives: amber (accent) ---- */
+  --color-accent-100: #fef3c7;
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+  --color-accent-800: #92400e;
+
+  /* ---- Primitives: slate (neutral) ---- */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+
+  /* ---- Primitives: status ---- */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-300: #6ee7b7;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #065f46;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-600: #e11d48;
+  --color-danger-700: #be123c;
+  --color-danger-800: #9f1239;
+  --color-danger-900: #881337;
+
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-800: #92400e;
+
+  /* ---- Semantic aliases ---- */
+  --surface: var(--color-neutral-0);
+  --surface-sunken: var(--color-neutral-50);
+  --surface-hover: var(--color-neutral-100);
+  --surface-inverse: var(--color-primary-950);
+
+  --text: var(--color-neutral-900);
+  --text-muted: var(--color-neutral-500);
+  --text-subtle: var(--color-neutral-400);
+  --text-strong: var(--color-neutral-800);
+  --text-body: var(--color-neutral-700);
+  --text-inverse: var(--color-neutral-0);
+
+  --border: var(--color-neutral-200);
+  --border-strong: var(--color-neutral-300);
+
+  --focus-ring: var(--color-primary-500);
+
+  /* ---- Typography ---- */
+  --font-sans:
+    'Inter var', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+  --font-numeric:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  --tracking-tight: -0.018em;
+  --tracking-wide: 0.04em;
+
+  /* ---- Radii ---- */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-full: 9999px;
+
+  /* ---- Elevation ----
+   * Two-layer shadows (a tight contact shadow plus a soft ambient one) read as
+   * depth rather than as a grey blur.
+   */
+  --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 2px 4px rgb(15 23 42 / 0.05), 0 4px 12px rgb(15 23 42 / 0.08);
+  --shadow-lg: 0 4px 8px rgb(15 23 42 / 0.05), 0 12px 28px rgb(15 23 42 / 0.10);
+  --shadow-primary: 0 1px 2px rgb(79 70 229 / 0.24), 0 6px 16px rgb(79 70 229 / 0.22);
+
+  /* ---- Motion ----
+   * Short and eased; this is a data tool, not a showreel.
+   */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 120ms var(--ease);
+  --transition: 180ms var(--ease);
+
+  /* ---- Layout ---- */
+  --container-max: 78rem;
+
+  /* E10 / Journey J3 — app shell theming.
+   *
+   * BrandingProvider overwrites both at runtime for a branded tenant. The
+   * defaults below are the platform's own chrome: a deep indigo header with
+   * light text, rather than the previous unstyled white bar.
+   */
+  --brand-color: var(--color-primary-950);
+  --brand-color-contrast: #ffffff;
+}
+
+/* ---------- Base ---------- */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--text-body);
+  background-color: var(--surface-sunken);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+/* Tabular figures keep dense numeric columns from shifting between rows. */
+td,
+th,
+.numeric,
+.metric-value {
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--color-primary-600);
+  text-decoration-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent);
+  text-underline-offset: 0.15em;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-primary-700);
+  text-decoration-color: currentColor;
+}
+
+/* One consistent, visible focus ring everywhere, instead of the browser
+ * default that several components were overriding ad hoc. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+::selection {
+  background: var(--color-primary-100);
+  color: var(--color-primary-900);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
