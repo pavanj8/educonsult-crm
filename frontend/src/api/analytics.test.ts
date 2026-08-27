@@ -43,7 +43,7 @@ describe('analytics API', () => {
       const result = await fetchRegistrationsOverTime()
 
       expect(apiFetch).toHaveBeenCalledTimes(1)
-      expect(apiFetch).toHaveBeenCalledWith('/analytics/registrations')
+      expect(apiFetch).toHaveBeenCalledWith('/analytics/registrations-over-time')
       expect(result).toEqual(mockResponse)
     })
 
@@ -58,7 +58,7 @@ describe('analytics API', () => {
       const params = { start_date: '2024-01-01' }
       const result = await fetchRegistrationsOverTime(params)
 
-      expect(apiFetch).toHaveBeenCalledWith('/analytics/registrations?start_date=2024-01-01')
+      expect(apiFetch).toHaveBeenCalledWith('/analytics/registrations-over-time?start_date=2024-01-01')
       expect(result).toEqual(mockResponse)
     })
 
@@ -77,7 +77,7 @@ describe('analytics API', () => {
       const result = await fetchRegistrationsOverTime(params)
 
       expect(apiFetch).toHaveBeenCalledWith(
-        '/analytics/registrations?start_date=2024-01-01&end_date=2024-12-31',
+        '/analytics/registrations-over-time?start_date=2024-01-01&end_date=2024-12-31',
       )
       expect(result).toEqual(mockResponse)
     })
@@ -448,6 +448,10 @@ describe('analytics API', () => {
     })
   })
 
+  // These URLs are a contract with the backend router, not an internal
+  // detail: they previously asserted /analytics/registrations, which the
+  // backend does not serve, so the suite stayed green while the chart 404'd
+  // in the browser (issue #514).
   describe('getAnalyticsExportUrl (E44; Journey J37)', () => {
     it('returns URL for funnel export with csv format by default', () => {
       const url = getAnalyticsExportUrl('funnel')

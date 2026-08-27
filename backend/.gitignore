@@ -4,4 +4,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.db
+# scripts/dev_db.sh moves the previous database aside rather than deleting it.
+*.db.bak
 qa_run_*.db
