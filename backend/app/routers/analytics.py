@@ -1,6 +1,6 @@
 """Analytics routes (E41, E42, E44; Journey J34, J35, J37)."""
 
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -39,6 +39,25 @@ from app.utils.export_helpers import (
 router = APIRouter()
 
 _DB_UNAVAILABLE_DETAIL = "Analytics service is temporarily unavailable"
+
+def _inclusive_end(end_date: datetime | None) -> datetime | None:
+    """Widen a bare ``end_date`` to cover the whole day it names.
+
+    The dashboards send a date rather than a timestamp, so ``end_date`` arrives
+    parsed to midnight. Filtering ``created_at <= midnight`` then drops
+    everything created during that day, which silently removes the most recent
+    day from every rolling window -- a "last 15 days" view was missing today
+    entirely, with nothing on screen to say the range was short (#517).
+
+    A caller who passes a real timestamp is taken at their word and gets an
+    exact cutoff; only a bare date is widened.
+    """
+    if end_date is None or end_date.time() != time.min:
+        return end_date
+    # End of that day, so the `<=` comparisons below stay inclusive.
+    return end_date + timedelta(days=1) - timedelta(microseconds=1)
+
+
 
 # Add export endpoint
 router.add_api_route("/export/students", export_student_list, methods=["GET"])
@@ -92,6 +111,7 @@ def conversion_funnel(
     - Both ``start_date`` and ``end_date`` are optional
     - When provided, filters applications by ``created_at`` timestamp
     - ``start_date`` is inclusive (>=), ``end_date`` is inclusive (<=)
+    - A date-only ``end_date`` covers that whole day, not just its midnight
 
     **Response structure**:
     - ``funnel``: list of stage buckets ordered by pipeline progression
@@ -128,7 +148,7 @@ def conversion_funnel(
         if start_date is not None:
             statement = statement.where(Application.created_at >= start_date)
         if end_date is not None:
-            statement = statement.where(Application.created_at <= end_date)
+            statement = statement.where(Application.created_at <= _inclusive_end(end_date))
 
         # Group by stage and count
         stage_counts = (
@@ -225,6 +245,7 @@ def registrations_over_time(
     - Both ``start_date`` and ``end_date`` are optional
     - When provided, filters registrations by ``created_at`` timestamp
     - ``start_date`` is inclusive (>=), ``end_date`` is inclusive (<=)
+    - A date-only ``end_date`` covers that whole day, not just its midnight
 
     **Response structure**:
     - ``data``: list of date/count buckets ordered chronologically
@@ -256,7 +277,7 @@ def registrations_over_time(
         if start_date is not None:
             statement = statement.where(User.created_at >= start_date)
         if end_date is not None:
-            statement = statement.where(User.created_at <= end_date)
+            statement = statement.where(User.created_at <= _inclusive_end(end_date))
 
         # Group by date (cast created_at to date) and count
         date_counts = (
@@ -346,6 +367,7 @@ def branch_comparison(
     - Both ``start_date`` and ``end_date`` are optional
     - When provided, filters applications by ``created_at`` timestamp
     - ``start_date`` is inclusive (>=), ``end_date`` is inclusive (<=)
+    - A date-only ``end_date`` covers that whole day, not just its midnight
 
     **Response structure**:
     - ``branches``: list of branch metrics ordered by total_applications descending
@@ -390,7 +412,7 @@ def branch_comparison(
         if start_date is not None:
             app_statement = app_statement.where(Application.created_at >= start_date)
         if end_date is not None:
-            app_statement = app_statement.where(Application.created_at <= end_date)
+            app_statement = app_statement.where(Application.created_at <= _inclusive_end(end_date))
 
         # Get all branches for this tenant
         branch_statement = apply_tenant_scope(select(Branch), Branch, current_user)
@@ -553,6 +575,7 @@ def platform_wide_stats(
     - Both ``start_date`` and ``end_date`` are optional
     - When provided, filters applications and students by ``created_at`` timestamp
     - ``start_date`` is inclusive (>=), ``end_date`` is inclusive (<=)
+    - A date-only ``end_date`` covers that whole day, not just its midnight
     - Does NOT filter tenants, branches, or staff counts (these show current totals)
 
     **Response structure**:
@@ -674,7 +697,7 @@ def platform_wide_stats(
         if start_date is not None:
             student_counts_query = student_counts_query.where(User.created_at >= start_date)
         if end_date is not None:
-            student_counts_query = student_counts_query.where(User.created_at <= end_date)
+            student_counts_query = student_counts_query.where(User.created_at <= _inclusive_end(end_date))
 
         student_counts_query = student_counts_query.group_by(User.tenant_id)
         student_counts_result = db.execute(student_counts_query).all()
@@ -687,7 +710,7 @@ def platform_wide_stats(
         if start_date is not None:
             app_base_query = app_base_query.where(Application.created_at >= start_date)
         if end_date is not None:
-            app_base_query = app_base_query.where(Application.created_at <= end_date)
+            app_base_query = app_base_query.where(Application.created_at <= _inclusive_end(end_date))
 
         # Aggregate application metrics per tenant
         app_counts_query = (
