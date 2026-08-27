@@ -1,12 +1,13 @@
 """Demo seed runner — validates and loads the canonical demo catalog."""
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.password import hash_password
+from app.models.application import Application
 from app.models.branch import Branch
 from app.models.country import Country
 from app.models.program import Program
@@ -26,6 +27,7 @@ class SeedResult:
     country_count: int
     university_count: int
     program_count: int
+    application_count: int
     roles_seeded: tuple[Role, ...]
 
 
@@ -180,6 +182,9 @@ def _persist_demo_catalog(session: Session, catalog: DemoCatalog) -> None:
             )
         )
     for user_record in catalog.users:
+        # Students carry a registration date so registrations-over-time has a
+        # curve; staff accounts default to 0 days ago and land at `now`.
+        user_created_at = now - timedelta(days=user_record.created_days_ago)
         session.add(
             User(
                 id=user_record.id,
@@ -188,8 +193,29 @@ def _persist_demo_catalog(session: Session, catalog: DemoCatalog) -> None:
                 role=user_record.role,
                 tenant_id=user_record.tenant_id,
                 branch_id=user_record.branch_id,
-                created_at=now,
-                updated_at=now,
+                created_at=user_created_at,
+                updated_at=user_created_at,
+            )
+        )
+    # Applications last: they reference users (student, counsellor) as well as
+    # branches and programmes, all added above in this same flush.
+    for application_record in catalog.applications:
+        created_at = now - timedelta(days=application_record.created_days_ago)
+        session.add(
+            Application(
+                id=application_record.id,
+                tenant_id=application_record.tenant_id,
+                branch_id=application_record.branch_id,
+                student_id=application_record.student_id,
+                assigned_counselor_id=application_record.assigned_counselor_id,
+                university_id=application_record.university_id,
+                program_id=application_record.program_id,
+                stage=application_record.stage,
+                loan_opt_in=application_record.loan_opt_in,
+                # The analytics views group by created_at, so this is the field
+                # that gives the demo dashboards their shape.
+                created_at=created_at,
+                updated_at=created_at,
             )
         )
     session.commit()
@@ -211,6 +237,7 @@ def seed_demo_data(session: Session | None = None, *, catalog: DemoCatalog | Non
         country_count=len(resolved_catalog.countries),
         university_count=len(resolved_catalog.universities),
         program_count=len(resolved_catalog.programs),
+        application_count=len(resolved_catalog.applications),
         roles_seeded=roles_seeded,
     )
 

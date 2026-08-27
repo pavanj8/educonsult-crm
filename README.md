@@ -68,15 +68,35 @@ harness-demo/        Frozen historical reference: the toy app used to design
 
 ## Running it locally
 
+**Database**
+
+Build a local database at the current migration head and load the demo data:
+
+```bash
+scripts/dev_db.sh
+```
+
+That creates `backend/dev.db` (SQLite), runs every migration, and seeds two
+tenants, four branches, all eight roles and a spread of applications — the
+applications are what give the analytics dashboards anything to show. Re-run it
+whenever migrations land; it moves the previous file aside rather than
+upgrading in place. Point it at a different database with `DATABASE_URL=...`.
+
+Every seeded account uses the password `demo-password`, and in a dev build the
+login page lists them for one-click sign-in.
+
 **Backend**
 
 ```bash
 cd backend
 python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+DATABASE_URL=sqlite:///./dev.db uvicorn app.main:app --reload
 # -> http://127.0.0.1:8000/health  => {"status": "ok"}
 ```
+
+The backend defaults to PostgreSQL; the `DATABASE_URL` above points it at the
+SQLite database `scripts/dev_db.sh` just built.
 
 Backend tests:
 
@@ -98,10 +118,9 @@ Frontend tests:
 cd frontend && npm test
 ```
 
-Both apps are still early scaffolding (foundation epic E1 in
-[`docs/epics.md`](docs/epics.md)) — most product features described in
-[`docs/requirements.md`](docs/requirements.md) don't exist yet and are
-tracked as open GitHub Issues.
+The MVP, phase-2 and phase-3 backlogs described in
+[`docs/epics.md`](docs/epics.md) are complete; remaining work is tracked as open
+GitHub Issues.
 
 ## How work happens here: the agent harness
 

@@ -39,7 +39,7 @@ export async function fetchRegistrationsOverTime(
   }
 
   const queryString = searchParams.toString()
-  const path = `/analytics/registrations${queryString ? `?${queryString}` : ''}`
+  const path = `/analytics/registrations-over-time${queryString ? `?${queryString}` : ''}`
 
   return apiFetch<RegistrationsOverTimeResponse>(path)
 }

@@ -72,7 +72,8 @@ def main(argv: list[str] | None = None) -> int:
             f"{result.tenant_count} tenants, "
             f"{result.branch_count} branches, "
             f"{result.user_count} users "
-            f"({len(result.roles_seeded)} roles)."
+            f"({len(result.roles_seeded)} roles), "
+            f"{result.application_count} applications."
         )
         print(f"Primary login: {PRIMARY_DEMO_EMAIL} / {DEMO_PASSWORD}")
 
