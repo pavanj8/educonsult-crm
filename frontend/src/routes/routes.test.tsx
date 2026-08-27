@@ -97,13 +97,28 @@ describe('AppRouter routes', () => {
     localStorage.clear()
   })
 
-  it('redirects unauthenticated users from protected routes to the public login page', async () => {
+  it('sends an unauthenticated visitor at the bare root to the marketing landing page', async () => {
     renderAppAt('/')
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /Streamline Your Education Consultancy/i }),
+      ).toBeInTheDocument()
+    })
+    // Not the app, and not dumped straight into a login form.
+    expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('login-email')).not.toBeInTheDocument()
+  })
+
+  it('sends an unauthenticated user from a protected deep link to the login page', async () => {
+    renderAppAt('/staff')
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     })
     expect(screen.getByTestId('login-email')).toBeInTheDocument()
+    // The attempted path is carried so login can return them to it.
+    expect(screen.getByTestId('redirect-from')).toHaveTextContent('/staff')
     expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
   })
 

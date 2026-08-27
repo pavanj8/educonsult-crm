@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { isApiError } from '../api/client'
+import { DemoAccountPicker } from '../components/auth/DemoAccountPicker'
 import { REGISTER_PATH, FORGOT_PASSWORD_PATH } from '../routes/paths'
 import { useAuth } from '../store/authStore'
 
@@ -58,6 +59,16 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // The demo picker signs in through the same store action as the form, so it
+  // exercises the real flow rather than a shortcut. It surfaces its own error,
+  // so rethrow instead of writing into the form's error slot.
+  async function handleDemoSignIn(email: string, password: string) {
+    setError(null)
+    clearError()
+    await login(email, password)
+    navigate(postLoginPath(location), { replace: true })
   }
 
   if ((isLoading && !submitting) || isAuthenticated) {
@@ -128,6 +139,12 @@ export default function LoginPage() {
             {t('login.links.createAccount')}
           </Link>
         </p>
+        {/* Written as a literal so Vite can fold it at build time: DEV is
+            replaced with `false` in a production build, letting Rollup drop
+            the picker and the seeded credentials it imports. */}
+        {import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGINS === 'true' ? (
+          <DemoAccountPicker onSignIn={handleDemoSignIn} disabled={submitting} />
+        ) : null}
       </div>
     </main>
   )
