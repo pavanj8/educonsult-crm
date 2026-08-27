@@ -123,10 +123,10 @@ describe('AppRouter routes', () => {
     expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
   })
 
-  it('signs out from inside the app shell and ends up signed out on a public page', async () => {
+  it('signs out from inside the app shell and lands on the login form', async () => {
     // Pins the real end-to-end behaviour, which a unit test of AccountMenu on
-    // its own cannot see: sign-out clears the session and ProtectedRoute
-    // decides the destination, which from the app root is the landing page.
+    // its own cannot see: the menu only clears the session, and ProtectedRoute
+    // picks the destination from `hasSignedOut` (issue #511).
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url.includes('/auth/me')) {
@@ -150,15 +150,16 @@ describe('AppRouter routes', () => {
     await userEvent.click(screen.getByTestId('account-menu-signout'))
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: /Streamline Your Education Consultancy/i }),
-      ).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     })
     expect(localStorage.getItem('access_token')).toBeNull()
     expect(localStorage.getItem('refresh_token')).toBeNull()
+    // Straight to the form, not back through the marketing page.
+    expect(
+      screen.queryByRole('heading', { name: /Streamline Your Education Consultancy/i }),
+    ).not.toBeInTheDocument()
     // The app shell is gone, so the session really has ended.
     expect(screen.queryByTestId('account-menu-trigger')).not.toBeInTheDocument()
-    expect(screen.queryByText('Welcome to EduConsult CRM')).not.toBeInTheDocument()
   })
 
   it('renders the login page directly without auth', async () => {
