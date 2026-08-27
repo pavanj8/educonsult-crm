@@ -1,5 +1,7 @@
 /** Staff types aligned with backend E12 schemas (Journey J5). */
 
+import { USER_ROLE_LABELS } from './auth'
+
 export type StaffCreatableRole =
   | 'branch_manager'
   | 'counselor'
@@ -38,10 +40,11 @@ export const STAFF_CREATABLE_ROLES: readonly StaffCreatableRole[] = [
   'receptionist',
 ] as const
 
+/** Narrowed from USER_ROLE_LABELS so the two cannot drift apart. */
 export const STAFF_ROLE_LABELS: Record<StaffCreatableRole, string> = {
-  branch_manager: 'Branch Manager',
-  counselor: 'Counselor',
-  document_verifier: 'Document Verifier',
-  visa_processor: 'Visa Processor',
-  receptionist: 'Receptionist',
+  branch_manager: USER_ROLE_LABELS.branch_manager,
+  counselor: USER_ROLE_LABELS.counselor,
+  document_verifier: USER_ROLE_LABELS.document_verifier,
+  visa_processor: USER_ROLE_LABELS.visa_processor,
+  receptionist: USER_ROLE_LABELS.receptionist,
 }

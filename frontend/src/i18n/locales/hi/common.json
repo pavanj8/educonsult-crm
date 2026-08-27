@@ -14,6 +14,10 @@
       "myApplications": "मेरे आवेदन",
       "intake": "इंटेक",
       "visaQueue": "वीज़ा कतार"
+    },
+    "account": {
+      "menu": "खाता मेनू",
+      "signOut": "साइन आउट"
     }
   },
   "home": {

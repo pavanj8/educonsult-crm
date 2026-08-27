@@ -20,6 +20,10 @@
       "myApplications": "My applications",
       "intake": "Intake",
       "visaQueue": "Visa queue"
+    },
+    "account": {
+      "menu": "Account menu",
+      "signOut": "Sign out"
     }
   },
   "home": {
