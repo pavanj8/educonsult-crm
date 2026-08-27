@@ -10,6 +10,8 @@ import {
   fetchConversionFunnel,
   fetchPlatformWideStats,
   fetchRegistrationsOverTime,
+  getStudentListExportUrl,
+  getAnalyticsExportUrl,
 } from './analytics'
 
 // Mock the HTTP client
@@ -412,6 +414,74 @@ describe('analytics API', () => {
       expect(result.tenants[0].applications_count).toBeGreaterThanOrEqual(
         result.tenants[1].applications_count,
       )
+    })
+  })
+
+  describe('getStudentListExportUrl (E44; Journey J37)', () => {
+    it('returns URL with csv format by default', () => {
+      const url = getStudentListExportUrl()
+      expect(url).toBe('/analytics/export/students?format=csv')
+    })
+
+    it('returns URL with xlsx format', () => {
+      const url = getStudentListExportUrl('xlsx')
+      expect(url).toBe('/analytics/export/students?format=xlsx')
+    })
+
+    it('includes date range parameters', () => {
+      const url = getStudentListExportUrl('csv', {
+        start_date: '2024-01-01T00:00:00Z',
+        end_date: '2024-12-31T23:59:59Z',
+      })
+      expect(url).toContain('format=csv')
+      expect(url).toContain('start_date=2024-01-01T00%3A00%3A00Z')
+      expect(url).toContain('end_date=2024-12-31T23%3A59%3A59Z')
+    })
+
+    it('handles only start_date', () => {
+      const url = getStudentListExportUrl('csv', {
+        start_date: '2024-01-01T00:00:00Z',
+      })
+      expect(url).toContain('format=csv')
+      expect(url).toContain('start_date=2024-01-01T00%3A00%3A00Z')
+      expect(url).not.toContain('end_date=')
+    })
+  })
+
+  describe('getAnalyticsExportUrl (E44; Journey J37)', () => {
+    it('returns URL for funnel export with csv format by default', () => {
+      const url = getAnalyticsExportUrl('funnel')
+      expect(url).toBe('/analytics/funnel/export?format=csv')
+    })
+
+    it('returns URL for registrations export', () => {
+      const url = getAnalyticsExportUrl('registrations')
+      expect(url).toBe('/analytics/registrations-over-time/export?format=csv')
+    })
+
+    it('returns URL for branch comparison export', () => {
+      const url = getAnalyticsExportUrl('branch-comparison')
+      expect(url).toBe('/analytics/branch-comparison/export?format=csv')
+    })
+
+    it('returns URL for platform stats export', () => {
+      const url = getAnalyticsExportUrl('platform-stats')
+      expect(url).toBe('/analytics/platform-wide-stats/export?format=csv')
+    })
+
+    it('returns URL with xlsx format', () => {
+      const url = getAnalyticsExportUrl('funnel', 'xlsx')
+      expect(url).toBe('/analytics/funnel/export?format=xlsx')
+    })
+
+    it('includes date range parameters', () => {
+      const url = getAnalyticsExportUrl('registrations', 'xlsx', {
+        start_date: '2024-01-01T00:00:00Z',
+        end_date: '2024-12-31T23:59:59Z',
+      })
+      expect(url).toContain('format=xlsx')
+      expect(url).toContain('start_date=2024-01-01T00%3A00%3A00Z')
+      expect(url).toContain('end_date=2024-12-31T23%3A59%3A59Z')
     })
   })
 })

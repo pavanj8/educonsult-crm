@@ -828,7 +828,7 @@ def export_conversion_funnel(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
-    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
     """Export conversion funnel analytics to CSV/Excel (E44; Journey J37).
@@ -839,7 +839,7 @@ def export_conversion_funnel(
     **Permission**: ``ANALYTICS_BRANCH`` (branch manager and above)
 
     **Query Parameters**:
-    - ``format``: Export format, either "csv" (default) or "excel"
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
 
     **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
@@ -865,7 +865,7 @@ def export_conversion_funnel(
         }
     )
 
-    if format == "excel":
+    if format in ("excel", "xlsx"):
         return write_excel_response(rows, "conversion_funnel")
     else:
         return write_csv_response(rows, "conversion_funnel")
@@ -885,7 +885,7 @@ def export_registrations_over_time(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
-    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
     """Export registrations-over-time analytics to CSV/Excel (E44; Journey J37).
@@ -896,7 +896,7 @@ def export_registrations_over_time(
     **Permission**: ``ANALYTICS_BRANCH`` (branch manager and above)
 
     **Query Parameters**:
-    - ``format``: Export format, either "csv" (default) or "excel"
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
 
     **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
@@ -922,7 +922,7 @@ def export_registrations_over_time(
         }
     )
 
-    if format == "excel":
+    if format in ("excel", "xlsx"):
         return write_excel_response(rows, "registrations_over_time")
     else:
         return write_csv_response(rows, "registrations_over_time")
@@ -941,7 +941,7 @@ def export_branch_comparison(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
-    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
     """Export cross-branch comparison analytics to CSV/Excel (E44; Journey J37).
@@ -952,7 +952,7 @@ def export_branch_comparison(
     **Permission**: ``ANALYTICS_CROSS_BRANCH`` (consultancy owner and super admin)
 
     **Query Parameters**:
-    - ``format``: Export format, either "csv" (default) or "excel"
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
 
     **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
@@ -990,7 +990,7 @@ def export_branch_comparison(
         }
     )
 
-    if format == "excel":
+    if format in ("excel", "xlsx"):
         return write_excel_response(rows, "branch_comparison")
     else:
         return write_csv_response(rows, "branch_comparison")
@@ -1004,7 +1004,7 @@ def export_platform_wide_stats(
     ],
     start_date: Annotated[datetime | None, Query()] = None,
     end_date: Annotated[datetime | None, Query()] = None,
-    format: Annotated[Literal["csv", "excel"], Query()] = "csv",
+    format: Annotated[Literal["csv", "excel", "xlsx"], Query()] = "csv",
     db: Session = Depends(get_db),
 ) -> Response:
     """Export platform-wide tenant stats to CSV/Excel (E44; Journey J37).
@@ -1015,7 +1015,7 @@ def export_platform_wide_stats(
     **Permission**: ``SUPER_ADMIN`` only
 
     **Query Parameters**:
-    - ``format``: Export format, either "csv" (default) or "excel"
+    - ``format``: Export format: "csv" (default), or "excel"/"xlsx" for Excel
 
     **Response**: ``text/csv`` or Excel MIME type with ``Content-Disposition: attachment``
     """
@@ -1061,7 +1061,7 @@ def export_platform_wide_stats(
         }
     )
 
-    if format == "excel":
+    if format in ("excel", "xlsx"):
         return write_excel_response(rows, "platform_wide_stats")
     else:
         return write_csv_response(rows, "platform_wide_stats")

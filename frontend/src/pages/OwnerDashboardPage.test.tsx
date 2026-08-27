@@ -19,6 +19,25 @@ import { useBranchComparison } from './../hooks/useBranchComparison'
 
 const mockUseBranchComparison = vi.mocked(useBranchComparison)
 
+// Mock the analytics API export functions
+vi.mock('./../api/analytics', () => ({
+  getAnalyticsExportUrl: vi.fn((type: string) => {
+    if (type === 'branch-comparison') {
+      return '/analytics/export/branch-comparison?format=csv'
+    }
+    return '/analytics/export/unknown?format=csv'
+  }),
+}))
+
+// Mock ExportButton to simplify testing
+vi.mock('./../components/analytics/ExportButton', () => ({
+  ExportButton: ({ label, className, 'data-testid': testId }: { label: string; className?: string; 'data-testid'?: string }) => (
+    <button type="button" className={className} data-testid={testId}>
+      {label}
+    </button>
+  ),
+}))
+
 describe('OwnerDashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -280,5 +299,33 @@ describe('OwnerDashboardPage', () => {
     await user.type(startDateInput, '2024-01-01')
 
     expect(screen.getByTestId('clear-filter')).not.toBeDisabled()
+  })
+
+  it('renders export button for branch comparison', () => {
+    mockUseBranchComparison.mockReturnValue({
+      branches: [
+        {
+          branch_id: 1,
+          branch_name: 'Downtown',
+          branch_city: 'New York',
+          total_applications: 100,
+          enrolled_count: 20,
+          rejected_count: 10,
+          withdrawn_count: 5,
+          active_count: 65,
+        },
+      ],
+      totalBranches: 1,
+      totalApplications: 100,
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+      refetch: vi.fn(),
+    })
+
+    renderWithRouter(<OwnerDashboardPage />)
+
+    expect(screen.getByTestId('export-branch-comparison-csv')).toBeInTheDocument()
+    expect(screen.getByTestId('export-branch-comparison-csv')).toHaveTextContent('Export (CSV)')
   })
 })

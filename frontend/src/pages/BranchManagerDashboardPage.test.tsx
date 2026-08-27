@@ -49,6 +49,27 @@ vi.mock('../hooks/useAnalytics', () => ({
   useAnalytics: () => mockUseAnalytics(),
 }))
 
+// Mock the analytics API export functions
+vi.mock('../api/analytics', () => ({
+  getAnalyticsExportUrl: vi.fn((type: string) => {
+    if (type === 'funnel') {
+      return '/analytics/export/funnel?format=csv'
+    }
+    if (type === 'registrations') {
+      return '/analytics/export/registrations?format=csv'
+    }
+    return '/analytics/export/unknown?format=csv'
+  }),
+}))
+
+vi.mock('../components/analytics/ExportButton', () => ({
+  ExportButton: ({ label, className, 'data-testid': testId }: { label: string; className?: string; 'data-testid'?: string }) => (
+    <button type="button" className={className} data-testid={testId}>
+      {label}
+    </button>
+  ),
+}))
+
 describe('BranchManagerDashboardPage', () => {
   beforeEach(() => {
     mockReload.mockClear()
@@ -257,5 +278,14 @@ describe('BranchManagerDashboardPage', () => {
     select = screen.getByTestId('preset-select')
     await user.selectOptions(select, '7d')
     expect(screen.queryByTestId('custom-date-range')).not.toBeInTheDocument()
+  })
+
+  it('renders export buttons for funnel and registrations', () => {
+    render(<BranchManagerDashboardPage />)
+
+    expect(screen.getByTestId('export-funnel-csv')).toBeInTheDocument()
+    expect(screen.getByTestId('export-funnel-csv')).toHaveTextContent('Export Funnel (CSV)')
+    expect(screen.getByTestId('export-registrations-csv')).toBeInTheDocument()
+    expect(screen.getByTestId('export-registrations-csv')).toHaveTextContent('Export Registrations (CSV)')
   })
 })

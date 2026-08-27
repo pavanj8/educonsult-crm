@@ -7,6 +7,8 @@
 import { useState } from 'react'
 
 import { useBranchComparison } from '../hooks/useBranchComparison'
+import { ExportButton } from '../components/analytics/ExportButton'
+import { getAnalyticsExportUrl } from '../api/analytics'
 
 /**
  * Owner dashboard component with branch comparison table and date filter.
@@ -46,9 +48,21 @@ export default function OwnerDashboardPage() {
     <section className="owner-dashboard" aria-labelledby="owner-dashboard-heading">
       <header className="owner-dashboard__header">
         <h1 id="owner-dashboard-heading">Branch comparison dashboard</h1>
-        <button type="button" onClick={() => void reload()} disabled={loading}>
-          Refresh
-        </button>
+        <div className="header-actions">
+          <ExportButton
+            endpoint={getAnalyticsExportUrl('branch-comparison', 'csv', {
+              start_date: startDate ? new Date(startDate).toISOString() : undefined,
+              end_date: endDate ? new Date(endDate).toISOString() : undefined,
+            })}
+            format="csv"
+            label="Export (CSV)"
+            className="export-button-branch-comparison"
+            data-testid="export-branch-comparison-csv"
+          />
+          <button type="button" onClick={() => void reload()} disabled={loading}>
+            Refresh
+          </button>
+        </div>
       </header>
 
       <div className="owner-dashboard__filters">

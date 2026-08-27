@@ -8,6 +8,8 @@
 import { useState } from 'react'
 
 import { useAnalytics } from '../hooks/useAnalytics'
+import { ExportButton } from '../components/analytics/ExportButton'
+import { getAnalyticsExportUrl } from '../api/analytics'
 import { PIPELINE_STAGE_LABELS } from '../types/application'
 import type { DateRange, DateRangePreset } from '../types/analytics'
 
@@ -84,14 +86,36 @@ export default function BranchManagerDashboardPage() {
     >
       <header className="branch-manager-dashboard__header">
         <h1 id="branch-manager-dashboard-heading">Branch Analytics Dashboard</h1>
-        <button
-          type="button"
-          onClick={() => void reload()}
-          disabled={loading}
-          data-testid="reload-button"
-        >
-          Refresh
-        </button>
+        <div className="header-actions">
+          <ExportButton
+            endpoint={getAnalyticsExportUrl('funnel', 'csv', {
+              start_date: dateRange.startDate ? new Date(dateRange.startDate).toISOString() : undefined,
+              end_date: dateRange.endDate ? new Date(dateRange.endDate).toISOString() : undefined,
+            })}
+            format="csv"
+            label="Export Funnel (CSV)"
+            className="export-button-funnel"
+            data-testid="export-funnel-csv"
+          />
+          <ExportButton
+            endpoint={getAnalyticsExportUrl('registrations', 'csv', {
+              start_date: dateRange.startDate ? new Date(dateRange.startDate).toISOString() : undefined,
+              end_date: dateRange.endDate ? new Date(dateRange.endDate).toISOString() : undefined,
+            })}
+            format="csv"
+            label="Export Registrations (CSV)"
+            className="export-button-registrations"
+            data-testid="export-registrations-csv"
+          />
+          <button
+            type="button"
+            onClick={() => void reload()}
+            disabled={loading}
+            data-testid="reload-button"
+          >
+            Refresh
+          </button>
+        </div>
       </header>
 
       {/* Date Range Filter */}

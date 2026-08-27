@@ -9,6 +9,8 @@
 import { useState } from 'react'
 
 import { usePlatformWideStats } from '../hooks/usePlatformWideStats'
+import { ExportButton } from '../components/analytics/ExportButton'
+import { getAnalyticsExportUrl } from '../api/analytics'
 import type { DateRange, DateRangePreset } from '../types/analytics'
 
 /**
@@ -83,14 +85,36 @@ export default function SuperAdminDashboardPage() {
     >
       <header className="super-admin-dashboard__header">
         <h1 id="super-admin-dashboard-heading">Platform-Wide Stats Dashboard</h1>
-        <button
-          type="button"
-          onClick={() => void reload()}
-          disabled={loading}
-          data-testid="reload-button"
-        >
-          Refresh
-        </button>
+        <div className="header-actions">
+          <ExportButton
+            endpoint={getAnalyticsExportUrl('platform-stats', 'csv', {
+              start_date: dateRange.startDate ? new Date(dateRange.startDate).toISOString() : undefined,
+              end_date: dateRange.endDate ? new Date(dateRange.endDate).toISOString() : undefined,
+            })}
+            format="csv"
+            label="Export Stats (CSV)"
+            className="export-button-platform-stats"
+            data-testid="export-platform-stats-csv"
+          />
+          <ExportButton
+            endpoint={getAnalyticsExportUrl('platform-stats', 'xlsx', {
+              start_date: dateRange.startDate ? new Date(dateRange.startDate).toISOString() : undefined,
+              end_date: dateRange.endDate ? new Date(dateRange.endDate).toISOString() : undefined,
+            })}
+            format="xlsx"
+            label="Export Stats (Excel)"
+            className="export-button-platform-stats-xlsx"
+            data-testid="export-platform-stats-xlsx"
+          />
+          <button
+            type="button"
+            onClick={() => void reload()}
+            disabled={loading}
+            data-testid="reload-button"
+          >
+            Refresh
+          </button>
+        </div>
       </header>
 
       {/* Date Range Filter */}
