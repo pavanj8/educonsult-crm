@@ -1,12 +1,22 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { initI18n } from '../i18n'
 import { AuthProvider } from '../store/authStore'
 import { BrandingProvider } from '../store/brandingStore'
+import { I18nProvider } from '../store/i18nStore'
 import { AppRoutes } from './index'
 import { REGISTER_PATH } from './paths'
 import { LOGIN_PATH } from './ProtectedRoute'
+
+// These routes render pages that call useTranslation(). In the app, App.tsx
+// wraps everything in <I18nProvider>, which initialises i18next on mount; here
+// the routes are mounted without it, so initialise once up front -- otherwise
+// every assertion matches against raw keys like "login.title".
+beforeAll(() => {
+  initI18n('en')
+})
 
 const mockUser = {
   id: 1,
@@ -68,14 +78,16 @@ function LocationStateProbe() {
 
 function renderAppAt(path: string) {
   return render(
-    <AuthProvider>
-      <BrandingProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <LocationStateProbe />
-          <AppRoutes />
-        </MemoryRouter>
-      </BrandingProvider>
-    </AuthProvider>,
+    <I18nProvider>
+      <AuthProvider>
+        <BrandingProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <LocationStateProbe />
+            <AppRoutes />
+          </MemoryRouter>
+        </BrandingProvider>
+      </AuthProvider>
+    </I18nProvider>,
   )
 }
 

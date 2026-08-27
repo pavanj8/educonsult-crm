@@ -159,7 +159,10 @@ describe('usePlanUpgrade', () => {
       open: vi.fn(),
       close: vi.fn(),
     }
-    const mockRazorpayConstructor = vi.fn().mockImplementation((options: any) => {
+    // Must be a regular function, not an arrow: the hook invokes this with
+    // `new`, and arrow functions are not constructable -- Vitest records the
+    // call but the body never runs, so nothing gets captured.
+    const mockRazorpayConstructor = vi.fn().mockImplementation(function (options: any) {
       capturedHandler = options.handler
       return mockRazorpayInstance
     })
@@ -203,7 +206,10 @@ describe('usePlanUpgrade', () => {
       open: vi.fn(),
       close: vi.fn(),
     }
-    const mockRazorpayConstructor = vi.fn().mockImplementation((options: any) => {
+    // Must be a regular function, not an arrow: the hook invokes this with
+    // `new`, and arrow functions are not constructable -- Vitest records the
+    // call but the body never runs, so nothing gets captured.
+    const mockRazorpayConstructor = vi.fn().mockImplementation(function (options: any) {
       capturedOnDismiss = options.modal?.ondismiss
       return mockRazorpayInstance
     })

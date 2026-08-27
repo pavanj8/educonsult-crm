@@ -29,5 +29,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
+    // Several suites convert a datetime-local value to a UTC timestamp and
+    // assert on the exact result, which only holds if the run's local zone is
+    // UTC. CI happens to be UTC, so without this they pass there and fail for
+    // anyone developing in another zone. Pin it so the two agree.
+    env: { TZ: 'UTC' },
   },
 })

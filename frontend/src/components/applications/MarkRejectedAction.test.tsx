@@ -26,6 +26,9 @@ describe('MarkRejectedAction', () => {
   it('blocks submit and shows a validation error when the reason is empty', async () => {
     render(<MarkRejectedAction applicationId={5} />)
     await userEvent.click(screen.getByTestId('mark-rejected-open-5'))
+    // Bypass native HTML validation to exercise our JS-side guard.
+    const form = screen.getByTestId('mark-rejected-form-5') as HTMLFormElement
+    form.noValidate = true
     await userEvent.click(screen.getByTestId('mark-rejected-submit-5'))
     expect(screen.getByTestId('mark-rejected-validation-5')).toHaveTextContent(/required/i)
     expect(markRejectedMock).not.toHaveBeenCalled()

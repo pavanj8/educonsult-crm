@@ -62,8 +62,14 @@ export default function LoanOptInAction({
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // When the prop changes (e.g., after a parent reload), sync local state
-  if (localLoanOptIn !== initialLoanOptIn) {
+  // Re-sync when the PROP changes (e.g. after a parent reload). Comparing the
+  // previous prop rather than the local value matters: right after an
+  // optimistic toggle, local and prop legitimately disagree, and comparing
+  // against the prop directly would immediately revert the optimistic update
+  // on the very next render.
+  const [prevLoanOptIn, setPrevLoanOptIn] = useState(initialLoanOptIn)
+  if (prevLoanOptIn !== initialLoanOptIn) {
+    setPrevLoanOptIn(initialLoanOptIn)
     setLocalLoanOptIn(initialLoanOptIn)
   }
 
