@@ -4,8 +4,8 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #ffffff;
-  color: #1a202c;
+  background-color: var(--surface);
+  color: var(--color-neutral-900);
 }
 
 /* Hero Section */
@@ -14,18 +14,25 @@
   flex-direction: column;
   align-items: center;
   padding: 4rem 1.5rem 3rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-800) 55%, var(--color-primary-950) 100%);
   color: white;
   text-align: center;
   gap: 2rem;
 }
 
-@media (min-width: 768px) {
+/* Side-by-side only once there is genuinely room for both columns. At 768px
+ * the headline's min-content width consumed the row and collapsed
+ * .hero-visual to its 2px borders -- a 4px sliver down the page. */
+@media (min-width: 64rem) {
   .hero {
     flex-direction: row;
     text-align: left;
     padding: 5rem 3rem;
     gap: 4rem;
+  }
+
+  .hero-visual {
+    min-width: 20rem;
   }
 }
 
@@ -77,6 +84,12 @@
   justify-content: center;
   align-items: center;
   min-height: 300px;
+  /* .hero centres its children, so in the stacked (column) layout this box
+   * shrink-wraps its content. That left .dashboard-preview resolving its
+   * `width: 100%` against a shrink-to-fit parent and collapsing to its 2px
+   * borders. An explicit width gives that percentage something to resolve
+   * against in both directions. */
+  width: 100%;
 }
 
 .dashboard-preview {
@@ -116,7 +129,7 @@
 /* Features Section */
 .features {
   padding: 5rem 1.5rem;
-  background-color: #f7fafc;
+  background-color: var(--surface-sunken);
 }
 
 .container {
@@ -130,7 +143,7 @@
   font-weight: 700;
   text-align: center;
   margin: 0 0 0.75rem 0;
-  color: #2d3748;
+  color: var(--text);
 }
 
 @media (min-width: 768px) {
@@ -143,7 +156,7 @@
   font-size: 1.125rem;
   text-align: center;
   margin: 0 0 3rem 0;
-  color: #718096;
+  color: var(--text-muted);
   max-width: 700px;
   margin-left: auto;
   margin-right: auto;
@@ -171,20 +184,20 @@
   background: white;
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-neutral-200);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .feature-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
-  border-color: #cbd5e0;
+  border-color: var(--color-neutral-300);
 }
 
 .feature-icon {
   width: 48px;
   height: 48px;
-  color: #667eea;
+  color: var(--color-primary-600);
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
@@ -200,20 +213,20 @@
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 0.75rem 0;
-  color: #2d3748;
+  color: var(--text);
 }
 
 .feature-description {
   font-size: 1rem;
   line-height: 1.6;
   margin: 0;
-  color: #718096;
+  color: var(--text-muted);
 }
 
 /* CTA Section */
 .cta-section {
   padding: 5rem 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-800) 55%, var(--color-primary-950) 100%);
   color: white;
   text-align: center;
 }
@@ -276,20 +289,20 @@
 }
 
 .btn-primary {
-  background-color: #ffffff;
-  color: #667eea;
+  background-color: var(--surface);
+  color: var(--color-primary-600);
 }
 
 .btn-primary:hover {
-  background-color: #f7fafc;
+  background-color: var(--surface-sunken);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .btn-secondary {
   background-color: transparent;
-  color: #ffffff;
-  border-color: #ffffff;
+  color: var(--surface);
+  border-color: var(--surface);
 }
 
 .btn-secondary:hover {
@@ -299,20 +312,20 @@
 
 .btn-outline {
   background-color: transparent;
-  color: #667eea;
-  border-color: #667eea;
+  color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
 }
 
 .btn-outline:hover {
-  background-color: #667eea;
-  color: #ffffff;
+  background-color: var(--color-primary-600);
+  color: var(--surface);
   transform: translateY(-1px);
 }
 
 /* Footer */
 .landing-footer {
   padding: 2rem 1.5rem;
-  background-color: #2d3748;
+  background-color: var(--text);
   color: white;
   margin-top: auto;
 }

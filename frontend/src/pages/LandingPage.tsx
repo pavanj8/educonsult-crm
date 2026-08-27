@@ -255,7 +255,10 @@ export default function LandingPage() {
             <Link to={REGISTER_PATH} className={`${styles.btn} ${styles['btn-primary']} ${styles['btn-large']}`}>
               {t('landing.cta.primary', 'Get Started Free')}
             </Link>
-            <Link to={LOGIN_PATH} className={`${styles.btn} ${styles['btn-outline']} ${styles['btn-large']}`}>
+            {/* btn-outline is the indigo-on-white variant; this section sits on
+                the indigo gradient, so it needs the light-on-dark treatment the
+                hero already uses. */}
+            <Link to={LOGIN_PATH} className={`${styles.btn} ${styles['btn-secondary']} ${styles['btn-large']}`}>
               {t('landing.cta.secondary', 'Request Demo')}
             </Link>
           </div>
